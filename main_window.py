@@ -10,6 +10,7 @@ from PyQt6.QtGui import *
 
 from back_test_worker import BacktestWorker
 from strategy_config_widget import StrategyConfigWidget
+from mock_data_provider import MockDataProvider  # Assuming this is defined in mock_data_provider.py
 
 # Set up logging
 logging.basicConfig(
@@ -253,7 +254,7 @@ class MainWindow(QMainWindow):
             return
         
         # Create data provider
-        self.data_provider = PolygonDataProvider(api_key)
+        self.data_provider = MockDataProvider()#♦PolygonDataProvider(api_key)
         
         # Disable buttons
         self.run_backtest_btn.setEnabled(False)

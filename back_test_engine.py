@@ -14,6 +14,7 @@ import aiohttp
 from collections import defaultdict
 import pickle
 import gzip
+from mock_data_provider import MockDataProvider
 
 # Set up logging
 logging.basicConfig(
@@ -32,7 +33,7 @@ from trade import Trade
 class BacktestEngine:
     """Complete backtesting engine implementation"""
     
-    def __init__(self, data_provider: PolygonDataProvider):
+    def __init__(self, data_provider: MockDataProvider):
         self.data_provider = data_provider
         self.trades: List[Trade] = []
         self.daily_pnl: Dict[datetime, float] = {}
@@ -118,6 +119,10 @@ class BacktestEngine:
         # Check for entry signals throughout the day
         market_open = time(9, 30)
         market_close = time(16, 0)
+        if isinstance(date, datetime):
+           dt = date
+        else:
+           dt = datetime.combine(date, datetime.min.time())
         
         for i in range(len(spx_data)):
             current_time = spx_data.iloc[i]['timestamp'].time()
@@ -136,7 +141,7 @@ class BacktestEngine:
                 
                 if strikes:
                     # Get option quotes
-                    expiration = date.replace(hour=16, minute=0, second=0)
+                    expiration = dt.replace(hour=16, minute=0, second=0)
                     contracts = self._create_option_contracts(strikes, expiration)
                     
                     # Create trade
@@ -332,7 +337,11 @@ class BacktestEngine:
         
         # Use official close price
         settlement_price = spx_data.iloc[-1]['close']
-        exit_time = date.replace(hour=16, minute=0, second=0)
+        if isinstance(date, datetime):
+           dt = date
+        else:
+           dt = datetime.combine(date, datetime.min.time())
+        exit_time = dt.replace(hour=16, minute=0, second=0)
         
         # Calculate settlement values for each option
         exit_prices = {}
