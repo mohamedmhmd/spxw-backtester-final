@@ -109,8 +109,8 @@ class BacktestEngine:
         trades = []
         
         # Get market data
-        spx_data = await self.data_provider.get_spx_data(date, "5min")
-        spy_data = await self.data_provider.get_spy_volume_data(date)
+        spx_data = await self.data_provider.get_spx_data(date, config.data_granularity)
+        spy_data = await self.data_provider.get_spy_volume_data(date, config.data_granularity)
         
         if spx_data.empty or spy_data.empty:
             logger.warning(f"No data available for {date}")

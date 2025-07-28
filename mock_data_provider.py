@@ -50,20 +50,23 @@ class MockDataProvider:
         """
         Generate synthetic SPX price OHLCV data.
         """
-        cache_key = f"spx_{date.strftime('%Y%m%d')}_{granularity}"
-        cached_data = self._load_from_cache(cache_key)
-        if cached_data is not None:
-            return cached_data
+        #cache_key = f"spx_{date.strftime('%Y%m%d')}_{granularity}"
+        #cached_data = self._load_from_cache(cache_key)
+        #if cached_data is not None:
+            #return cached_data
 
-        np.random.seed(hash(date.strftime('%Y%m%d')) % 2**32)  # Same data per day
+        #np.random.seed(hash(date.strftime('%Y%m%d')) % 2**32)  # Same data per day
 
         # Set up trading times
-        if granularity in ["minute", "1m"]:
+        if granularity == "tick":
+            freq = "1s"
+        elif granularity in ["minute", "1m"]:
             freq = "1min"
         elif granularity in ["5min", "5minute"]:
             freq = "5min"
         else:
             freq = "1min"
+        
         
         if isinstance(date, datetime):
            dt = date
@@ -95,19 +98,27 @@ class MockDataProvider:
             "close": close,
             "volume": volume
         })
-        self._save_to_cache(cache_key, df)
+        #self._save_to_cache(cache_key, df)
         return df
 
-    async def get_spy_volume_data(self, date: datetime) -> pd.DataFrame:
+    async def get_spy_volume_data(self, date: datetime, granularity: str = "minute") -> pd.DataFrame:
         """
         Generate synthetic SPY volume bars for the day (only 'timestamp' and 'volume').
         """
-        cache_key = f"spy_{date.strftime('%Y%m%d')}_5min"
-        cached_data = self._load_from_cache(cache_key)
-        if cached_data is not None:
-            return cached_data
+        #cache_key = f"spy_{date.strftime('%Y%m%d')}_5min"
+        #cached_data = self._load_from_cache(cache_key)
+        #if cached_data is not None:
+            #return cached_data
 
-        freq = "5min"
+        # Set up trading times
+        if granularity == "tick":
+            freq = "1s"
+        elif granularity in ["minute", "1m"]:
+            freq = "1min"
+        elif granularity in ["5min", "5minute"]:
+            freq = "5min"
+        else:
+            freq = "1min"
         if isinstance(date, datetime):
            dt = date
         else:
@@ -122,17 +133,17 @@ class MockDataProvider:
         volume[0] *= 2
         volume[-1] *= 1.5
         df = pd.DataFrame({"timestamp": times, "volume": volume})
-        self._save_to_cache(cache_key, df)
+        #self._save_to_cache(cache_key, df)
         return df
 
-    async def get_option_chain(self, date: datetime, expiration: datetime, underlying: str = "SPX") -> pd.DataFrame:
+    async def get_option_chain(self, date: datetime, expiration: datetime, underlying: str = "SPX", granularity: str = "minute") -> pd.DataFrame:
         """
         Generate a synthetic option chain for a given expiry.
         """
-        cache_key = f"options_{date.strftime('%Y%m%d')}_{expiration.strftime('%Y%m%d')}"
-        cached_data = self._load_from_cache(cache_key)
-        if cached_data is not None:
-            return cached_data
+        #cache_key = f"options_{date.strftime('%Y%m%d')}_{expiration.strftime('%Y%m%d')}"
+        #cached_data = self._load_from_cache(cache_key)
+        #if cached_data is not None:
+            #return cached_data
 
         # Get SPX close price for that day (ATM center)
         spx_df = await self.get_spx_data(date, "minute")
@@ -182,7 +193,7 @@ class MockDataProvider:
                 })
 
         df = pd.DataFrame(options)
-        self._save_to_cache(cache_key, df)
+        #self._save_to_cache(cache_key, df)
         return df
 
     async def get_option_quotes(self, contracts: List[str], timestamp: datetime) -> Dict[str, Dict]:
@@ -195,10 +206,11 @@ class MockDataProvider:
             # Parse contract symbol for K and C/P
             try:
                 parts = c.split(':')[-1]
-                underlying, rest = parts[:3], parts[3:]
-                expiry = rest[:6]
-                cp = rest[6]
-                strike = int(rest[7:]) / 1000
+                underlying = parts[:3]
+                rest = parts[3:]
+                expiry = rest[1:7]
+                cp = rest[7]
+                strike = int(rest[8:]) / 1000
                 bid = max(0.01, round(np.random.uniform(8, 55), 2))
                 ask = bid + np.random.uniform(1, 3)
                 last = np.random.uniform(bid, ask)
