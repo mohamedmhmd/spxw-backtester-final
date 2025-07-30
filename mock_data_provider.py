@@ -138,7 +138,7 @@ class MockDataProvider:
         
         # Set up trading times
         freq_map = {
-            "tick": "1S",
+            "tick": "1s",
             "minute": "1min",
             "1min": "1min", 
             "5min": "5min",
