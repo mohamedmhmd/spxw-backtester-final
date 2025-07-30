@@ -137,7 +137,9 @@ class BacktestEngine:
             if signals['entry_signal']:
                 # Find option strikes
                 current_price = spx_data.iloc[i]['close']
-                strikes = self._find_iron_condor_strikes(current_price, strategy)
+                option_chain = await self.data_provider.get_option_chain(date, date, 
+                              "SPX", config.data_granularity)
+                strikes = self._find_iron_condor_strikes(current_price, option_chain, strategy)
                 
                 if strikes:
                     # Get option quotes
@@ -236,24 +238,89 @@ class BacktestEngine:
         
         return signals
     
-    def _find_iron_condor_strikes(self, current_price: float, 
-                                 strategy: StrategyConfig) -> Optional[Dict[str, float]]:
-        """Find strikes for Iron Condor with target win/loss ratio"""
-        # Round to nearest 5
-        atm_strike = round(current_price / 5) * 5
-        
-        # For 1.5:1 win/loss ratio, we need specific strike distances
-        # This is simplified - in reality would use option pricing models
-        strike_distance = 25  # Start with 25 points
-        
-        strikes = {
-            'short_call': atm_strike,
-            'short_put': atm_strike,
-            'long_call': atm_strike + strike_distance,
-            'long_put': atm_strike - strike_distance
-        }
-        
-        return strikes
+    def _find_iron_condor_strikes(
+        self,
+        current_price: float,
+        option_chain: pd.DataFrame,
+        strategy: "StrategyConfig"
+    ) -> Optional[Dict[str, float]]:
+        """
+        Find Iron Condor strikes for a target win/loss ratio using option prices
+        from the provided mock option_chain DataFrame.
+
+        Args:
+            current_price (float): The current underlying price.
+            option_chain (pd.DataFrame): DataFrame with columns ['strike', 'type', 'bid', 'ask'].
+            strategy (StrategyConfig): Strategy configuration object.
+
+        Returns:
+            Optional[Dict[str, float]]: Dict of strike prices for each leg, or None if not possible.
+        """
+        # Round ATM to nearest 5
+        atm_strike = int(round(current_price / 5) * 5)
+        available_strikes = sorted(option_chain['strike'].unique())
+
+        # Configurable search window
+        min_wing = getattr(strategy, 'min_wing', 15)
+        max_wing = getattr(strategy, 'max_wing', 70)
+        step = 5
+
+        target_ratio = getattr(strategy, 'win_loss_ratio', 1.5)
+        best_combo = None
+        best_diff = float('inf')
+
+        for d in range(min_wing, max_wing+1, step):
+            sc = atm_strike
+            lc = atm_strike + d
+            sp = atm_strike
+            lp = atm_strike - d
+            # All strikes must exist
+            if not all(s in available_strikes for s in [lc, sc, sp, lp]):
+                continue
+
+            # Helper to get mid quote
+            def get_mid(cp, strike):
+                row = option_chain[(option_chain['strike']==strike) & (option_chain['type']==cp)]
+                if not row.empty:
+                    bid, ask = row.iloc[0]['bid'], row.iloc[0]['ask']
+                    return (bid + ask) / 2
+                return None
+
+            sc_mid = get_mid('C', sc)
+            lc_mid = get_mid('C', lc)
+            sp_mid = get_mid('P', sp)
+            lp_mid = get_mid('P', lp)
+            if None in [sc_mid, lc_mid, sp_mid, lp_mid]:
+                continue
+
+            # Short at bid (sell), long at ask (buy)
+            net_credit = sc_mid + sp_mid - lc_mid - lp_mid
+            max_loss = d - net_credit
+
+            # Avoid division by zero/bad combos
+            if net_credit <= 0 or max_loss <= 0:
+                continue
+
+            ratio = net_credit / max_loss
+            diff = abs(ratio - target_ratio)
+            if diff < best_diff:
+                best_diff = diff
+                best_combo = {
+                    'short_call': sc,
+                    'long_call': lc,
+                    'short_put': sp,
+                    'long_put': lp,
+                    'net_credit': net_credit,
+                    'max_loss': max_loss,
+                    'ratio': ratio,
+                    'distance': d
+                }
+        if best_combo:
+            # Optionally log diagnostics
+            print(f"Selected Iron Condor: {best_combo}")
+            return {k: best_combo[k] for k in ['short_call', 'long_call', 'short_put', 'long_put']}
+        return None
+
     
     def _create_option_contracts(self, strikes: Dict[str, float], 
                                expiration: datetime) -> Dict[str, str]:
