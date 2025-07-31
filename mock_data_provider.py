@@ -255,8 +255,8 @@ class MockDataProvider:
         regime = self._get_market_regime(date)
         
         # Set up times
-        freq_map = {"5min": "5T", "5minute": "5T", "minute": "1T", "1min": "1T"}
-        freq = freq_map.get(granularity, "5T")
+        freq_map = {"5min": "5min", "5minute": "5min", "minute": "1min", "1min": "1min"}
+        freq = freq_map.get(granularity, "5min")
         
         if isinstance(date, datetime):
             dt = date

@@ -163,9 +163,23 @@ class BacktestEngine:
         
         return trades
     
-    def _check_entry_signals(self, spx_data: pd.DataFrame, spy_data: pd.DataFrame, 
-                            current_idx: int, strategy: StrategyConfig) -> Dict[str, Any]:
-        """Check if entry conditions are met"""
+    def _check_entry_signals(
+        self, 
+        spx_data: pd.DataFrame, 
+        spy_data: pd.DataFrame, 
+        current_idx: int, 
+        strategy: 'StrategyConfig',
+        bar_interval: str = "5T"
+    ) -> Dict[str, Any]:
+        """
+        Check if entry conditions are met, always using 5-minute bars even if
+        source data is tick/second/minute level.
+
+        Returns a dictionary with signal booleans and details.
+        """
+        import numpy as np
+
+        # Initialize signal dictionary
         signals = {
             'entry_signal': False,
             'volume_condition': False,
@@ -173,70 +187,224 @@ class BacktestEngine:
             'range_condition': False,
             'details': {}
         }
-        
-        # Need enough history
-        if current_idx < max(strategy.consecutive_candles, strategy.lookback_candles, 
-                           strategy.avg_range_candles):
+
+        # --- Step 1: Ensure 5-min bars ---
+        def _ensure_5min(df, ohlc_cols=None):
+            """
+            Resample the input DataFrame to 5-minute bars.
+            If ohlc_cols is provided, aggregate OHLCV; otherwise, just volume.
+            """
+            df = df.copy()
+            if not pd.infer_freq(df['timestamp']):
+                df = df.set_index('timestamp')
+            if ohlc_cols:  # For SPX (OHLCV)
+                return df.resample(bar_interval).agg({
+                    'open': 'first',
+                    'high': 'max',
+                    'low': 'min',
+                    'close': 'last',
+                    'volume': 'sum'
+                }).dropna().reset_index()
+            else:          # For SPY (volume only)
+                return df.resample(bar_interval).agg({'volume': 'sum'}).dropna().reset_index()
+
+        # Convert SPX and SPY data to 5-minute bars if needed
+        if 'open' in spx_data.columns and 'high' in spx_data.columns and 'low' in spx_data.columns and 'close' in spx_data.columns:
+            spx_bars = _ensure_5min(spx_data, ohlc_cols=True)
+        else:
+            raise ValueError("SPX data missing OHLC columns")
+        if 'volume' in spy_data.columns:
+            spy_bars = _ensure_5min(spy_data)
+        else:
+            raise ValueError("SPY data missing volume column")
+
+        # Remap current_idx to new bars (if originally called from tick index)
+        # If not enough bars, return default signals
+        if len(spx_bars) <= max(
+            strategy.consecutive_candles,
+            strategy.lookback_candles,
+            strategy.avg_range_candles
+        ):
             return signals
-        
-        # Condition 1: Volume check
-        if not spy_data.empty:
-            first_candle_volume = spy_data.iloc[0]['volume']
+        # Always use most recent bar for signal calculation
+        idx = len(spx_bars) - 1
+
+        # --- Volume Condition ---
+        # Check if the last N consecutive SPY 5-min bars have volume below threshold
+        if not spy_bars.empty:
+            first_candle_volume = spy_bars.iloc[0]['volume']
             volume_threshold = first_candle_volume * strategy.volume_threshold
-            
             volume_ok = True
             for j in range(strategy.consecutive_candles):
-                idx = current_idx - strategy.consecutive_candles + j + 1
-                current_volume = spy_data.iloc[idx]['volume'] if idx < len(spy_data) else 0
+                k = idx - strategy.consecutive_candles + j + 1
+                current_volume = spy_bars.iloc[k]['volume'] if k < len(spy_bars) else 0
                 if current_volume > volume_threshold:
                     volume_ok = False
                     break
-            
             signals['volume_condition'] = volume_ok
-        
-        # Condition 2: Direction check
+
+        # --- Direction Condition ---
+        # Check if all last N bars are not the same direction (not all up or all down)
         directions = []
         for j in range(strategy.lookback_candles):
-            idx = current_idx - strategy.lookback_candles + j + 1
-            if idx >= 0 and idx < len(spx_data):
-                close = spx_data.iloc[idx]['close']
-                open_price = spx_data.iloc[idx]['open']
+            k = idx - strategy.lookback_candles + j + 1
+            if k >= 0 and k < len(spx_bars):
+                close = spx_bars.iloc[k]['close']
+                open_price = spx_bars.iloc[k]['open']
                 directions.append(1 if close > open_price else -1)
-        
         if directions:
             all_same = all(d == directions[0] for d in directions)
             signals['direction_condition'] = not all_same
-        
-        # Condition 3: Range check
+
+        # --- Range Condition ---
+        # Check if the average range of recent bars is below a threshold
         recent_ranges = []
         for j in range(strategy.avg_range_candles):
-            idx = current_idx - strategy.avg_range_candles + j + 1
-            if idx >= 0 and idx < len(spx_data):
-                high = spx_data.iloc[idx]['high']
-                low = spx_data.iloc[idx]['low']
+            k = idx - strategy.avg_range_candles + j + 1
+            if k >= 0 and k < len(spx_bars):
+                high = spx_bars.iloc[k]['high']
+                low = spx_bars.iloc[k]['low']
                 recent_ranges.append(high - low)
-        
         if recent_ranges:
             avg_recent_range = np.mean(recent_ranges)
-            
-            # Calculate average range for the day
-            all_ranges = []
-            for j in range(len(spx_data[:current_idx+1])):
-                high = spx_data.iloc[j]['high']
-                low = spx_data.iloc[j]['low']
-                all_ranges.append(high - low)
-            
+            all_ranges = [spx_bars.iloc[m]['high'] - spx_bars.iloc[m]['low'] for m in range(idx+1)]
             if all_ranges:
                 avg_day_range = np.mean(all_ranges)
                 range_threshold = avg_day_range * strategy.range_threshold
                 signals['range_condition'] = avg_recent_range < range_threshold
-        
-        # All conditions must be met
-        signals['entry_signal'] = (signals['volume_condition'] and 
-                                 signals['direction_condition'] and 
-                                 signals['range_condition'])
-        
+
+        # --- Final signal ---
+        # Entry signal is True only if all conditions are met
+        signals['entry_signal'] = (
+            signals['volume_condition'] and
+            signals['direction_condition'] and
+            signals['range_condition']
+        )
         return signals
+
+    def _check_entry_signals(
+        self, 
+        spx_data: pd.DataFrame, 
+        spy_data: pd.DataFrame, 
+        current_idx: int, 
+        strategy: 'StrategyConfig',
+        bar_interval: str = "5min"
+    ) -> Dict[str, Any]:
+        """
+        Check if entry conditions are met, always using 5-minute bars even if
+        source data is tick/second/minute level.
+
+        Returns a dictionary with signal booleans and details.
+        """
+        signals = {
+            'entry_signal': False,
+            'volume_condition': False,
+            'direction_condition': False,
+            'range_condition': False,
+            'details': {}
+        }
+
+        # --- Step 1: Ensure 5-min bars ---
+        def _ensure_5min(df : pd.DataFrame, ohlc_cols=None):
+            df = df.copy()
+            if not isinstance(df.index, pd.DatetimeIndex):
+                 df = df.set_index('timestamp')
+            if ohlc_cols:  # For SPX
+                return df.resample(bar_interval).agg({
+                    'open': 'first',
+                    'high': 'max',
+                    'low': 'min',
+                    'close': 'last',
+                    'volume': 'sum'
+                }).dropna().reset_index()
+            else:          # For SPY (volume only)
+                return df.resample(bar_interval).agg({'volume': 'sum'}).dropna().reset_index()
+
+        # Convert to 5min bars if needed
+        if 'open' in spx_data.columns and 'high' in spx_data.columns and 'low' in spx_data.columns and 'close' in spx_data.columns:
+            spx_bars = _ensure_5min(spx_data, ohlc_cols=True)
+        else:
+            raise ValueError("SPX data missing OHLC columns")
+        if 'volume' in spy_data.columns:
+            spy_bars = _ensure_5min(spy_data)
+        else:
+            raise ValueError("SPY data missing volume column")
+
+        # Remap current_idx to new bars (if originally called from tick index)
+        if len(spx_bars) <= max(
+            strategy.consecutive_candles,
+            strategy.lookback_candles,
+            strategy.avg_range_candles
+        ):
+            return signals
+        # Always use most recent bar
+        idx = len(spx_bars) - 1
+
+        # --- Volume Condition ---
+        if not spy_bars.empty:
+            first_candle_volume = spy_bars.iloc[0]['volume']
+            volume_threshold = first_candle_volume * strategy.volume_threshold
+            volume_ok = True
+            for j in range(strategy.consecutive_candles):
+                k = idx - strategy.consecutive_candles + j + 1
+                current_volume = spy_bars.iloc[k]['volume'] if k < len(spy_bars) else 0
+                if current_volume > volume_threshold:
+                    volume_ok = False
+                    break
+            signals['volume_condition'] = volume_ok
+
+        # --- Direction Condition ---
+        directions = []
+        for j in range(strategy.lookback_candles):
+            k = idx - strategy.lookback_candles + j + 1
+            if k >= 0 and k < len(spx_bars):
+                close = spx_bars.iloc[k]['close']
+                open_price = spx_bars.iloc[k]['open']
+                directions.append(1 if close > open_price else -1)
+        if directions:
+            all_same = all(d == directions[0] for d in directions)
+            signals['direction_condition'] = not all_same
+
+        # --- Range Condition ---
+        recent_ranges = []
+        for j in range(strategy.avg_range_candles):
+            k = idx - strategy.avg_range_candles + j + 1
+            if k >= 0 and k < len(spx_bars):
+                high = spx_bars.iloc[k]['high']
+                low = spx_bars.iloc[k]['low']
+                recent_ranges.append(high - low)
+        if recent_ranges:
+            avg_recent_range = np.mean(recent_ranges)
+            all_ranges = [spx_bars.iloc[m]['high'] - spx_bars.iloc[m]['low'] for m in range(idx+1)]
+            if all_ranges:
+                avg_day_range = np.mean(all_ranges)
+                range_threshold = avg_day_range * strategy.range_threshold
+                signals['range_condition'] = avg_recent_range < range_threshold
+
+        # --- Final signal ---
+        signals['entry_signal'] = (
+            signals['volume_condition'] and
+            signals['direction_condition'] and
+            signals['range_condition']
+        )
+        return signals
+
+
+
+    
+    def _create_option_contracts(self, strikes: Dict[str, float], 
+                               expiration: datetime) -> Dict[str, str]:
+        """Create option contract symbols"""
+        exp_str = expiration.strftime('%y%m%d')
+        
+        contracts = {
+            'short_call': f"O:SPXW{exp_str}C{int(strikes['short_call']):08d}",
+            'short_put': f"O:SPXW{exp_str}P{int(strikes['short_put']):08d}",
+            'long_call': f"O:SPXW{exp_str}C{int(strikes['long_call']):08d}",
+            'long_put': f"O:SPXW{exp_str}P{int(strikes['long_put']):08d}"
+        }
+        
+        return contracts
     
     def _find_iron_condor_strikes(
         self,
@@ -320,21 +488,6 @@ class BacktestEngine:
             print(f"Selected Iron Condor: {best_combo}")
             return {k: best_combo[k] for k in ['short_call', 'long_call', 'short_put', 'long_put']}
         return None
-
-    
-    def _create_option_contracts(self, strikes: Dict[str, float], 
-                               expiration: datetime) -> Dict[str, str]:
-        """Create option contract symbols"""
-        exp_str = expiration.strftime('%y%m%d')
-        
-        contracts = {
-            'short_call': f"O:SPXW{exp_str}C{int(strikes['short_call']):08d}",
-            'short_put': f"O:SPXW{exp_str}P{int(strikes['short_put']):08d}",
-            'long_call': f"O:SPXW{exp_str}C{int(strikes['long_call']):08d}",
-            'long_put': f"O:SPXW{exp_str}P{int(strikes['long_put']):08d}"
-        }
-        
-        return contracts
     
     async def _execute_iron_condor(self, date: datetime, entry_time: datetime,
                                   contracts: Dict[str, str], strategy: StrategyConfig,
