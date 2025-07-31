@@ -268,12 +268,6 @@ class MockDataProvider:
         times = pd.date_range(market_open, market_close, freq=freq)
         n_periods = len(times)
         
-        # Minutes from open for pattern
-        if freq == "5T":
-            minutes_from_open = np.arange(0, 390, 5)[:n_periods]
-        else:
-            minutes_from_open = np.arange(0, 390)[:n_periods]
-        
         
         # Apply volume pattern
         # This block ensures your volume_pattern matches your bar count!
@@ -296,8 +290,6 @@ class MockDataProvider:
            
         volume_pattern = pattern
 
-        #volume_pattern = self.intraday_patterns['volume'][minutes_from_open]
-        
         # Base volume calculation
         base_volume = self.spy_base_volume / n_periods
         
