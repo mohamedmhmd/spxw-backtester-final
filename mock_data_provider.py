@@ -365,17 +365,17 @@ class MockDataProvider:
         
         # Dense strikes near ATM
         for i in range(-10, 11):
-            strikes.append(atm_strike + i * 5)
+            strikes.append(atm_strike + i )
         
         # Wider strikes further out
         for i in range(11, 21):
-            strikes.append(atm_strike + i * 10)
-            strikes.append(atm_strike - i * 10)
+            strikes.append(atm_strike + i )
+            strikes.append(atm_strike - i )
             
         # Far OTM strikes
         for i in range(3, 8):
-            strikes.append(atm_strike + 200 + i * 25)
-            strikes.append(atm_strike - 200 - i * 25)
+            strikes.append(atm_strike  + i)
+            strikes.append(atm_strike  - i)
         
         strikes = sorted([s for s in set(strikes) if s > 0])
         
@@ -516,7 +516,7 @@ class MockDataProvider:
                 if parts.startswith('SPXW'):
                     expiry_str = parts[4:10]
                     cp = parts[10]
-                    strike = int(parts[11:]) / 1000
+                    strike = int(parts[11:]) 
                 else:
                     # Handle alternative format
                     raise ValueError("Unknown contract format")
