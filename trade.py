@@ -15,6 +15,7 @@ class Trade:
     exit_signals: Optional[Dict[str, Any]] = None
     pnl: float = 0.0
     status: str = "OPEN"  # OPEN, CLOSED
+    metadata: Optional[Dict[str, Any]] = None
     
     def calculate_pnl(self, exit_prices: Dict[str, float], commission_per_contract: float):
         """Calculate P&L for the trade"""
