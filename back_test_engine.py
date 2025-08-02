@@ -131,7 +131,7 @@ class BacktestEngine:
     
     async def _run_daily_strategy(self, date: datetime, config: BacktestConfig, 
                                   strategy: StrategyConfig) -> List[Trade]:
-        """Run strategy for a single day with both Iron Condor and Straddle"""
+        """Run strategy for a single day with both Iron Condor and Straddle - allows multiple entries per day"""
         trades = []
         self.open_straddles = []  # Reset for new day
         
@@ -171,8 +171,8 @@ class BacktestEngine:
             logger.warning(f"Insufficient bars for {date}: {len(merged_data)} < {min_bars_needed}")
             return trades
         
-        # Track if we've entered trades today
-        iron_condor_entered = False
+        # Track active Iron Condor trades for the day
+        active_iron_condors = []
         
         # Check for entry signals and manage trades throughout the day
         for i in range(min_bars_needed, len(merged_data)):
@@ -186,95 +186,95 @@ class BacktestEngine:
             # Check for Straddle exit conditions first
             await self._check_straddle_exits(current_price, current_bar_time, config)
             
+            # Check entry conditions for new Iron Condor trades
+            signals = self._check_entry_signals_5min(merged_data, i, strategy)
             
-            # Check entry conditions if we haven't entered yet
-            if not iron_condor_entered:
-                signals = self._check_entry_signals_5min(merged_data, i, strategy)
+            if signals['entry_signal']:
+                # Prepare for option trades
+                if isinstance(date, datetime):
+                    option_date = date
+                else:
+                    option_date = datetime.combine(date, datetime.min.time())
                 
-                if signals['entry_signal']:
-                    # Prepare for option trades
-                    if isinstance(date, datetime):
-                        option_date = date
-                    else:
-                        option_date = datetime.combine(date, datetime.min.time())
+                # Get option chain
+                option_chain = await self.data_provider.get_option_chain(
+                    option_date, 
+                    option_date,  # 0DTE
+                    "SPX",
+                    config.data_granularity
+                )
+                
+                if option_chain.empty:
+                    logger.warning(f"No option chain data at {current_bar_time}")
+                    continue
+                
+                # Find Iron Condor strikes
+                ic_result = self._find_iron_condor_strikes(current_price, option_chain, strategy)
+                
+                if ic_result:
+                    ic_strikes = {
+                        'short_call': ic_result['short_call'],
+                        'short_put': ic_result['short_put'],
+                        'long_call': ic_result['long_call'],
+                        'long_put': ic_result['long_put']
+                    }
                     
-                    # Get option chain
-                    option_chain = await self.data_provider.get_option_chain(
-                        option_date, 
-                        option_date,  # 0DTE
-                        "SPX",
-                        config.data_granularity
+                    # Create option contracts for Iron Condor
+                    ic_contracts = self._create_option_contracts(ic_strikes, option_date)
+                    
+                    # Get quotes and calculate net credit BEFORE executing
+                    ic_quotes = await self.data_provider.get_option_quotes(
+                        list(ic_contracts.values()), current_bar_time
                     )
                     
-                    if option_chain.empty:
-                        logger.warning(f"No option chain data at {current_bar_time}")
-                        continue
+                    # Calculate net credit
+                    net_credit = self._calculate_iron_condor_credit(ic_quotes, ic_contracts, config)
                     
-                    # Find Iron Condor strikes
-                    ic_result = self._find_iron_condor_strikes(current_price, option_chain, strategy)
-                    
-                    if ic_result:
-                        ic_strikes = {
-                            'short_call': ic_result['short_call'],
-                            'short_put': ic_result['short_put'],
-                            'long_call': ic_result['long_call'],
-                            'long_put': ic_result['long_put']
-                        }
-                        
-                        # Create option contracts for Iron Condor
-                        ic_contracts = self._create_option_contracts(ic_strikes, option_date)
-                        
-                        # Get quotes and calculate net credit BEFORE executing
-                        ic_quotes = await self.data_provider.get_option_quotes(
-                            list(ic_contracts.values()), current_bar_time
+                    if net_credit > 0:
+                        # Execute Iron Condor trade
+                        ic_trade = await self._execute_iron_condor(
+                            option_date,
+                            current_bar_time,
+                            ic_contracts,
+                            strategy,
+                            config,
+                            signals,
+                            net_credit
                         )
                         
-                        # Calculate net credit
-                        net_credit = self._calculate_iron_condor_credit(ic_quotes, ic_contracts, config)
-                        
-                        if net_credit > 0:
-                            # Execute Iron Condor trade
-                            ic_trade = await self._execute_iron_condor(
-                                option_date,
-                                current_bar_time,
-                                ic_contracts,
-                                strategy,
-                                config,
-                                signals,
-                                net_credit
+                        if ic_trade:
+                            trades.append(ic_trade)
+                            active_iron_condors.append(ic_trade)
+                            logger.info(f"Entered Iron Condor #{len(active_iron_condors)} at {current_bar_time}: {ic_strikes}")
+                            
+                            # Calculate Straddle strikes based on Iron Condor credit
+                            straddle_distance = net_credit * strategy.straddle_distance_multiplier
+                            straddle_strike = self._calculate_straddle_strike(
+                                current_price, straddle_distance
                             )
                             
-                            if ic_trade:
-                                trades.append(ic_trade)
-                                iron_condor_entered = True
-                                logger.info(f"Entered Iron Condor at {current_bar_time}: {ic_strikes}")
-                                
-                                # Calculate Straddle strikes based on Iron Condor credit
-                                straddle_distance = net_credit * strategy.straddle_distance_multiplier
-                                straddle_strike = self._calculate_straddle_strike(
-                                    current_price, straddle_distance
-                                )
-                                
-                                # Execute Straddle trade
-                                straddle_trade = await self._execute_straddle(
-                                    option_date,
-                                    current_bar_time,
-                                    straddle_strike,
-                                    option_chain,
-                                    strategy,
-                                    config,
-                                    ic_trade
-                                )
-                                
-                                if straddle_trade:
-                                    trades.append(straddle_trade)
-                                    self.open_straddles.append(straddle_trade)
-                                    logger.info(f"Entered Straddle at {current_bar_time}: Strike={straddle_strike}")
+                            # Execute Straddle trade
+                            straddle_trade = await self._execute_straddle(
+                                option_date,
+                                current_bar_time,
+                                straddle_strike,
+                                option_chain,
+                                strategy,
+                                config,
+                                ic_trade
+                            )
+                            
+                            if straddle_trade:
+                                trades.append(straddle_trade)
+                                self.open_straddles.append(straddle_trade)
+                                logger.info(f"Entered Straddle #{len(self.open_straddles)} at {current_bar_time}: Strike={straddle_strike}")
         
         # Close all trades at market close
         for trade in trades:
             if trade.status == "OPEN":
                 await self._close_trade_at_expiry(trade, date, config)
+        
+        logger.info(f"Day {date.strftime('%Y-%m-%d')} completed: {len([t for t in trades if t.trade_type == 'Iron Condor'])} Iron Condors, {len([t for t in trades if t.trade_type == 'Straddle'])} Straddles")
         
         return trades
     
