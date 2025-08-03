@@ -8,25 +8,25 @@ class StrategyConfig:
     trade_type: str = "Iron Condor"
     
     # Iron Condor Entry signal parameters
-    consecutive_candles: int = 3
-    volume_threshold: float = 0.5
-    lookback_candles: int = 4
-    avg_range_candles: int = 2
-    range_threshold: float = 1.5
+    consecutive_candles: int = 3  # Three consecutive 5min candles
+    volume_threshold: float = 0.5  # 50% of first candle volume
+    lookback_candles: int = 4  # Last four 5min candles for direction check
+    avg_range_candles: int = 2  # Last two 5min candles for range check
+    range_threshold: float = 0.8  # 80% of day's average range
     
     # Iron Condor Trade parameters
-    trade_size: int = 10
-    target_win_loss_ratio: float = 1.5
+    trade_size: int = 10  # 10 contracts (configurable)
+    target_win_loss_ratio: float = 1.5  # Target 1.5:1 win/loss ratio
     
     # Iron Condor strike selection parameters
-    min_wing_width: int = 10  # Minimum distance from ATM
-    max_wing_width: int = 100  # Maximum distance from ATM
+    min_wing_width: int = 15  # Minimum distance from ATM
+    max_wing_width: int = 70  # Maximum distance from ATM
     wing_width_step: int = 5   # Step size for searching
     
     # Straddle parameters
-    straddle_distance_multiplier: float = 2.5  # Multiply IC credit by this for distance
-    straddle_exit_percentage: float = 0.1  # Exit 50% of position
-    straddle_exit_multiplier: float = 1.1  # Exit when price is 2x entry
+    straddle_distance_multiplier: float = 2.5  # Multiply IC credit by 2.5 for distance
+    straddle_exit_percentage: float = 0.5  # Exit 50% of position
+    straddle_exit_multiplier: float = 2.0  # Exit when price is 2x entry
     
     def to_dict(self) -> dict:
         return {
