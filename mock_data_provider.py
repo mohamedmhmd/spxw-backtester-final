@@ -364,8 +364,8 @@ class MockDataProvider:
         strikes = []
         
         # Dense strikes near ATM
-        for i in range(-10, 11):
-            strikes.append(atm_strike + i )
+        for i in range(-4, 4):
+            strikes.append(atm_strike + i)
         
         # Wider strikes further out
         for i in range(11, 21):
@@ -373,7 +373,7 @@ class MockDataProvider:
             strikes.append(atm_strike - i )
             
         # Far OTM strikes
-        for i in range(3, 8):
+        for i in range(30, 40):
             strikes.append(atm_strike  + i)
             strikes.append(atm_strike  - i)
         
