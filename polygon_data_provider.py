@@ -96,61 +96,13 @@ class PolygonDataProvider:
             logger.error(f"Connection test failed: {e}")
             return False
 
-    async def get_spx_data(self, date: datetime, granularity: str = "minute") -> pd.DataFrame:
-        """
-        Get SPX index data for the specific date and granularity.
-        Use granularity="tick" for tick data; otherwise, use Polygon bars.
-        """
-        cache_key = f"spx_{date.strftime('%Y%m%d')}_{granularity}"
-        cached_data = self._load_from_cache(cache_key)
-        if cached_data is not None:
-            return cached_data
-
-        if granularity == "tick":
-            # Use Polygon /v3/trades/SPX to fetch all trades for that day
-            trades = []
-            start_timestamp = int(date.replace(hour=9, minute=30).timestamp() * 1000)
-            end_timestamp = int(date.replace(hour=16, minute=0).timestamp() * 1000)
-            url = f"{self.base_url}/v3/trades/SPX"
-            params = {
-                "timestamp.gte": start_timestamp,
-                "timestamp.lt": end_timestamp,
-                "limit": 50000,
-                "apiKey": self.api_key
-            }
-            
-            try:
-                while True:
-                    data = await self._rate_limited_request(url, params)
-                    results = data.get("results", [])
-                    trades.extend(results)
-                    next_url = data.get("next_url")
-                    if not next_url or not results:
-                        break
-                    url = next_url
-                    params = {"apiKey": self.api_key}  # Next URL includes other params
-                    
-                if trades:
-                    df = pd.DataFrame(trades)
-                    df['timestamp'] = pd.to_datetime(df['sip_timestamp'], unit='ns')
-                    df.rename(columns={'price': 'close', 'size': 'volume'}, inplace=True)
-                    # For tick data, OHLC are all the same
-                    df['open'] = df['close']
-                    df['high'] = df['close']
-                    df['low'] = df['close']
-                    df = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
-                    self._save_to_cache(cache_key, df)
-                    return df
-            except Exception as e:
-                logger.error(f"Error fetching SPX tick data: {e}")
-                return pd.DataFrame()
-        else:
-            # Regular bars
+    async def get_ohlc_data(self, date: datetime) -> pd.DataFrame:
+          # Regular bars
             timespan = "minute"
-            multiplier = 1 if granularity == "minute" else 5
+            multiplier = 5
             start = date.strftime('%Y-%m-%d')
             end = (date + timedelta(days=1)).strftime('%Y-%m-%d')
-            url = f"{self.base_url}/v2/aggs/ticker/SPX/range/{multiplier}/{timespan}/{start}/{end}"
+            url = f"{self.base_url}/v2/aggs/ticker/SPY/range/{multiplier}/{timespan}/{start}/{end}"
             params = {
                 "apiKey": self.api_key,
                 "adjusted": "true",
@@ -170,7 +122,6 @@ class PolygonDataProvider:
                         'v': 'volume'
                     }, inplace=True)
                     df = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
-                    self._save_to_cache(cache_key, df)
                     return df
                 else:
                     logger.warning(f"No SPX data for {date}")
@@ -179,77 +130,6 @@ class PolygonDataProvider:
                 logger.error(f"Error fetching SPX data: {e}")
                 return pd.DataFrame()
 
-    async def get_spy_volume_data(self, date: datetime, granularity: str = "5min") -> pd.DataFrame:
-        """
-        Get SPY volume bars or ticks (if granularity='tick').
-        """
-        cache_key = f"spy_{date.strftime('%Y%m%d')}_{granularity}"
-        cached_data = self._load_from_cache(cache_key)
-        if cached_data is not None:
-            return cached_data
-
-        if granularity == "tick":
-            # Use Polygon /v3/trades/SPY
-            trades = []
-            start_timestamp = int(date.replace(hour=9, minute=30).timestamp() * 1000)
-            end_timestamp = int(date.replace(hour=16, minute=0).timestamp() * 1000)
-            url = f"{self.base_url}/v3/trades/SPY"
-            params = {
-                "timestamp.gte": start_timestamp,
-                "timestamp.lt": end_timestamp,
-                "limit": 50000,
-                "apiKey": self.api_key
-            }
-            
-            try:
-                while True:
-                    data = await self._rate_limited_request(url, params)
-                    results = data.get("results", [])
-                    trades.extend(results)
-                    next_url = data.get("next_url")
-                    if not next_url or not results:
-                        break
-                    url = next_url
-                    params = {"apiKey": self.api_key}
-                    
-                if trades:
-                    df = pd.DataFrame(trades)
-                    df['timestamp'] = pd.to_datetime(df['sip_timestamp'], unit='ns')
-                    df.rename(columns={'size': 'volume'}, inplace=True)
-                    df = df[['timestamp', 'volume']]
-                    self._save_to_cache(cache_key, df)
-                    return df
-            except Exception as e:
-                logger.error(f"Error fetching SPY tick data: {e}")
-                return pd.DataFrame()
-        else:
-            # Use bars
-            timespan = "minute"
-            multiplier = 5 if granularity == "5min" else 1
-            start = date.strftime('%Y-%m-%d')
-            end = (date + timedelta(days=1)).strftime('%Y-%m-%d')
-            url = f"{self.base_url}/v2/aggs/ticker/SPY/range/{multiplier}/{timespan}/{start}/{end}"
-            params = {
-                "apiKey": self.api_key,
-                "adjusted": "true",
-                "sort": "asc"
-            }
-            
-            try:
-                data = await self._rate_limited_request(url, params)
-                if 'results' in data and data['results']:
-                    df = pd.DataFrame(data['results'])
-                    df['timestamp'] = pd.to_datetime(df['t'], unit='ms')
-                    df.rename(columns={'v': 'volume'}, inplace=True)
-                    df = df[['timestamp', 'volume']]
-                    self._save_to_cache(cache_key, df)
-                    return df
-                else:
-                    logger.warning(f"No SPY volume data for {date}")
-                    return pd.DataFrame()
-            except Exception as e:
-                logger.error(f"Error fetching SPY data: {e}")
-                return pd.DataFrame()
 
     async def get_option_chain(
         self,
@@ -258,6 +138,7 @@ class PolygonDataProvider:
         entry_time: Optional[datetime] = None,
         underlying: str = "SPX"
     ) -> pd.DataFrame:
+        return None
         """
         Get the option chain with a consistent structure expected by backtest engine.
         Returns DataFrame with columns: timestamp, strike, type, bid, ask, last, volume
@@ -266,10 +147,7 @@ class PolygonDataProvider:
         if entry_time is None:
             entry_time = date.replace(hour=10, minute=0)
             
-        cache_key = f"options_{date.strftime('%Y%m%d')}_{expiration.strftime('%Y%m%d')}_{entry_time.strftime('%H%M%S')}"
-        cached_data = self._load_from_cache(cache_key)
-        if cached_data is not None:
-            return cached_data
+        
 
         # Get all contracts for this expiry
         exp_str = expiration.strftime('%Y-%m-%d')
@@ -278,7 +156,8 @@ class PolygonDataProvider:
             "underlying_ticker": underlying,
             "expiration_date": exp_str,
             "limit": 1000,
-            "apiKey": self.api_key
+            "apiKey": self.api_key,
+            "as_of":exp_str
         }
         
         contracts = []
@@ -303,7 +182,6 @@ class PolygonDataProvider:
             opt_type = 'C' if opt['contract_type'] == 'call' else 'P'
             
             quote = await self._get_option_tick_quote(contract, entry_time)
-            
             records.append({
                 'timestamp': entry_time,
                 'strike': strike,
@@ -319,7 +197,6 @@ class PolygonDataProvider:
         if not df.empty:
             # Ensure we have the expected columns in the right order
             df = df[['timestamp', 'strike', 'type', 'bid', 'ask', 'last', 'volume', 'contract']]
-            self._save_to_cache(cache_key, df)
         return df
 
     async def _get_option_tick_quote(self, contract: str, timestamp: datetime) -> Dict:
@@ -334,7 +211,7 @@ class PolygonDataProvider:
             "timestamp.lte": ts,
             "limit": 1,
             "order": "desc",
-            "apiKey": self.api_key
+            "apiKey": self.api_key,  # Ensure we get quotes for the correct date
         }
         
         try:
@@ -378,7 +255,7 @@ class PolygonDataProvider:
             logger.error(f"Error fetching trade for {contract}: {e}")
 
         # Return minimal valid quote
-        return {'bid': 0.01, 'ask': 0.05, 'last': 0.03, 'volume': 0}
+        return None
 
     async def get_option_quotes(self, contracts: List[str], timestamp: datetime) -> Dict[str, Dict]:
         """

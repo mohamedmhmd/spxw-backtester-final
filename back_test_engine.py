@@ -136,28 +136,10 @@ class BacktestEngine:
         self.open_straddles = []  # Reset for new day
         
         # Get market data
-        spx_data = await self.data_provider.get_spx_data(date, config.data_granularity)
-        spy_data = await self.data_provider.get_spy_volume_data(date, config.data_granularity)
+        ohlc_data = await self.data_provider.get_ohlc_data(date)
         
-        if spx_data.empty or spy_data.empty:
+        if ohlc_data.empty:
             logger.warning(f"No data available for {date}")
-            return trades
-        
-        # Convert to 5-minute bars
-        spx_5min = self._ensure_5min_bars(spx_data, has_ohlc=True)
-        spy_5min = self._ensure_5min_bars(spy_data, has_ohlc=False)
-        
-        # Ensure we have the same timestamps
-        merged_data = pd.merge(
-            spx_5min, 
-            spy_5min, 
-            on='timestamp', 
-            how='inner',
-            suffixes=('_spx', '_spy')
-        )
-        
-        if merged_data.empty:
-            logger.warning(f"No overlapping data for {date}")
             return trades
         
         # Need minimum bars for all conditions
@@ -167,17 +149,17 @@ class BacktestEngine:
             strategy.avg_range_candles
         )
         
-        if len(merged_data) < min_bars_needed:
-            logger.warning(f"Insufficient bars for {date}: {len(merged_data)} < {min_bars_needed}")
+        if len(ohlc_data) < min_bars_needed:
+            logger.warning(f"Insufficient bars for {date}: {len(ohlc_data)} < {min_bars_needed}")
             return trades
         
         # Track active Iron Condor trades for the day
         active_iron_condors = []
         
         # Check for entry signals and manage trades throughout the day
-        for i in range(min_bars_needed, len(merged_data)):
-            current_bar_time = merged_data.iloc[i]['timestamp']
-            current_price = merged_data.iloc[i]['close']
+        for i in range(min_bars_needed, len(ohlc_data)):
+            current_bar_time = ohlc_data.iloc[i]['timestamp']
+            current_price = ohlc_data.iloc[i]['open']
             
             # Only trade during regular hours (9:30 AM - 4:00 PM)
             if current_bar_time.time() < time(9, 30) or current_bar_time.time() >= time(16, 0):
@@ -187,7 +169,7 @@ class BacktestEngine:
             await self._check_straddle_exits(current_price, current_bar_time, config)
             
             # Check entry conditions for new Iron Condor trades
-            signals = self._check_entry_signals_5min(merged_data, i, strategy)
+            signals = self._check_entry_signals_5min(ohlc_data, i, strategy)
             
             if signals['entry_signal']:
                 # Prepare for option trades
@@ -199,17 +181,17 @@ class BacktestEngine:
                 # Get option chain
                 option_chain = await self.data_provider.get_option_chain(
                     option_date, 
-                    option_date,  # 0DTE
-                    "SPX",
-                    config.data_granularity
+                    option_date,
+                    current_bar_time,  # 0DTE
+                    "SPX"
                 )
                 
-                if option_chain.empty:
-                    logger.warning(f"No option chain data at {current_bar_time}")
-                    continue
+                #if option_chain.empty:
+                    #logger.warning(f"No option chain data at {current_bar_time}")
+                    #continue
                 
                 # Find Iron Condor strikes
-                ic_result = self._find_iron_condor_strikes(current_price, option_chain, strategy)
+                ic_result = await self._find_iron_condor_strikes(current_price, current_bar_time, strategy)
                 
                 if ic_result:
                     ic_strikes = {
@@ -250,7 +232,7 @@ class BacktestEngine:
                             # Calculate Straddle strikes based on Iron Condor credit
                             straddle_distance = net_credit * strategy.straddle_distance_multiplier
                             straddle_strike = self._calculate_straddle_strike(
-                                current_price, straddle_distance
+                                current_price*10, straddle_distance
                             )
                             
                             # Execute Straddle trade
@@ -290,7 +272,7 @@ class BacktestEngine:
         }
         
         # Condition 1: Volume check (consecutive candles below threshold)
-        first_candle_volume = merged_data.iloc[0]['volume_spy']
+        first_candle_volume = merged_data.iloc[0]['volume']
         volume_threshold = first_candle_volume * strategy.volume_threshold
         
         volume_ok = True
@@ -298,7 +280,7 @@ class BacktestEngine:
         for j in range(strategy.consecutive_candles):
             idx = current_idx - strategy.consecutive_candles + j + 1
             if idx >= 0 and idx < len(merged_data):
-                current_volume = merged_data.iloc[idx]['volume_spy']
+                current_volume = merged_data.iloc[idx]['volume']
                 volume_checks.append(current_volume)
                 if current_volume > volume_threshold:
                     volume_ok = False
@@ -357,16 +339,16 @@ class BacktestEngine:
         
         return signals
     
-    def _find_iron_condor_strikes(self, current_price: float, option_chain: pd.DataFrame,
+    async def _find_iron_condor_strikes(self, current_price: float, timestamp: datetime,
                                  strategy: StrategyConfig) -> Optional[Dict[str, float]]:
         """Find Iron Condor strikes targeting specific win/loss ratio"""
         # Round ATM to nearest 5
-        atm_strike = int(round(current_price / 5) * 5)
-        available_strikes = sorted(option_chain['strike'].unique())
+        atm_strike = int(round(current_price / 5) * 5)*10
+        #available_strikes = sorted(option_chain['strike'].unique())
 
         # Configurable search window
-        min_wing = getattr(strategy, 'min_wing_width', 15)
-        max_wing = getattr(strategy, 'max_wing_width', 70)
+        min_wing = 5#getattr(strategy, 'min_wing_width', 15)
+        max_wing = 20#getattr(strategy, 'max_wing_width', 70)
         step = getattr(strategy, 'wing_width_step', 5)
 
         target_ratio = getattr(strategy, 'target_win_loss_ratio', 1.5)
@@ -379,22 +361,26 @@ class BacktestEngine:
             sp = atm_strike
             lp = atm_strike - d
             
+            qsc = await self.data_provider._get_option_tick_quote(f"O:SPXW{timestamp.strftime('%y%m%d')}C{sc*1000:08d}", timestamp)
+            qlc = await self.data_provider._get_option_tick_quote(f"O:SPXW{timestamp.strftime('%y%m%d')}C{lc*1000:08d}", timestamp)
+            qsp = await self.data_provider._get_option_tick_quote(f"O:SPXW{timestamp.strftime('%y%m%d')}P{sp*1000:08d}", timestamp)
+            qlp = await self.data_provider._get_option_tick_quote(f"O:SPXW{timestamp.strftime('%y%m%d')}P{lp*1000:08d}", timestamp)
             # All strikes must exist
-            if not all(s in available_strikes for s in [lc, sc, sp, lp]):
+            if None in [qsc, qlc, qsp, qlp]:
                 continue
 
-            # Helper to get mid quote
-            def get_mid(cp, strike):
-                row = option_chain[(option_chain['strike']==strike) & (option_chain['type']==cp)]
-                if not row.empty:
-                    bid, ask = row.iloc[0]['bid'], row.iloc[0]['ask']
-                    return (bid + ask) / 2
+            
+            def get_premium(q, action):
+                if(action == "long"):
+                    return q['ask']
+                elif(action == "short"):
+                    return q['bid']
                 return None
 
-            sc_mid = get_mid('C', sc)
-            lc_mid = get_mid('C', lc)
-            sp_mid = get_mid('P', sp)
-            lp_mid = get_mid('P', lp)
+            sc_mid = get_premium(qsc, "short")
+            lc_mid = get_premium(qlc, "long")
+            sp_mid = get_premium(qsp, "short")
+            lp_mid = get_premium(qlp, "long")
             
             if None in [sc_mid, lc_mid, sp_mid, lp_mid]:
                 continue
@@ -465,10 +451,10 @@ class BacktestEngine:
         exp_str = expiration.strftime('%y%m%d')
         
         contracts = {
-            'short_call': f"O:SPXW{exp_str}C{int(strikes['short_call']):08d}",
-            'short_put': f"O:SPXW{exp_str}P{int(strikes['short_put']):08d}",
-            'long_call': f"O:SPXW{exp_str}C{int(strikes['long_call']):08d}",
-            'long_put': f"O:SPXW{exp_str}P{int(strikes['long_put']):08d}"
+            'short_call': f"O:SPXW{exp_str}C{int(strikes['short_call']*1000):08d}",
+            'short_put': f"O:SPXW{exp_str}P{int(strikes['short_put']*1000):08d}",
+            'long_call': f"O:SPXW{exp_str}C{int(strikes['long_call']*1000):08d}",
+            'long_put': f"O:SPXW{exp_str}P{int(strikes['long_put']*1000):08d}"
         }
         
         return contracts
@@ -543,8 +529,8 @@ class BacktestEngine:
         # Create straddle contracts
         exp_str = date.strftime('%y%m%d')
         contracts = {
-            'straddle_call': f"O:SPXW{exp_str}C{straddle_strike:08d}",
-            'straddle_put': f"O:SPXW{exp_str}P{straddle_strike:08d}"
+            'straddle_call': f"O:SPXW{exp_str}C{straddle_strike*1000:08d}",
+            'straddle_put': f"O:SPXW{exp_str}P{straddle_strike*1000:08d}"
         }
         
         # Get quotes
@@ -659,13 +645,13 @@ class BacktestEngine:
                                    config: BacktestConfig):
         """Close trade at market close using settlement prices"""
         # Get SPX close price
-        spx_data = await self.data_provider.get_spx_data(date, "minute")
+        spx_data = await self.data_provider.get_ohlc_data(date)
         if spx_data.empty:
             logger.error(f"No SPX data for settlement on {date}")
             return
         
         # Use official close price
-        settlement_price = spx_data.iloc[-1]['close']
+        settlement_price = spx_data.iloc[-1]['close']*10
         if isinstance(date, datetime):
             dt = date
         else:
@@ -680,7 +666,7 @@ class BacktestEngine:
             
             # Extract strike from contract symbol
             strike_str = contract[-8:]
-            strike = int(strike_str)
+            strike = int(strike_str)/1000
             
             # Calculate intrinsic value at expiration
             if 'call' in leg_type:
