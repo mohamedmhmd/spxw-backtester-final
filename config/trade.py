@@ -17,27 +17,27 @@ class Trade:
     status: str = "OPEN"  # OPEN, CLOSED
     metadata: Optional[Dict[str, Any]] = None
     
-    def calculate_pnl(self, exit_prices: Dict[str, float], commission_per_contract: float):
+    def calculate_pnl(self, payoffs: Dict[str, float], commission_per_contract: float):
         """Calculate P&L for the trade"""
-        total_pnl = 0.0
+        total_pnl = self.metadata.get('partial_pnl', 0.0)
         total_commissions = 0.0
         
         for contract, details in self.contracts.items():
-            position = details['position']
+            remaining = details.get('remaining_position', details['position'])
             entry_price = details['entry_price']
-            exit_price = exit_prices.get(contract, details.get('exit_price', 0))
+            payoff = payoffs.get(contract)
             
             # Calculate raw P&L
-            if position > 0:  # Long
-                pnl = (exit_price - entry_price) * position * 100  # SPX multiplier is 100
+            if remaining > 0:  # Long
+                pnl = (payoff - entry_price) * remaining  # SPX multiplier is 100
             else:  # Short
-                pnl = (entry_price - exit_price) * abs(position) * 100
+                pnl = (entry_price - payoff) * abs(remaining)
             
             total_pnl += pnl
-            total_commissions += abs(position) * commission_per_contract * 2  # Entry and exit
+            total_commissions += abs(remaining) * commission_per_contract * 2  # Entry and exit
             
             # Update exit price
-            details['exit_price'] = exit_price
+            details['exit_price'] = payoff
         
         self.pnl = total_pnl - total_commissions
         return self.pnl

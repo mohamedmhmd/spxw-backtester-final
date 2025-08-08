@@ -91,31 +91,6 @@ class BacktestEngine:
         
         return True
     
-    def _ensure_5min_bars(self, df: pd.DataFrame, has_ohlc: bool = True) -> pd.DataFrame:
-        """Convert any timeframe data to 5-minute bars"""
-        if df.empty:
-            return df
-            
-        df = df.copy()
-        if 'timestamp' in df.columns and not isinstance(df.index, pd.DatetimeIndex):
-            df = df.set_index('timestamp')
-        
-        if has_ohlc:
-            # Resample OHLCV data
-            resampled = df.resample('5T').agg({
-                'open': 'first',
-                'high': 'max',
-                'low': 'min',
-                'close': 'last',
-                'volume': 'sum'
-            }).dropna()
-        else:
-            # Resample volume-only data
-            resampled = df.resample('5T').agg({
-                'volume': 'sum'
-            }).dropna()
-        
-        return resampled.reset_index()
     
     async def _run_daily_strategy(self, date: datetime, config: BacktestConfig, 
                                   strategy: StrategyConfig) -> List[Trade]:
@@ -144,6 +119,7 @@ class BacktestEngine:
         # Track active Iron Condor trades for the day
         active_iron_condors = []
         
+        ic1_found = False
         # Check for entry signals and manage trades throughout the day
         for i in range(min_bars_needed, len(ohlc_data)):
             current_bar_time = ohlc_data.iloc[i]['timestamp']
@@ -155,6 +131,10 @@ class BacktestEngine:
             
             # Check for Straddle exit conditions first
             await self._check_straddle_exits(current_price, current_bar_time, config)
+
+            if(ic1_found):
+                # If we already found an Iron Condor, skip further checks
+                continue
             
             # Check entry conditions for new Iron Condor trades
             signals = self._check_entry_signals_5min(ohlc_data, i, strategy)
@@ -165,18 +145,6 @@ class BacktestEngine:
                     option_date = date
                 else:
                     option_date = datetime.combine(date, datetime.min.time())
-                
-                # Get option chain
-                option_chain = await self.data_provider.get_option_chain(
-                    option_date, 
-                    option_date,
-                    current_bar_time,  # 0DTE
-                    "SPX"
-                )
-                
-                #if option_chain.empty:
-                    #logger.warning(f"No option chain data at {current_bar_time}")
-                    #continue
                 
                 # Find Iron Condor strikes
                 ic_result = await self._find_iron_condor_strikes(current_price, current_bar_time, strategy)
@@ -203,11 +171,10 @@ class BacktestEngine:
                     if net_credit > 0:
                         # Execute Iron Condor trade
                         ic_trade = await self._execute_iron_condor(
-                            option_date,
+                            ic_quotes,
                             current_bar_time,
                             ic_contracts,
                             strategy,
-                            config,
                             signals,
                             net_credit
                         )
@@ -216,7 +183,7 @@ class BacktestEngine:
                             trades.append(ic_trade)
                             active_iron_condors.append(ic_trade)
                             logger.info(f"Entered Iron Condor #{len(active_iron_condors)} at {current_bar_time}: {ic_strikes}")
-                            
+                            ic1_found = True  # Mark that we found an Iron Condor
                             # Calculate Straddle strikes based on Iron Condor credit
                             straddle_distance = net_credit * strategy.straddle_distance_multiplier
                             straddle_strike = self._calculate_straddle_strike(
@@ -228,7 +195,6 @@ class BacktestEngine:
                                 option_date,
                                 current_bar_time,
                                 straddle_strike,
-                                option_chain,
                                 strategy,
                                 config,
                                 ic_trade
@@ -242,13 +208,13 @@ class BacktestEngine:
         # Close all trades at market close
         for trade in trades:
             if trade.status == "OPEN":
-                await self._close_trade_at_expiry(trade, date, config)
+                await self._close_trade_at_expiry(ohlc_data, trade, date, config)
         
         logger.info(f"Day {date.strftime('%Y-%m-%d')} completed: {len([t for t in trades if t.trade_type == 'Iron Condor'])} Iron Condors, {len([t for t in trades if t.trade_type == 'Straddle'])} Straddles")
         
         return trades
     
-    def _check_entry_signals_5min(self, merged_data: pd.DataFrame, current_idx: int, 
+    def _check_entry_signals_5min(self, ohloc_data: pd.DataFrame, current_idx: int, 
                                   strategy: StrategyConfig) -> Dict[str, Any]:
         """Check entry signals using 5-minute bars only"""
         signals = {
@@ -260,15 +226,15 @@ class BacktestEngine:
         }
         
         # Condition 1: Volume check (consecutive candles below threshold)
-        first_candle_volume = merged_data.iloc[0]['volume']
+        first_candle_volume = ohloc_data.iloc[0]['volume']
         volume_threshold = first_candle_volume * strategy.volume_threshold
         
         volume_ok = True
         volume_checks = []
         for j in range(strategy.consecutive_candles):
             idx = current_idx - strategy.consecutive_candles + j + 1
-            if idx >= 0 and idx < len(merged_data):
-                current_volume = merged_data.iloc[idx]['volume']
+            if idx >= 0 and idx < len(ohloc_data):
+                current_volume = ohloc_data.iloc[idx]['volume']
                 volume_checks.append(current_volume)
                 if current_volume > volume_threshold:
                     volume_ok = False
@@ -281,9 +247,9 @@ class BacktestEngine:
         directions = []
         for j in range(strategy.lookback_candles):
             idx = current_idx - strategy.lookback_candles + j + 1
-            if idx >= 0 and idx < len(merged_data):
-                open_price = merged_data.iloc[idx]['open']
-                close_price = merged_data.iloc[idx]['close']
+            if idx >= 0 and idx < len(ohloc_data):
+                open_price = ohloc_data.iloc[idx]['open']
+                close_price = ohloc_data.iloc[idx]['close']
                 directions.append(1 if close_price > open_price else -1)
         
         if directions:
@@ -295,9 +261,9 @@ class BacktestEngine:
         recent_ranges = []
         for j in range(strategy.avg_range_candles):
             idx = current_idx - strategy.avg_range_candles + j + 1
-            if idx >= 0 and idx < len(merged_data):
-                high = merged_data.iloc[idx]['high']
-                low = merged_data.iloc[idx]['low']
+            if idx >= 0 and idx < len(ohloc_data):
+                high = ohloc_data.iloc[idx]['high']
+                low = ohloc_data.iloc[idx]['low']
                 recent_ranges.append(high - low)
         
         if recent_ranges:
@@ -306,8 +272,8 @@ class BacktestEngine:
             # Calculate average range for all candles up to current
             all_ranges = []
             for j in range(current_idx + 1):
-                high = merged_data.iloc[j]['high']
-                low = merged_data.iloc[j]['low']
+                high = ohloc_data.iloc[j]['high']
+                low = ohloc_data.iloc[j]['low']
                 all_ranges.append(high - low)
             
             if all_ranges:
@@ -414,14 +380,14 @@ class BacktestEngine:
         for leg in ['short_call', 'short_put']:
             contract = contracts[leg]
             if contract in quotes:
-                price = quotes[contract]['bid'] if config.use_bid_ask else (quotes[contract]['bid'] + quotes[contract]['ask']) / 2
+                price = quotes[contract]['bid']
                 total_credit += price
         
         # Long positions (buy at ask)
         for leg in ['long_call', 'long_put']:
             contract = contracts[leg]
             if contract in quotes:
-                price = quotes[contract]['ask'] if config.use_bid_ask else (quotes[contract]['bid'] + quotes[contract]['ask']) / 2
+                price = quotes[contract]['ask'] 
                 total_debit += price
         
         return total_credit - total_debit
@@ -447,14 +413,11 @@ class BacktestEngine:
         
         return contracts
     
-    async def _execute_iron_condor(self, date: datetime, entry_time: datetime,
+    async def _execute_iron_condor(self, quotes: Dict[str, Dict], entry_time: datetime,
                                   contracts: Dict[str, str], strategy: StrategyConfig,
-                                  config: BacktestConfig, signals: Dict,
+                                  signals: Dict,
                                   net_credit: float) -> Optional[Trade]:
-        """Execute Iron Condor trade"""
-        # Get option quotes
-        quotes = await self.data_provider.get_option_quotes(list(contracts.values()), entry_time)
-        
+        """Execute Iron Condor trade""" 
         # Check if we have all quotes
         if not all(contract in quotes for contract in contracts.values()):
             logger.warning("Missing option quotes, skipping trade")
@@ -467,10 +430,7 @@ class BacktestEngine:
         for leg, contract in [('short_call', contracts['short_call']), 
                             ('short_put', contracts['short_put'])]:
             quote = quotes[contract]
-            if config.use_bid_ask:
-                price = quote['bid']  # Sell at bid
-            else:
-                price = (quote['bid'] + quote['ask']) / 2
+            price = quote['bid']
             
             trade_contracts[contract] = {
                 'position': -strategy.trade_size,
@@ -482,10 +442,7 @@ class BacktestEngine:
         for leg, contract in [('long_call', contracts['long_call']), 
                             ('long_put', contracts['long_put'])]:
             quote = quotes[contract]
-            if config.use_bid_ask:
-                price = quote['ask']  # Buy at ask
-            else:
-                price = (quote['bid'] + quote['ask']) / 2
+            price = quote['ask']
             
             trade_contracts[contract] = {
                 'position': strategy.trade_size,
@@ -510,7 +467,7 @@ class BacktestEngine:
         return trade
     
     async def _execute_straddle(self, date: datetime, entry_time: datetime,
-                               straddle_strike: int, option_chain: pd.DataFrame,
+                               straddle_strike: int,
                                strategy: StrategyConfig, config: BacktestConfig,
                                iron_condor_trade: Trade) -> Optional[Trade]:
         """Execute Straddle trade"""
@@ -534,10 +491,7 @@ class BacktestEngine:
         
         for leg, contract in contracts.items():
             quote = quotes[contract]
-            if config.use_bid_ask:
-                price = quote['ask']  # Buy at ask
-            else:
-                price = (quote['bid'] + quote['ask']) / 2
+            price = quote['ask']
             
             trade_contracts[contract] = {
                 'position': strategy.trade_size,  # Long position
@@ -629,17 +583,16 @@ class BacktestEngine:
                                     logger.info(f"Partial straddle exit: {leg_type} at ${exit_price:.2f} "
                                               f"(entry: ${entry_price:.2f}), Size: {exit_size}, P&L: ${partial_pnl:.2f}")
     
-    async def _close_trade_at_expiry(self, trade: Trade, date: datetime, 
+    async def _close_trade_at_expiry(self, ohlc_data : pd.DataFrame, trade: Trade, date: datetime, 
                                    config: BacktestConfig):
         """Close trade at market close using settlement prices"""
         # Get SPX close price
-        spx_data = await self.data_provider.get_ohlc_data(date)
-        if spx_data.empty:
+        if ohlc_data.empty:
             logger.error(f"No SPX data for settlement on {date}")
             return
         
         # Use official close price
-        settlement_price = spx_data.iloc[-1]['close']*10
+        settlement_price = ohlc_data.iloc[-1]['close']*10
         if isinstance(date, datetime):
             dt = date
         else:
@@ -647,7 +600,8 @@ class BacktestEngine:
         exit_time = dt.replace(hour=16, minute=0, second=0)
         
         # Calculate settlement values for each option
-        exit_prices = {}
+
+        payoffs = {}
         
         for contract, details in trade.contracts.items():
             leg_type = details['leg_type']
@@ -662,29 +616,9 @@ class BacktestEngine:
             else:  # put
                 value = max(0, strike - settlement_price)
             
-            exit_prices[contract] = value
+            payoffs[contract] = value
         
-        # For straddles, account for any partial exits
-        if trade.trade_type == "Straddle":
-            # Calculate P&L only for remaining positions
-            total_pnl = trade.metadata.get('partial_pnl', 0)  # Start with partial exit P&L
-            
-            for contract, details in trade.contracts.items():
-                remaining = details.get('remaining_position', details['position'])
-                if remaining > 0:
-                    entry_price = details['entry_price']
-                    exit_price = exit_prices[contract]
-                    position_pnl = (exit_price - entry_price) * remaining * 100  # SPX multiplier
-                    position_pnl -= config.commission_per_contract * remaining  # Exit commission
-                    total_pnl += position_pnl
-            
-            # Account for entry commissions
-            total_pnl -= config.commission_per_contract * trade.size * 2  # 2 legs
-            
-            trade.pnl = total_pnl
-        else:
-            # Standard P&L calculation for Iron Condor
-            trade.calculate_pnl(exit_prices, config.commission_per_contract)
+        trade.calculate_pnl(payoffs, config.commission_per_contract)
         
         trade.exit_time = exit_time
         trade.status = "CLOSED"
