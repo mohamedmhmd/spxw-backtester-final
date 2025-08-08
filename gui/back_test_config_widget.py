@@ -1,11 +1,8 @@
 import logging
-
-# GUI imports
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
-
-from back_test_config import BacktestConfig
+from config.back_test_config import BacktestConfig
 
 # Set up logging
 logging.basicConfig(

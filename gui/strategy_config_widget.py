@@ -1,11 +1,8 @@
 import logging
-
-# GUI imports
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
-
-from strategy_config import StrategyConfig
+from config.strategy_config import StrategyConfig
 
 logging.basicConfig(
     level=logging.INFO,

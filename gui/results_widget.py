@@ -2,14 +2,13 @@
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
 import logging
-
-# GUI imports
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
+from config.trade import Trade
 
 # Set up logging
 logging.basicConfig(
@@ -17,10 +16,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-# ==================== Configuration Classes ====================
-
-from trade import Trade
 
 
 class ResultsWidget(QWidget):

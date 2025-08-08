@@ -3,7 +3,8 @@ import logging
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
-from back_test_engine import BacktestEngine  # Assuming this is defined in backtest_engine.py
+from engine.back_test_engine import BacktestEngine  # Assuming this is defined in backtest_engine.py
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,

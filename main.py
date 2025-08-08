@@ -6,8 +6,6 @@ Professional backtesting platform for SPX 0DTE options strategies
 
 import sys
 import logging
-
-# GUI imports
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
@@ -19,7 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from main_window import MainWindow  
+from gui.main_window import MainWindow  
 def main():
     """Main entry point"""
     app = QApplication(sys.argv)

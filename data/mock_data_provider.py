@@ -4,7 +4,7 @@ import pickle
 import gzip
 import logging
 import numpy as np
-from datetime import datetime, timedelta, time
+from datetime import datetime, time
 from typing import Dict, List, Optional
 from scipy.stats import norm
 from scipy.ndimage import gaussian_filter1d

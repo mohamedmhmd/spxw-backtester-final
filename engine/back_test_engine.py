@@ -1,20 +1,13 @@
-import sys
-import os
-import json
-import sqlite3
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta, time
 from typing import Dict, List, Tuple, Optional, Any, Union
 import logging
-from dataclasses import dataclass, field
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-import asyncio
-import aiohttp
-from collections import defaultdict
-import pickle
-import gzip
-from mock_data_provider import MockDataProvider
+from data.mock_data_provider import MockDataProvider
+from config.back_test_config import BacktestConfig
+from data.polygon_data_provider import PolygonDataProvider
+from config.strategy_config import StrategyConfig
+from config.trade import Trade
 
 # Set up logging
 logging.basicConfig(
@@ -23,11 +16,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Import configurations and providers
-from back_test_config import BacktestConfig
-from polygon_data_provider import PolygonDataProvider
-from strategy_config import StrategyConfig
-from trade import Trade
 
 class BacktestEngine:
     """Complete backtesting engine implementation with Iron Condor and Straddle"""

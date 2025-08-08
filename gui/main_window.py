@@ -2,15 +2,12 @@ import json
 import pandas as pd
 import logging
 import asyncio
-
-# GUI imports
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
-
-from back_test_worker import BacktestWorker
-from strategy_config_widget import StrategyConfigWidget
-from mock_data_provider import MockDataProvider  # Assuming this is defined in mock_data_provider.py
+from .back_test_worker import BacktestWorker
+from .strategy_config_widget import StrategyConfigWidget
+from data.mock_data_provider import MockDataProvider
 
 # Set up logging
 logging.basicConfig(
@@ -21,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 # ==================== Configuration Classes ====================
 
-from back_test_config_widget import BacktestConfigWidget
-from results_widget import ResultsWidget
-from polygon_data_provider import PolygonDataProvider
+from gui.back_test_config_widget import BacktestConfigWidget
+from gui.results_widget import ResultsWidget
+from data.polygon_data_provider import PolygonDataProvider
 
 
 class MainWindow(QMainWindow):
