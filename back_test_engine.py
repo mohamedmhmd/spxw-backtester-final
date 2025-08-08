@@ -343,7 +343,7 @@ class BacktestEngine:
                                  strategy: StrategyConfig) -> Optional[Dict[str, float]]:
         """Find Iron Condor strikes targeting specific win/loss ratio"""
         # Round ATM to nearest 5
-        atm_strike = int(round(current_price / 5) * 5)*10
+        atm_strike = int(round(current_price / 5) * 5)*10 #approximation of spx
         #available_strikes = sorted(option_chain['strike'].unique())
 
         # Configurable search window
