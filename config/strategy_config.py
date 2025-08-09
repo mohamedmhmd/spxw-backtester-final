@@ -15,7 +15,7 @@ class StrategyConfig:
     range_threshold: float = 0.8  # 80% of day's average range
     
     # Iron Condor Trade parameters
-    trade_size: int = 10  # 10 contracts (configurable)
+    iron_1_trade_size: int = 10  # 10 contracts (configurable)
     target_win_loss_ratio: float = 1.5  # Target 1.5:1 win/loss ratio
     
     # Iron Condor strike selection parameters
@@ -24,6 +24,7 @@ class StrategyConfig:
     wing_width_step: int = 5   # Step size for searching
     
     # Straddle parameters
+    straddle_1_trade_size: int = 2
     straddle_distance_multiplier: float = 2.5  # Multiply IC credit by 2.5 for distance
     straddle_exit_percentage: float = 0.5  # Exit 50% of position
     straddle_exit_multiplier: float = 2.0  # Exit when price is 2x entry
@@ -37,7 +38,8 @@ class StrategyConfig:
             'lookback_candles': self.lookback_candles,
             'avg_range_candles': self.avg_range_candles,
             'range_threshold': self.range_threshold,
-            'trade_size': self.trade_size,
+            'iron_1_trade_size': self.iron_1_trade_size,
+            'straddle_1_trade_size': self.straddle_1_trade_size,
             'target_win_loss_ratio': self.target_win_loss_ratio,
             'min_wing_width': self.min_wing_width,
             'max_wing_width': self.max_wing_width,

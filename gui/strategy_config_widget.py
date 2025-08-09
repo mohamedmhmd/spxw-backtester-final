@@ -88,11 +88,11 @@ class StrategyConfigWidget(QWidget):
         ic_trade_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
         layout.addRow(ic_trade_label)
 
-        self.trade_size = QSpinBox()
-        self.trade_size.setRange(1, 100)
-        self.trade_size.setValue(10)
-        self.trade_size.setToolTip("Number of contracts per trade")
-        layout.addRow("Trade Size (contracts):", self.trade_size)
+        self.iron_1_trade_size = QSpinBox()
+        self.iron_1_trade_size.setRange(1, 100)
+        self.iron_1_trade_size.setValue(10)
+        self.iron_1_trade_size.setToolTip("Number of contracts per iron_1 trade")
+        layout.addRow("Iron 1 Size:", self.iron_1_trade_size)
 
         self.target_win_loss_ratio = QDoubleSpinBox()
         self.target_win_loss_ratio.setRange(1.0, 5.0)
@@ -130,6 +130,12 @@ class StrategyConfigWidget(QWidget):
         straddle_label = QLabel("=== STRADDLE SETTINGS ===")
         straddle_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
         layout.addRow(straddle_label)
+
+        self.straddle_1_trade_size = QSpinBox()
+        self.straddle_1_trade_size.setRange(1, 100)
+        self.straddle_1_trade_size.setValue(2)
+        self.straddle_1_trade_size.setToolTip("Number of contracts per straddle_1 trade")
+        layout.addRow("Straddle 1  Size:", self.straddle_1_trade_size)
 
         self.straddle_distance_multiplier = QDoubleSpinBox()
         self.straddle_distance_multiplier.setRange(1.0, 10.0)
@@ -255,7 +261,8 @@ class StrategyConfigWidget(QWidget):
             lookback_candles=self.lookback_candles.value(),
             avg_range_candles=self.avg_range_candles.value(),
             range_threshold=self.range_threshold.value(),
-            trade_size=self.trade_size.value(),
+            iron_1_trade_size=self.iron_1_trade_size.value(),
+            straddle_1_trade_size=self.straddle_1_trade_size.value(),
             target_win_loss_ratio=self.target_win_loss_ratio.value(),
             min_wing_width=self.min_wing_width.value(),
             max_wing_width=self.max_wing_width.value(),
@@ -274,7 +281,8 @@ class StrategyConfigWidget(QWidget):
         self.lookback_candles.setValue(config.lookback_candles)
         self.avg_range_candles.setValue(config.avg_range_candles)
         self.range_threshold.setValue(config.range_threshold)
-        self.trade_size.setValue(config.trade_size)
+        self.iron_1_trade_size.setValue(config.iron_1_trade_size)
+        self.straddle_1_trade_size.setValue(config.straddle_1_trade_size)
         self.target_win_loss_ratio.setValue(config.target_win_loss_ratio)
         self.min_wing_width.setValue(config.min_wing_width)
         self.max_wing_width.setValue(config.max_wing_width)

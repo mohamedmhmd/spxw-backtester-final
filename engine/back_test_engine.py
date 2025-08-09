@@ -433,7 +433,7 @@ class BacktestEngine:
             price = quote['bid']
             
             trade_contracts[contract] = {
-                'position': -strategy.trade_size,
+                'position': -strategy.iron_1_trade_size,
                 'entry_price': price,
                 'leg_type': leg
             }
@@ -445,7 +445,7 @@ class BacktestEngine:
             price = quote['ask']
             
             trade_contracts[contract] = {
-                'position': strategy.trade_size,
+                'position': strategy.iron_1_trade_size,
                 'entry_price': price,
                 'leg_type': leg
             }
@@ -456,7 +456,7 @@ class BacktestEngine:
             exit_time=None,
             trade_type="Iron Condor",
             contracts=trade_contracts,
-            size=strategy.trade_size,
+            size=strategy.iron_1_trade_size,
             entry_signals=signals,
             metadata={
                 'net_credit': net_credit,
@@ -494,13 +494,13 @@ class BacktestEngine:
             price = quote['ask']
             
             trade_contracts[contract] = {
-                'position': strategy.trade_size,  # Long position
+                'position': strategy.straddle_1_trade_size,  # Long position
                 'entry_price': price,
                 'leg_type': leg,
                 'strike': straddle_strike,
-                'remaining_position': strategy.trade_size  # Track for partial exits
+                'remaining_position': strategy.straddle_1_trade_size  # Track for partial exits
             }
-            total_premium += price * strategy.trade_size
+            total_premium += price * strategy.straddle_1_trade_size
         
         # Create straddle trade
         trade = Trade(
@@ -508,7 +508,7 @@ class BacktestEngine:
             exit_time=None,
             trade_type="Straddle",
             contracts=trade_contracts,
-            size=strategy.trade_size,
+            size=strategy.straddle_1_trade_size,
             entry_signals={'triggered_by': 'iron_condor'},
             metadata={
                 'strategy_name': 'straddle_1',
