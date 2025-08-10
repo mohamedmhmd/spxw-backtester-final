@@ -301,8 +301,8 @@ class BacktestEngine:
         #available_strikes = sorted(option_chain['strike'].unique())
 
         # Configurable search window
-        min_wing = 5#getattr(strategy, 'min_wing_width', 15)
-        max_wing = 20#getattr(strategy, 'max_wing_width', 70)
+        min_wing = getattr(strategy, 'min_wing_width', 15)
+        max_wing = getattr(strategy, 'max_wing_width', 70)
         step = getattr(strategy, 'wing_width_step', 5)
 
         target_ratio = getattr(strategy, 'target_win_loss_ratio', 1.5)
@@ -431,11 +431,13 @@ class BacktestEngine:
                             ('short_put', contracts['short_put'])]:
             quote = quotes[contract]
             price = quote['bid']
+            strike = int(contract[-8:]) / 1000  # Extract strike from contract
             
             trade_contracts[contract] = {
                 'position': -strategy.iron_1_trade_size,
                 'entry_price': price,
-                'leg_type': leg
+                'leg_type': leg,
+                'strike': strike
             }
         
         # Long positions
@@ -443,11 +445,13 @@ class BacktestEngine:
                             ('long_put', contracts['long_put'])]:
             quote = quotes[contract]
             price = quote['ask']
+            strike = int(contract[-8:]) / 1000  # Extract strike from contract
             
             trade_contracts[contract] = {
                 'position': strategy.iron_1_trade_size,
                 'entry_price': price,
-                'leg_type': leg
+                'leg_type': leg,
+                'strike': strike
             }
         
         # Create trade with metadata
