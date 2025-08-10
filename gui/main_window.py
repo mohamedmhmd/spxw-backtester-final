@@ -36,7 +36,7 @@ class MainWindow(QMainWindow):
         
     def init_ui(self):
         """Initialize UI"""
-        self.setWindowTitle("SPX 0DTE Options Backtester - Professional Edition")
+        self.setWindowTitle("SPX 0DTE Options Backtester")
         self.setGeometry(100, 100, 1400, 900)
         
         # Create central widget
@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
             "Enable this to use realistic mock data instead of real Polygon.io data.\n"
             "Perfect for testing strategies without API costs."
         )
-        self.use_mock_data.setChecked(True)  # Default to mock data
+        self.use_mock_data.setChecked(False)  # Default to mock data
         self.use_mock_data.stateChanged.connect(self.on_mock_data_changed)
         api_layout.addWidget(self.use_mock_data)
         

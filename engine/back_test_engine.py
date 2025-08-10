@@ -32,10 +32,10 @@ class BacktestEngine:
         """Run complete backtest"""
         logger.info(f"Starting backtest from {config.start_date} to {config.end_date}")
         
-        self.current_capital = config.initial_capital
         self.trades = []
+        self.current_capital = config.initial_capital
         self.daily_pnl = {}
-        self.equity_curve = [(config.start_date, config.initial_capital)]
+        self.equity_curve = [(config.start_date, self.current_capital)]
         
         # Process each trading day
         current_date = config.start_date
@@ -454,7 +454,7 @@ class BacktestEngine:
         trade = Trade(
             entry_time=entry_time,
             exit_time=None,
-            trade_type="Iron Condor",
+            trade_type="Iron Condor 1",
             contracts=trade_contracts,
             size=strategy.iron_1_trade_size,
             entry_signals=signals,
@@ -506,7 +506,7 @@ class BacktestEngine:
         trade = Trade(
             entry_time=entry_time,
             exit_time=None,
-            trade_type="Straddle",
+            trade_type="Straddle 1",
             contracts=trade_contracts,
             size=strategy.straddle_1_trade_size,
             entry_signals={'triggered_by': 'iron_condor'},
@@ -555,7 +555,7 @@ class BacktestEngine:
                         quotes = await self.data_provider.get_option_quotes([contract], current_time)
                         if contract in quotes:
                             current_quote = quotes[contract]
-                            exit_price = current_quote['bid'] if config.use_bid_ask else (current_quote['bid'] + current_quote['ask']) / 2
+                            exit_price = current_quote['bid']
                             
                             # Check if price is 2x or more of entry
                             if exit_price >= entry_price * exit_multiplier:

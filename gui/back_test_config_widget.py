@@ -33,12 +33,12 @@ class BacktestConfigWidget(QWidget):
         layout.addRow("End Date:", self.end_date)
         
         # Capital
-        self.initial_capital = QDoubleSpinBox()
-        self.initial_capital.setRange(10000, 10000000)
-        self.initial_capital.setSingleStep(10000)
-        self.initial_capital.setValue(100000)
-        self.initial_capital.setPrefix("$")
-        layout.addRow("Initial Capital:", self.initial_capital)
+        #self.initial_capital = QDoubleSpinBox()
+        #self.initial_capital.setRange(10000, 10000000)
+        #self.initial_capital.setSingleStep(10000)
+        #self.initial_capital.setValue(100000)
+        #self.initial_capital.setPrefix("$")
+        #layout.addRow("Initial Capital:", self.initial_capital)
         
         # Commission
         self.commission = QDoubleSpinBox()
@@ -48,16 +48,6 @@ class BacktestConfigWidget(QWidget):
         self.commission.setPrefix("$")
         layout.addRow("Commission/Contract:", self.commission)
         
-        # Data granularity
-        self.granularity = QComboBox()
-        self.granularity.addItems(["tick", "1min", "5min"])
-        self.granularity.setCurrentText("5min")
-        layout.addRow("Data Granularity:", self.granularity)
-        
-        # Use bid/ask
-        self.use_bid_ask = QCheckBox("Use Bid/Ask Spreads")
-        self.use_bid_ask.setChecked(True)
-        layout.addRow(self.use_bid_ask)
         
         self.setLayout(layout)
     
@@ -66,8 +56,5 @@ class BacktestConfigWidget(QWidget):
         return BacktestConfig(
             start_date=self.start_date.date().toPyDate(),
             end_date=self.end_date.date().toPyDate(),
-            initial_capital=self.initial_capital.value(),
             commission_per_contract=self.commission.value(),
-            use_bid_ask=self.use_bid_ask.isChecked(),
-            data_granularity=self.granularity.currentText()
         )

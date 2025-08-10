@@ -102,9 +102,9 @@ class ResultsWidget(QWidget):
         
         # Create table
         self.trades_table = QTableWidget()
-        self.trades_table.setColumnCount(7)
+        self.trades_table.setColumnCount(8)
         self.trades_table.setHorizontalHeaderLabels([
-            "Entry Time", "Exit Time", "Type", "Size", 
+            "Entry Time", "Exit Time", "Type", "Size", "Net Premium",
             "Entry Signals", "P&L", "Status"
         ])
         
@@ -193,10 +193,17 @@ class ResultsWidget(QWidget):
             
             # Size
             self.trades_table.setItem(i, 3, QTableWidgetItem(str(trade.size)))
-            
+
+            # Entry price
+            if(trade.trade_type == "Iron Condor 1"):
+                entry_price = trade.metadata['net_credit']*trade.size
+            else:
+                entry_price = -trade.metadata['total_premium']
+            self.trades_table.setItem(i, 4, QTableWidgetItem(str(entry_price)))
+
             # Entry signals
             signals = ", ".join([k for k, v in trade.entry_signals.items() if v and k.endswith('_condition')])
-            self.trades_table.setItem(i, 4, QTableWidgetItem(signals))
+            self.trades_table.setItem(i, 5, QTableWidgetItem(signals))
             
             # P&L
             pnl_item = QTableWidgetItem(f"${trade.pnl:,.2f}")
@@ -204,10 +211,10 @@ class ResultsWidget(QWidget):
                 pnl_item.setForeground(QColor(0, 128, 0))
             else:
                 pnl_item.setForeground(QColor(255, 0, 0))
-            self.trades_table.setItem(i, 5, pnl_item)
+            self.trades_table.setItem(i, 6, pnl_item)
             
             # Status
-            self.trades_table.setItem(i, 6, QTableWidgetItem(trade.status))
+            self.trades_table.setItem(i, 7, QTableWidgetItem(trade.status))
     
     def _plot_daily_pnl(self, daily_pnl: Dict[datetime, float]):
         """Plot daily P&L"""

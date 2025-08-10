@@ -32,20 +32,7 @@ class StrategyConfigWidget(QWidget):
         
         # Add section headers and organize parameters
         
-        # === GENERAL STRATEGY INFO ===
-        general_label = QLabel("=== GENERAL STRATEGY SETTINGS ===")
-        general_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 10px;")
-        layout.addRow(general_label)
-        
-        self.strategy_name = QLineEdit()
-        self.strategy_name.setText("iron_1")
-        layout.addRow("Strategy Name:", self.strategy_name)
-        
-        self.trade_type = QLineEdit()
-        self.trade_type.setText("Iron Condor")
-        self.trade_type.setReadOnly(True)
-        layout.addRow("Trade Type:", self.trade_type)
-
+    
         # === IRON CONDOR ENTRY SIGNAL PARAMETERS ===
         entry_label = QLabel("=== IRON CONDOR ENTRY CONDITIONS ===")
         entry_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
@@ -254,8 +241,6 @@ class StrategyConfigWidget(QWidget):
     def get_config(self) -> StrategyConfig:
         """Get full strategy configuration from widget values."""
         return StrategyConfig(
-            name=self.strategy_name.text(),
-            trade_type=self.trade_type.text(),
             consecutive_candles=self.consecutive_candles.value(),
             volume_threshold=self.volume_threshold.value(),
             lookback_candles=self.lookback_candles.value(),
