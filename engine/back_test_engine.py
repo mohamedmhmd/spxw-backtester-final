@@ -100,6 +100,9 @@ class BacktestEngine:
         
         # Get market data
         ohlc_data = await self.data_provider.get_ohlc_data(date)
+
+        #ohlc_data= ohlc_data[ohlc_data['timestamp'].dt.time >=  time(9, 30) and 
+                             #ohlc_data['timestamp'].dt.time <= time(16, 0)]
         
         if ohlc_data.empty:
             logger.warning(f"No data available for {date}")
@@ -121,7 +124,7 @@ class BacktestEngine:
         
         ic1_found = False
         # Check for entry signals and manage trades throughout the day
-        for i in range(min_bars_needed, len(ohlc_data)):
+        for i in range(min_bars_needed + 18, len(ohlc_data)):
             current_bar_time = ohlc_data.iloc[i]['timestamp']
             current_price = ohlc_data.iloc[i]['open']
             
@@ -194,9 +197,9 @@ class BacktestEngine:
                             straddle_trade = await self._execute_straddle(
                                 option_date,
                                 current_bar_time,
-                                straddle_strike,
+                                current_price*10,
+                                straddle_distance,
                                 strategy,
-                                config,
                                 ic_trade
                             )
                             
@@ -471,15 +474,18 @@ class BacktestEngine:
         return trade
     
     async def _execute_straddle(self, date: datetime, entry_time: datetime,
-                               straddle_strike: int,
-                               strategy: StrategyConfig, config: BacktestConfig,
+                               current_price: float,
+                               straddle_distance : float,
+                               strategy: StrategyConfig,
                                iron_condor_trade: Trade) -> Optional[Trade]:
         """Execute Straddle trade"""
         # Create straddle contracts
         exp_str = date.strftime('%y%m%d')
+        c_strike = self._calculate_straddle_strike(current_price, straddle_distance)
+        p_strike = self._calculate_straddle_strike(current_price, -straddle_distance)
         contracts = {
-            'straddle_call': f"O:SPXW{exp_str}C{straddle_strike*1000:08d}",
-            'straddle_put': f"O:SPXW{exp_str}P{straddle_strike*1000:08d}"
+            'straddle_call': f"O:SPXW{exp_str}C{c_strike*1000:08d}",
+            'straddle_put': f"O:SPXW{exp_str}P{p_strike*1000:08d}"
         }
         
         # Get quotes
@@ -496,6 +502,11 @@ class BacktestEngine:
         for leg, contract in contracts.items():
             quote = quotes[contract]
             price = quote['ask']
+
+            if 'call' in leg:
+                straddle_strike = c_strike
+            else:  # put
+                straddle_strike = p_strike
             
             trade_contracts[contract] = {
                 'position': strategy.straddle_1_trade_size,  # Long position
@@ -517,7 +528,8 @@ class BacktestEngine:
             metadata={
                 'strategy_name': 'straddle_1',
                 'iron_condor_ref': iron_condor_trade,
-                'straddle_strike': straddle_strike,
+                'call_straddle_strike': c_strike,
+                'put_straddle_strike': p_strike,
                 'total_premium': total_premium,
                 'exit_percentage': strategy.straddle_exit_percentage,
                 'exit_multiplier': strategy.straddle_exit_multiplier
@@ -533,12 +545,13 @@ class BacktestEngine:
             if straddle.status != "OPEN":
                 continue
             
-            straddle_strike = straddle.metadata['straddle_strike']
+            call_straddle_strike = straddle.metadata['call_straddle_strike']
+            put_straddle_strike = straddle.metadata['put_straddle_strike']
             exit_percentage = straddle.metadata['exit_percentage']
             exit_multiplier = straddle.metadata['exit_multiplier']
             
             # Check if price hit the straddle strike
-            if abs(current_price - straddle_strike) < 0.01:  # Within penny of strike
+            if abs(current_price - call_straddle_strike) < 0.01 or abs(current_price - put_straddle_strike) < 0.01:  # Within penny of strike
                 # Determine which leg is ITM
                 for contract, details in straddle.contracts.items():
                     if details['remaining_position'] <= 0:
@@ -549,9 +562,9 @@ class BacktestEngine:
                     
                     # Check which leg to potentially exit
                     should_exit = False
-                    if 'call' in leg_type and current_price >= straddle_strike:
+                    if 'call' in leg_type and current_price >= call_straddle_strike:
                         should_exit = True
-                    elif 'put' in leg_type and current_price <= straddle_strike:
+                    elif 'put' in leg_type and current_price <= put_straddle_strike:
                         should_exit = True
                     
                     if should_exit:

@@ -131,73 +131,7 @@ class PolygonDataProvider:
                 return pd.DataFrame()
 
 
-    async def get_option_chain(
-        self,
-        date: datetime,
-        expiration: datetime,
-        entry_time: Optional[datetime] = None,
-        underlying: str = "SPX"
-    ) -> pd.DataFrame:
-        return None
-        """
-        Get the option chain with a consistent structure expected by backtest engine.
-        Returns DataFrame with columns: timestamp, strike, type, bid, ask, last, volume
-        """
-        # If no entry_time specified, use 10 AM
-        if entry_time is None:
-            entry_time = date.replace(hour=10, minute=0)
-            
-        
-
-        # Get all contracts for this expiry
-        exp_str = expiration.strftime('%Y-%m-%d')
-        url = f"{self.base_url}/v3/reference/options/contracts"
-        params = {
-            "underlying_ticker": underlying,
-            "expiration_date": exp_str,
-            "limit": 1000,
-            "apiKey": self.api_key,
-            "as_of":exp_str
-        }
-        
-        contracts = []
-        try:
-            while True:
-                data = await self._rate_limited_request(url, params)
-                results = data.get('results', [])
-                contracts.extend(results)
-                next_url = data.get('next_url')
-                if not next_url or not results:
-                    break
-                url = next_url
-                params = {"apiKey": self.api_key}
-        except Exception as e:
-            logger.error(f"Error fetching option contracts: {e}")
-
-        # For each contract, fetch the latest quote before entry_time
-        records = []
-        for opt in contracts:
-            contract = opt['ticker']
-            strike = float(opt['strike_price'])
-            opt_type = 'C' if opt['contract_type'] == 'call' else 'P'
-            
-            quote = await self._get_option_tick_quote(contract, entry_time)
-            records.append({
-                'timestamp': entry_time,
-                'strike': strike,
-                'type': opt_type,
-                'bid': quote.get('bid', 0.01),
-                'ask': quote.get('ask', 0.01),
-                'last': quote.get('last', 0.01),
-                'volume': quote.get('volume', 0),
-                'contract': contract  # Keep contract symbol for reference
-            })
-            
-        df = pd.DataFrame(records)
-        if not df.empty:
-            # Ensure we have the expected columns in the right order
-            df = df[['timestamp', 'strike', 'type', 'bid', 'ask', 'last', 'volume', 'contract']]
-        return df
+    
 
     async def _get_option_tick_quote(self, contract: str, timestamp: datetime) -> Dict:
         """
