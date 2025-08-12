@@ -110,7 +110,7 @@ class BacktestEngine:
         
         active_iron_condors = []
         ic1_found = False
-        for i in range(min_bars_needed + 18, len(spy_ohlc_data)):
+        for i in range(min_bars_needed, len(spy_ohlc_data)):
             current_bar_time = spy_ohlc_data.iloc[i]['timestamp']
             current_price = spy_ohlc_data.iloc[i]['open']
             if current_bar_time.time() < time(9, 30) or current_bar_time.time() >= time(16, 0):
@@ -145,6 +145,7 @@ class BacktestEngine:
                     trades.append(straddle_trade)
                     self.open_straddles.append(straddle_trade)
                     logger.info(f"Entered Straddle 1 at {current_bar_time}.")
+        
         
         for trade in trades:
             if trade.status == "OPEN":

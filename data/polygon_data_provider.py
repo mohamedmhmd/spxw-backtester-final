@@ -107,7 +107,7 @@ class PolygonDataProvider:
           timespan = "minute"
           multiplier = 5
           start = date.strftime('%Y-%m-%d')
-          end = (date + timedelta(days=1)).strftime('%Y-%m-%d')
+          end = start#(date + timedelta(days=1)).strftime('%Y-%m-%d')
           url = f"{self.base_url}/v2/aggs/ticker/{underlying}/range/{multiplier}/{timespan}/{start}/{end}"
           params = {
           "apiKey": self.api_key,
@@ -146,6 +146,10 @@ class PolygonDataProvider:
                     df = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
                     df = df.sort_values('timestamp').drop_duplicates(subset=['timestamp'])
                 
+                    df = df[
+                            (df['timestamp'].dt.time >= pd.Timestamp('09:30:00').time()) & 
+                            (df['timestamp'].dt.time <= pd.Timestamp('16:00:00').time())
+                             ]
                     logger.info(f"Fetched {len(df)} bars for {underlying} on {date}")
                     return df
                  else:
