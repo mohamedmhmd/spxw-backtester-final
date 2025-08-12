@@ -1,7 +1,5 @@
-import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta, time
-from typing import Dict, List, Tuple, Optional, Any, Union
+from typing import Dict, List, Tuple, Any, Union
 import logging
 from data.mock_data_provider import MockDataProvider
 from config.back_test_config import BacktestConfig
