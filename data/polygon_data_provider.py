@@ -44,26 +44,33 @@ class PolygonDataProvider:
             await self.session.close()
             self.session = None
 
-    async def _rate_limited_request(self, url: str, params: dict) -> dict:
-        """Make rate-limited request to Polygon API"""
-        async with self.rate_limiter:
-            # Ensure minimum time between requests
-            current_time = time.time()
-            time_since_last = current_time - self.last_request_time
-            if time_since_last < self.min_request_interval:
-                await asyncio.sleep(self.min_request_interval - time_since_last)
-            
-            self.last_request_time = time.time()
-            
-            if not self.session:
-                self.session = aiohttp.ClientSession()
-                
-            async with self.session.get(url, params=params) as response:
-                if response.status == 200:
-                    return await response.json()
+    async def _rate_limited_request(self, url: str, params: dict = None) -> dict:
+          """Make rate-limited request to Polygon API"""
+          async with self.rate_limiter:
+                current_time = time.time()
+                time_since_last = current_time - self.last_request_time
+                if time_since_last < self.min_request_interval:
+                   await asyncio.sleep(self.min_request_interval - time_since_last)
+        
+                self.last_request_time = time.time()
+        
+                if not self.session:
+                   self.session = aiohttp.ClientSession()
+        
+                if params:
+                   async with self.session.get(url, params=params) as response:
+                         if response.status == 200:
+                            return await response.json()
+                         else:
+                            logger.error(f"API error: {response.status} for {url}")
+                            return {}
                 else:
-                    logger.error(f"API error: {response.status} for {url}")
-                    return {}
+                    async with self.session.get(url) as response:
+                          if response.status == 200:
+                             return await response.json()
+                          else:
+                             logger.error(f"API error: {response.status} for {url}")
+                             return {}
 
     def _get_cache_path(self, cache_key: str) -> str:
         return os.path.join(self.cache_dir, f"{cache_key}.pkl.gz")
@@ -96,39 +103,61 @@ class PolygonDataProvider:
             logger.error(f"Connection test failed: {e}")
             return False
 
-    async def get_ohlc_data(self, date: datetime, underlying : str) -> pd.DataFrame:
-          # Regular bars
-            timespan = "minute"
-            multiplier = 5
-            start = date.strftime('%Y-%m-%d')
-            end = (date + timedelta(days=1)).strftime('%Y-%m-%d')
-            url = f"{self.base_url}/v2/aggs/ticker/{underlying}/range/{multiplier}/{timespan}/{start}/{end}"
-            params = {
-                "apiKey": self.api_key,
-                "adjusted": "true",
-                "sort": "asc"
-            }
+    async def get_ohlc_data(self, date: datetime, underlying: str) -> pd.DataFrame:
+          timespan = "minute"
+          multiplier = 5
+          start = date.strftime('%Y-%m-%d')
+          end = (date + timedelta(days=1)).strftime('%Y-%m-%d')
+          url = f"{self.base_url}/v2/aggs/ticker/{underlying}/range/{multiplier}/{timespan}/{start}/{end}"
+          params = {
+          "apiKey": self.api_key,
+          "adjusted": "true",
+          "sort": "asc",
+          "limit": 50000
+        }
+    
+          try:
+              all_results = []
+              data = await self._rate_limited_request(url, params)
+        
+              if 'results' in data and data['results']:
+                 all_results.extend(data['results'])
+                 while 'next_url' in data and data['next_url']:
+                       logger.info(f"Fetching next page of data for {underlying} on {date}")
+                       # next_url already includes the API key and other parameters
+                       next_url = data['next_url']
+                       data = await self._rate_limited_request(next_url)
+                
+                       if 'results' in data and data['results']:
+                          all_results.extend(data['results'])
+                       else:
+                          break
             
-            try:
-                data = await self._rate_limited_request(url, params)
-                if 'results' in data and data['results']:
-                    df = pd.DataFrame(data['results'])
+                 if all_results:
+                    df = pd.DataFrame(all_results)
                     df['timestamp'] = pd.to_datetime(df['t'], unit='ms')
                     df.rename(columns={
-                        'o': 'open',
-                        'h': 'high',
-                        'l': 'low',
-                        'c': 'close',
-                        'v': 'volume'
-                    }, inplace=True)
+                    'o': 'open',
+                    'h': 'high',
+                    'l': 'low',
+                    'c': 'close',
+                    'v': 'volume'
+                     }, inplace=True)
                     df = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
+                    df = df.sort_values('timestamp').drop_duplicates(subset=['timestamp'])
+                
+                    logger.info(f"Fetched {len(df)} bars for {underlying} on {date}")
                     return df
-                else:
-                    logger.warning(f"No SPX data for {date}")
-                    return pd.DataFrame()
-            except Exception as e:
-                logger.error(f"Error fetching SPX data: {e}")
-                return pd.DataFrame()
+                 else:
+                      logger.warning(f"No {underlying} data for {date}")
+                      return pd.DataFrame()
+              else:
+                  logger.warning(f"No {underlying} data for {date}")
+                  return pd.DataFrame()
+            
+          except Exception as e:
+               logger.error(f"Error fetching {underlying} data: {e}")
+               return pd.DataFrame()  
 
 
     
