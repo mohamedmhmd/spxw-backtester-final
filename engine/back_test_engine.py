@@ -93,9 +93,9 @@ class BacktestEngine:
         trades = []
         self.open_straddles = []
         
-        ohlc_data = await self.data_provider.get_ohlc_data(date)
+        spy_ohlc_data = await self.data_provider.get_ohlc_data(date, "SPY")
 
-        if ohlc_data.empty:
+        if spy_ohlc_data.empty:
             logger.warning(f"No data available for {date}")
             return trades
         
@@ -104,15 +104,15 @@ class BacktestEngine:
             strategy.lookback_candles,
             strategy.avg_range_candles
         )
-        if len(ohlc_data) < min_bars_needed:
-            logger.warning(f"Insufficient bars for {date}: {len(ohlc_data)} < {min_bars_needed}")
+        if len(spy_ohlc_data) < min_bars_needed:
+            logger.warning(f"Insufficient bars for {date}: {len(spy_ohlc_data)} < {min_bars_needed}")
             return trades
         
         active_iron_condors = []
         ic1_found = False
-        for i in range(min_bars_needed + 18, len(ohlc_data)):
-            current_bar_time = ohlc_data.iloc[i]['timestamp']
-            current_price = ohlc_data.iloc[i]['open']
+        for i in range(min_bars_needed + 18, len(spy_ohlc_data)):
+            current_bar_time = spy_ohlc_data.iloc[i]['timestamp']
+            current_price = spy_ohlc_data.iloc[i]['open']
             if current_bar_time.time() < time(9, 30) or current_bar_time.time() >= time(16, 0):
                 continue
             
@@ -120,7 +120,7 @@ class BacktestEngine:
             if(ic1_found):
                 continue
             
-            ic_trade = await IronCondor1._find_iron_trade(ohlc_data, i, strategy, 
+            ic_trade = await IronCondor1._find_iron_trade(spy_ohlc_data, i, strategy, 
                                                      date, current_price, current_bar_time,
                                                      self.data_provider)
             if ic_trade:
@@ -148,7 +148,7 @@ class BacktestEngine:
         
         for trade in trades:
             if trade.status == "OPEN":
-                await trade._close_trade_at_expiry(ohlc_data, date, config)
+                await trade._close_trade_at_expiry(spy_ohlc_data, date, config)
         
         logger.info(f"Day {date.strftime('%Y-%m-%d')} completed: {len([t for t in trades if t.trade_type == 'Iron Condor 1'])} Iron Condors, {len([t for t in trades if t.trade_type == 'Straddle 1'])} Straddles")
         return trades

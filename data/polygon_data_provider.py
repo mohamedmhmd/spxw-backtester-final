@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class PolygonDataProvider:
     """
-    PRODUCTION Polygon.io data provider supporting true second/tick-level
+    Polygon.io data provider supporting true second/tick-level
     OHLCV, options chains, and real-time (to-the-second) options pricing.
     With rate limiting and proper data structures.
     """
@@ -96,13 +96,13 @@ class PolygonDataProvider:
             logger.error(f"Connection test failed: {e}")
             return False
 
-    async def get_ohlc_data(self, date: datetime) -> pd.DataFrame:
+    async def get_ohlc_data(self, date: datetime, underlying : str) -> pd.DataFrame:
           # Regular bars
             timespan = "minute"
             multiplier = 5
             start = date.strftime('%Y-%m-%d')
             end = (date + timedelta(days=1)).strftime('%Y-%m-%d')
-            url = f"{self.base_url}/v2/aggs/ticker/SPY/range/{multiplier}/{timespan}/{start}/{end}"
+            url = f"{self.base_url}/v2/aggs/ticker/{underlying}/range/{multiplier}/{timespan}/{start}/{end}"
             params = {
                 "apiKey": self.api_key,
                 "adjusted": "true",
