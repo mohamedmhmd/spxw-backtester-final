@@ -8,7 +8,7 @@ from PyQt6.QtGui import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
-from config.trade import Trade
+from trades.trade import Trade
 
 # Set up logging
 logging.basicConfig(

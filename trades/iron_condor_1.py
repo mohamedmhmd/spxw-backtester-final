@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from pyparsing import Union
 from config.strategy_config import StrategyConfig
-from config.trade import Trade
+from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
 

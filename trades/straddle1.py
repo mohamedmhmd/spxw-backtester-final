@@ -5,7 +5,7 @@ from pyparsing import Union
 
 from config.back_test_config import BacktestConfig
 from config.strategy_config import StrategyConfig
-from config.trade import Trade
+from trades.trade import Trade
 import logging
 
 from data.mock_data_provider import MockDataProvider

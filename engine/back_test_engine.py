@@ -7,7 +7,7 @@ from data.mock_data_provider import MockDataProvider
 from config.back_test_config import BacktestConfig
 from data.polygon_data_provider import PolygonDataProvider
 from config.strategy_config import StrategyConfig
-from config.trade import Trade
+from trades.trade import Trade
 from engine.statistics import Statistics
 from trades.iron_condor_1 import IronCondor1
 from trades.straddle1 import Straddle1
