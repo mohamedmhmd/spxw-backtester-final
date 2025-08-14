@@ -8,6 +8,7 @@ from config.strategy_config import StrategyConfig
 from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
+import asyncio
 
 #Set up logging
 logging.basicConfig(
@@ -103,82 +104,180 @@ class IronCondor1:
         
         return signals
     
-    async def _find_iron_condor_strikes(current_price: float, timestamp: datetime,
-                                 strategy: StrategyConfig, data_provider : Union[MockDataProvider, PolygonDataProvider]) -> Optional[Dict[str, float]]: # type: ignore
-        """Find Iron Condor strikes targeting specific win/loss ratio"""
-        # Round ATM to nearest 5
-        atm_strike = int(round(current_price / 5) * 5) #approximation of spx
-        #available_strikes = sorted(option_chain['strike'].unique())
+    async def _find_iron_condor_strikes(current_price: float, 
+    timestamp: datetime,
+    strategy, # StrategyConfig 
+    data_provider : Union[MockDataProvider, PolygonDataProvider],
+    tolerance: float = 0.05  # Stop early if ratio within 5% of target
+) -> Optional[Dict[str, float]]:
+         atm_strike = int(round(current_price / 5) * 5)
+    
+         min_wing = getattr(strategy, 'min_wing_width', 15)
+         max_wing = getattr(strategy, 'max_wing_width', 70)
+         step = getattr(strategy, 'wing_width_step', 5)
+         target_ratio = getattr(strategy, 'target_win_loss_ratio', 1.5)
 
-        # Configurable search window
-        min_wing = getattr(strategy, 'min_wing_width', 15)
-        max_wing = getattr(strategy, 'max_wing_width', 70)
-        step = getattr(strategy, 'wing_width_step', 5)
-
-        target_ratio = getattr(strategy, 'target_win_loss_ratio', 1.5)
-        best_combo = None
-        best_diff = float('inf')
-
-        for d in range(min_wing, max_wing+1, step):
-            sc = atm_strike
-            lc = atm_strike + d
-            sp = atm_strike
-            lp = atm_strike - d
-            
-            qsc = await data_provider._get_option_tick_quote(f"O:SPXW{timestamp.strftime('%y%m%d')}C{sc*1000:08d}", timestamp)
-            qlc = await data_provider._get_option_tick_quote(f"O:SPXW{timestamp.strftime('%y%m%d')}C{lc*1000:08d}", timestamp)
-            qsp = await data_provider._get_option_tick_quote(f"O:SPXW{timestamp.strftime('%y%m%d')}P{sp*1000:08d}", timestamp)
-            qlp = await data_provider._get_option_tick_quote(f"O:SPXW{timestamp.strftime('%y%m%d')}P{lp*1000:08d}", timestamp)
-            # All strikes must exist
-            if None in [qsc, qlc, qsp, qlp]:
-                continue
-
-            
-            def get_premium(q, action):
-                if(action == "long"):
-                    return q['ask']
-                elif(action == "short"):
-                    return q['bid']
+         distances = list(range(min_wing, max_wing + 1, step))
+    
+         logger.info(f"Searching {len(distances)} wing distances concurrently for optimal Iron Condor...")
+    
+   
+         sc = atm_strike
+         sp = atm_strike
+    
+         atm_call_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{sc*1000:08d}"
+         atm_put_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{sp*1000:08d}"
+    
+         try:
+            qsc, qsp = await asyncio.gather(
+            data_provider._get_option_tick_quote(atm_call_symbol, timestamp),
+            data_provider._get_option_tick_quote(atm_put_symbol, timestamp),
+            return_exceptions=True)
+            if isinstance(qsc, Exception) or isinstance(qsp, Exception) or None in [qsc, qsp]:
+                logger.error("Failed to get ATM option quotes")
                 return None
-
-            sc_mid = get_premium(qsc, "short")
-            lc_mid = get_premium(qlc, "long")
-            sp_mid = get_premium(qsp, "short")
-            lp_mid = get_premium(qlp, "long")
             
-            if None in [sc_mid, lc_mid, sp_mid, lp_mid]:
+         except Exception as e:
+               logger.error(f"Error fetching ATM quotes: {e}")
+               return None
+    
+         option_symbols = []
+         symbol_to_distance = {}
+         symbol_to_strike_type = {}  # 'call' or 'put'
+     
+         for d in distances:
+             lc = atm_strike + d  # Long call strike
+             lp = atm_strike - d  # Long put strike
+        
+             lc_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{lc*1000:08d}"
+             lp_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{lp*1000:08d}"
+        
+             option_symbols.extend([lc_symbol, lp_symbol])
+             symbol_to_distance[lc_symbol] = d
+             symbol_to_distance[lp_symbol] = d
+             symbol_to_strike_type[lc_symbol] = 'call'
+             symbol_to_strike_type[lp_symbol] = 'put'
+    
+        # Step 3: Fetch all wing option quotes concurrently
+         logger.info(f"Fetching {len(option_symbols)} option quotes concurrently...")
+    
+         start_time = asyncio.get_event_loop().time()
+    
+         try:
+             quote_tasks = [
+             data_provider._get_option_tick_quote(symbol, timestamp) 
+             for symbol in option_symbols
+             ]
+        
+             all_quotes = await asyncio.gather(*quote_tasks, return_exceptions=True)
+        
+             fetch_time = asyncio.get_event_loop().time() - start_time
+             logger.info(f"Fetched all quotes in {fetch_time:.2f} seconds")
+        
+         except Exception as e:
+             logger.error(f"Error in concurrent quote fetching: {e}")
+             return None
+    
+         # Step 4: Create lookup dictionary for successful quotes
+         quote_lookup = {}
+         failed_count = 0
+    
+         for i, symbol in enumerate(option_symbols):
+             if i < len(all_quotes):
+                quote = all_quotes[i]
+             if isinstance(quote, Exception):
+                logger.warning(f"Failed to get quote for {symbol}: {quote}")
+                failed_count += 1
+             elif quote is not None:
+                quote_lookup[symbol] = quote
+             else:
+                failed_count += 1
+    
+         if failed_count > 0:
+            logger.warning(f"Failed to fetch {failed_count} out of {len(option_symbols)} quotes")
+    
+         # Step 5: Define premium calculation function (moved outside loop)
+         def get_premium(q, action):
+            if q is None:
+               return None
+            if action == "long":
+               return q.get('ask')
+            elif action == "short":
+                 return q.get('bid')
+            return None
+    
+         # Step 6: Process all combinations to find best ratio
+         best_combo = None
+         best_diff = float('inf')
+         valid_combos_checked = 0
+    
+         for d in distances:
+             lc = atm_strike + d
+             lp = atm_strike - d
+        
+             lc_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{lc*1000:08d}"
+             lp_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{lp*1000:08d}"
+        
+             # Get quotes from our lookup
+             qlc = quote_lookup.get(lc_symbol)
+             qlp = quote_lookup.get(lp_symbol)
+        
+             # All strikes must exist
+             if None in [qsc, qlc, qsp, qlp]:
                 continue
-
-            # Calculate net credit
-            net_credit = sc_mid + sp_mid - lc_mid - lp_mid
-            max_loss = d - net_credit
-
-            # Avoid division by zero/bad combos
-            if net_credit <= 0 or max_loss <= 0:
+        
+            # Calculate premiums
+             sc_mid = get_premium(qsc, "short")
+             lc_mid = get_premium(qlc, "long")
+             sp_mid = get_premium(qsp, "short")
+             lp_mid = get_premium(qlp, "long")
+        
+             if None in [sc_mid, lc_mid, sp_mid, lp_mid]:
                 continue
-
-            ratio = net_credit / max_loss
-            diff = abs(ratio - target_ratio)
-            
-            if diff < best_diff:
+        
+             valid_combos_checked += 1
+        
+        # Calculate net credit
+             net_credit = sc_mid + sp_mid - lc_mid - lp_mid
+             max_loss = d - net_credit
+        
+        # Avoid division by zero/bad combos
+             if net_credit <= 0 or max_loss <= 0:
+               continue
+        
+             ratio = net_credit / max_loss
+             diff = abs(ratio - target_ratio)
+        
+             if diff < best_diff:
                 best_diff = diff
                 best_combo = {
-                    'short_call': sc,
-                    'long_call': lc,
-                    'short_put': sp,
-                    'long_put': lp,
-                    'net_credit': net_credit,
-                    'max_loss': max_loss,
-                    'ratio': ratio,
-                    'distance': d
+                'short_call': sc,
+                'long_call': lc,
+                'short_put': sp,
+                'long_put': lp,
+                'net_credit': net_credit,
+                'max_loss': max_loss,
+                'ratio': ratio,
+                'distance': d
                 }
-                
-        if best_combo:
+            
+            # Early termination if we find a very good match
+                if diff <= tolerance:
+                   logger.info(f"Found excellent match early (tolerance={tolerance:.1%}): "
+                           f"Wing=${d}, Credit=${net_credit:.2f}, Ratio={ratio:.2f}")
+                   break
+    
+         logger.info(f"Processed {valid_combos_checked} valid combinations out of {len(distances)} distances")
+    
+         # Step 7: Return best result
+         if best_combo:
             logger.info(f"Selected Iron Condor: Wing=${best_combo['distance']}, "
-                       f"Credit=${best_combo['net_credit']:.2f}, Ratio={best_combo['ratio']:.2f}")
+                   f"Credit=${best_combo['net_credit']:.2f}, Ratio={best_combo['ratio']:.2f} "
+                   f"(Target: {target_ratio:.2f})")
             return best_combo
-        
-        return None
+         else:
+             logger.warning("No valid Iron Condor combination found")
+             return None
     
 
     def _calculate_iron_condor_credit(quotes: Dict[str, Dict], contracts: Dict[str, str],
