@@ -1,4 +1,3 @@
-
 from datetime import datetime
 from typing import Dict, List, Tuple, Any
 import logging
@@ -8,6 +7,7 @@ from PyQt6.QtGui import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
+import matplotlib.style as mplstyle
 from trades.trade import Trade
 
 # Set up logging
@@ -18,77 +18,277 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class ResultsWidget(QWidget):
-    """Widget for displaying backtest results"""
+class StatsCard(QFrame):
+    """Individual statistics card with enhanced styling"""
+    
+    def __init__(self, title: str, value: str = "--", color: str = "#2196F3"):
+        super().__init__()
+        self.setFrameStyle(QFrame.Shape.Box)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: white;
+                border: 1px solid #E0E0E0;
+                border-radius: 8px;
+                padding: 16px;
+            }}
+            QFrame:hover {{
+                border-color: {color};
+            }}
+        """)
+        
+        layout = QVBoxLayout()
+        layout.setSpacing(8)
+        
+        # Title
+        title_label = QLabel(title)
+        title_label.setStyleSheet("""
+            QLabel {
+                color: #666666;
+                font-size: 12px;
+                font-weight: 500;
+                margin: 0;
+            }
+        """)
+        
+        # Value
+        self.value_label = QLabel(value)
+        self.value_label.setStyleSheet(f"""
+            QLabel {{
+                color: {color};
+                font-size: 24px;
+                font-weight: bold;
+                margin: 0;
+            }}
+        """)
+        
+        layout.addWidget(title_label)
+        layout.addWidget(self.value_label)
+        layout.addStretch()
+        
+        self.setLayout(layout)
+        self.setMinimumHeight(100)
+        
+    def update_value(self, value: str, color: str = None):
+        """Update the value and optionally the color"""
+        self.value_label.setText(value)
+        if color:
+            current_style = self.value_label.styleSheet()
+            new_style = current_style.replace(self.value_label.styleSheet().split('color: ')[1].split(';')[0], color)
+            self.value_label.setStyleSheet(new_style)
+
+
+class EnhancedTableWidget(QTableWidget):
+    """Enhanced table with better styling and functionality"""
     
     def __init__(self):
         super().__init__()
+        self.setAlternatingRowColors(True)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        
+        # Enhanced styling
+        self.setStyleSheet("""
+            QTableWidget {
+                gridline-color: #E0E0E0;
+                background-color: white;
+                alternate-background-color: #F8F9FA;
+                selection-background-color: #E3F2FD;
+                border: 1px solid #E0E0E0;
+                border-radius: 4px;
+            }
+            QTableWidget::item {
+                padding: 8px;
+                border: none;
+            }
+            QTableWidget::item:selected {
+                background-color: #E3F2FD;
+                color: #1976D2;
+            }
+            QHeaderView::section {
+                background-color: #F5F5F5;
+                padding: 12px 8px;
+                border: none;
+                border-bottom: 2px solid #E0E0E0;
+                font-weight: bold;
+                color: #424242;
+            }
+        """)
+
+
+class LegsDisplayWidget(QWidget):
+    """Custom widget for displaying trade legs in a structured way"""
+    
+    def __init__(self, contracts: Dict):
+        super().__init__()
+        self.setMaximumHeight(120)
+        layout = QVBoxLayout()
+        layout.setSpacing(4)
+        layout.setContentsMargins(4, 4, 4, 4)
+        
+        for leg_type, details in contracts.items():
+            leg_frame = QFrame()
+            leg_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #F8F9FA;
+                    border: 1px solid #E0E0E0;
+                    border-radius: 4px;
+                    padding: 4px;
+                }
+            """)
+            
+            leg_layout = QHBoxLayout()
+            leg_layout.setContentsMargins(6, 3, 6, 3)
+            
+            # Leg type
+            type_label = QLabel(leg_type)
+            type_label.setStyleSheet("font-weight: bold; color: #1976D2; font-size: 11px;")
+            
+            # Details
+            details_text = " | ".join([f"{k}: {v}" for k, v in details.items()])
+            details_label = QLabel(details_text)
+            details_label.setStyleSheet("color: #666; font-size: 11px;")
+            details_label.setWordWrap(True)
+            
+            leg_layout.addWidget(type_label)
+            leg_layout.addWidget(details_label, 1)
+            leg_frame.setLayout(leg_layout)
+            
+            layout.addWidget(leg_frame)
+        
+        self.setLayout(layout)
+
+
+class ResultsWidget(QWidget):
+    """Enhanced widget for displaying backtest results"""
+    
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #FAFAFA;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            QTabWidget::pane {
+                border: 1px solid #E0E0E0;
+                background-color: white;
+                border-radius: 4px;
+            }
+            QTabBar::tab {
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+                padding: 12px 24px;
+                margin-right: 2px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }
+            QTabBar::tab:selected {
+                background-color: white;
+                border-bottom-color: white;
+                font-weight: bold;
+                color: #1976D2;
+            }
+            QTabBar::tab:hover:!selected {
+                background-color: #E3F2FD;
+            }
+        """)
         self.init_ui()
         
     def init_ui(self):
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
+        
+        # Title
+        title = QLabel("Backtest Results")
+        title.setStyleSheet("""
+            QLabel {
+                font-size: 28px;
+                font-weight: bold;
+                color: #212121;
+                margin-bottom: 8px;
+            }
+        """)
+        layout.addWidget(title)
         
         # Create tabs
         self.tabs = QTabWidget()
         
         # Statistics tab
         self.stats_widget = self._create_stats_widget()
-        self.tabs.addTab(self.stats_widget, "Statistics")
+        self.tabs.addTab(self.stats_widget, "📊 Statistics")
         
         # Equity curve tab
         self.equity_widget = self._create_equity_widget()
-        self.tabs.addTab(self.equity_widget, "Equity Curve")
+        self.tabs.addTab(self.equity_widget, "📈 Equity Curve")
         
         # Trades tab
         self.trades_widget = self._create_trades_widget()
-        self.tabs.addTab(self.trades_widget, "Trades")
+        self.tabs.addTab(self.trades_widget, "📋 Trades")
         
         # Daily P&L tab
         self.daily_pnl_widget = self._create_daily_pnl_widget()
-        self.tabs.addTab(self.daily_pnl_widget, "Daily P&L")
+        self.tabs.addTab(self.daily_pnl_widget, "📅 Daily P&L")
         
         layout.addWidget(self.tabs)
         self.setLayout(layout)
     
     def _create_stats_widget(self):
-        """Create statistics display widget"""
+        """Create statistics display widget with cards"""
         widget = QWidget()
-        layout = QGridLayout()
+        widget.setStyleSheet("background-color: white;")
+        layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(24, 24, 24, 24)
         
-        # Statistics labels
-        self.stats_labels = {}
-        stats_names = [
-            ('total_trades', 'Total Trades'),
-            ('win_rate', 'Win Rate'),
-            ('total_pnl', 'Total P&L'),
-            ('avg_trade_pnl', 'Avg Trade P&L'),
-            ('profit_factor', 'Profit Factor'),
-            ('sharpe_ratio', 'Sharpe Ratio'),
-            ('max_drawdown', 'Max Drawdown'),
-            ('return_pct', 'Total Return %')
+        # Performance Summary Header
+        summary_label = QLabel("Performance Summary")
+        summary_label.setStyleSheet("""
+            QLabel {
+                font-size: 20px;
+                font-weight: bold;
+                color: #212121;
+                margin-bottom: 16px;
+            }
+        """)
+        layout.addWidget(summary_label)
+        
+        # Create cards grid
+        cards_layout = QGridLayout()
+        cards_layout.setSpacing(16)
+        
+        # Initialize stat cards
+        self.stat_cards = {}
+        stats_config = [
+            ('total_trades', 'Total Trades', '#2196F3'),
+            ('win_rate', 'Win Rate', '#4CAF50'),
+            ('total_pnl', 'Total P&L', '#FF9800'),
+            ('avg_trade_pnl', 'Avg Trade P&L', '#9C27B0'),
+            ('profit_factor', 'Profit Factor', '#00BCD4'),
+            ('sharpe_ratio', 'Sharpe Ratio', '#795548'),
+            ('max_drawdown', 'Max Drawdown', '#F44336'),
+            ('return_pct', 'Total Return %', '#607D8B')
         ]
         
-        row = 0
-        for key, name in stats_names:
-            label = QLabel(f"{name}:")
-            label.setStyleSheet("font-weight: bold;")
-            value_label = QLabel("--")
-            self.stats_labels[key] = value_label
-            
-            layout.addWidget(label, row, 0)
-            layout.addWidget(value_label, row, 1)
-            row += 1
+        for i, (key, name, color) in enumerate(stats_config):
+            card = StatsCard(name, "--", color)
+            self.stat_cards[key] = card
+            cards_layout.addWidget(card, i // 4, i % 4)
+        
+        layout.addLayout(cards_layout)
+        layout.addStretch()
         
         widget.setLayout(layout)
         return widget
     
     def _create_equity_widget(self):
-        """Create equity curve chart"""
+        """Create equity curve chart with enhanced styling"""
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
         
         # Create matplotlib figure
-        self.equity_figure = Figure(figsize=(10, 6))
+        self.equity_figure = Figure(figsize=(12, 8), facecolor='white')
         self.equity_canvas = FigureCanvas(self.equity_figure)
         layout.addWidget(self.equity_canvas)
         
@@ -96,33 +296,62 @@ class ResultsWidget(QWidget):
         return widget
     
     def _create_trades_widget(self):
-        """Create trades table"""
+        """Create enhanced trades table"""
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
         
-        # Create table
-        self.trades_table = QTableWidget()
+        # Header
+        header_label = QLabel("Trade History")
+        header_label.setStyleSheet("""
+            QLabel {
+                font-size: 18px;
+                font-weight: bold;
+                color: #212121;
+            }
+        """)
+        layout.addWidget(header_label)
+        
+        # Create enhanced table
+        self.trades_table = EnhancedTableWidget()
         self.trades_table.setColumnCount(8)
         self.trades_table.setHorizontalHeaderLabels([
-            "Entry Time", "Exit Time", "Type", "SPX Price", "Legs", "Size", "Net Premium",
-             "P&L", "Status"
+            "Entry Time", "Exit Time", "Type", "SPX Price", "Strategy Details", 
+            "Size", "Net Premium", "P&L"
         ])
         
-        # Set column widths
+        # Set column widths for optimal horizontal scrolling
         header = self.trades_table.horizontalHeader()
-        header.setStretchLastSection(True)
+        
+        # Set specific widths that work well for scrolling
+        self.trades_table.setColumnWidth(0, 120)  # Entry Time
+        self.trades_table.setColumnWidth(1, 120)  # Exit Time  
+        self.trades_table.setColumnWidth(2, 150)  # Type
+        self.trades_table.setColumnWidth(3, 100)  # SPX Price
+        self.trades_table.setColumnWidth(4, 200)  # Strategy Details
+        self.trades_table.setColumnWidth(5, 80)   # Size
+        self.trades_table.setColumnWidth(6, 120)  # Net Premium
+        self.trades_table.setColumnWidth(7, 100)  # P&L
+        
+        # Allow manual column resizing
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        
+        # Enable horizontal scrolling when content exceeds widget width
+        self.trades_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
         layout.addWidget(self.trades_table)
         widget.setLayout(layout)
         return widget
     
     def _create_daily_pnl_widget(self):
-        """Create daily P&L chart"""
+        """Create daily P&L chart with enhanced styling"""
         widget = QWidget()
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
         
         # Create matplotlib figure
-        self.pnl_figure = Figure(figsize=(10, 6))
+        self.pnl_figure = Figure(figsize=(12, 8), facecolor='white')
         self.pnl_canvas = FigureCanvas(self.pnl_figure)
         layout.addWidget(self.pnl_canvas)
         
@@ -131,123 +360,299 @@ class ResultsWidget(QWidget):
     
     def update_results(self, results: Dict[str, Any]):
         """Update all results displays"""
-        # Update statistics
+        # Update statistics cards
         stats = results['statistics']
-        for key, label in self.stats_labels.items():
+        for key, card in self.stat_cards.items():
             if key in stats:
                 value = stats[key]
                 if key in ['total_pnl', 'avg_trade_pnl']:
-                    label.setText(f"${value:,.2f}")
+                    formatted_value = f"${value:,.2f}"
+                    color = "#4CAF50" if value >= 0 else "#F44336"
                 elif key in ['win_rate', 'max_drawdown', 'return_pct']:
-                    label.setText(f"{value:.2%}")
+                    formatted_value = f"{value:.1%}"
+                    if key == 'max_drawdown':
+                        color = "#F44336"
+                    elif key == 'win_rate':
+                        color = "#4CAF50" if value >= 0.5 else "#FF9800"
+                    else:
+                        color = "#4CAF50" if value >= 0 else "#F44336"
                 elif key in ['profit_factor', 'sharpe_ratio']:
-                    label.setText(f"{value:.2f}")
+                    formatted_value = f"{value:.2f}"
+                    color = "#4CAF50" if value >= 1.0 else "#FF9800"
                 else:
-                    label.setText(str(value))
+                    formatted_value = str(value)
+                    color = "#2196F3"
+                
+                card.update_value(formatted_value, color)
         
-        # Update equity curve
+        # Update charts and table
         self._plot_equity_curve(results['equity_curve'])
-        
-        # Update trades table
         self._update_trades_table(results['trades'])
-        
-        # Update daily P&L
         self._plot_daily_pnl(results['daily_pnl'])
     
     def _plot_equity_curve(self, equity_curve: List[Tuple[datetime, float]]):
-        """Plot equity curve"""
+        """Plot enhanced equity curve with proper cumulative P&L"""
         self.equity_figure.clear()
         ax = self.equity_figure.add_subplot(111)
         
+        if not equity_curve:
+            ax.text(0.5, 0.5, 'No equity data available', 
+                   transform=ax.transAxes, ha='center', va='center',
+                   fontsize=14, color='gray')
+            self.equity_canvas.draw()
+            return
+        
+        # Extract and validate data
         dates = [eq[0] for eq in equity_curve]
         values = [eq[1] for eq in equity_curve]
         
-        ax.plot(dates, values, 'b-', linewidth=2)
-        ax.set_title('Equity Curve', fontsize=14, fontweight='bold')
-        ax.set_xlabel('Date')
-        ax.set_ylabel('Portfolio Value ($)')
-        ax.grid(True, alpha=0.3)
+        # Debug: Check if all values are the same (flat line issue)
+        if len(set(values)) == 1:
+            # If all values are the same, this suggests the equity curve calculation is wrong
+            # Let's add some debugging info
+            print(f"WARNING: Equity curve appears flat. All values = {values[0]}")
+            print(f"Equity curve data points: {len(values)}")
         
-        # Format y-axis
+        # Plot with enhanced styling
+        line = ax.plot(dates, values, color='#1976D2', linewidth=3, alpha=0.9, marker='o', markersize=3)[0]
+        ax.fill_between(dates, values, alpha=0.1, color='#1976D2')
+        
+        # Styling
+        ax.set_title('Portfolio Equity Curve', fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel('Date', fontsize=12)
+        ax.set_ylabel('Portfolio Value ($)', fontsize=12)
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.set_facecolor('#FAFAFA')
+        
+        # Format axes with better scaling
         ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
+        ax.tick_params(labelsize=10)
+        
+        # Auto-scale Y axis to show variance better
+        if len(values) > 1:
+            y_range = max(values) - min(values)
+            if y_range > 0:
+                padding = y_range * 0.1  # 10% padding
+                ax.set_ylim(min(values) - padding, max(values) + padding)
+        
+        # Rotate dates for better readability
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+        
+        # Add statistics box with more detailed info
+        if values and len(values) > 1:
+            total_return = ((values[-1] - values[0]) / values[0]) * 100 if values[0] != 0 else 0
+            max_value = max(values)
+            min_value = min(values)
+            volatility = self._calculate_volatility(values)
+            
+            stats_text = (f'Total Return: {total_return:.1f}%\n'
+                         f'Max Value: ${max_value:,.0f}\n'
+                         f'Min Value: ${min_value:,.0f}\n'
+                         f'Volatility: {volatility:.1f}%')
+            
+            ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10,
+                   verticalalignment='top', 
+                   bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.9, edgecolor='#E0E0E0'))
         
         self.equity_figure.tight_layout()
         self.equity_canvas.draw()
     
+    def _calculate_volatility(self, values: List[float]) -> float:
+        """Calculate simple volatility of equity curve"""
+        if len(values) < 2:
+            return 0.0
+        
+        returns = []
+        for i in range(1, len(values)):
+            if values[i-1] != 0:
+                daily_return = (values[i] - values[i-1]) / values[i-1]
+                returns.append(daily_return)
+        
+        if not returns:
+            return 0.0
+        
+        # Calculate standard deviation
+        mean_return = sum(returns) / len(returns)
+        variance = sum((r - mean_return) ** 2 for r in returns) / len(returns)
+        volatility = (variance ** 0.5) * 100  # Convert to percentage
+        
+        return volatility
+    
     def _update_trades_table(self, trades: List[Trade]):
-        """Update trades table"""
+        """Update trades table with enhanced formatting"""
         self.trades_table.setRowCount(len(trades))
         
         for i, trade in enumerate(trades):
             # Entry time
-            self.trades_table.setItem(i, 0, QTableWidgetItem(
-                trade.entry_time.strftime('%Y-%m-%d %H:%M')
-            ))
+            entry_item = QTableWidgetItem(trade.entry_time.strftime('%Y-%m-%d\n%H:%M'))
+            entry_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.trades_table.setItem(i, 0, entry_item)
             
             # Exit time
-            exit_time = trade.exit_time.strftime('%Y-%m-%d %H:%M') if trade.exit_time else "--"
-            self.trades_table.setItem(i, 1, QTableWidgetItem(exit_time))
+            if trade.exit_time:
+                exit_text = trade.exit_time.strftime('%Y-%m-%d\n%H:%M')
+            else:
+                exit_text = "Open"
+            exit_item = QTableWidgetItem(exit_text)
+            exit_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.trades_table.setItem(i, 1, exit_item)
             
-            # Type
-            self.trades_table.setItem(i, 2, QTableWidgetItem(trade.trade_type))
-
-            #¸ SPX Price
+            # Type with color coding
+            type_item = QTableWidgetItem(trade.trade_type)
+            type_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            type_item.setBackground(QColor("#E3F2FD"))
+            self.trades_table.setItem(i, 2, type_item)
+            
+            # SPX Price
             spx_price = trade.metadata.get('spx_price', 'N/A')
-            self.trades_table.setItem(i, 3, QTableWidgetItem(str(spx_price)))
-
-            #legs
-            legs = ""
-            for value in trade.contracts.values():
-                legs += ", ".join([f"{k} : {v}" for k, v in value.items()])
-                legs += "\n"
-            item = QTableWidgetItem(legs)
-            item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-            self.trades_table.setItem(i, 4, item)
-            #self.trades_table.setWordWrap(True)
-            self.trades_table.resizeRowsToContents()
+            spx_item = QTableWidgetItem(f"${spx_price:,.2f}" if isinstance(spx_price, (int, float)) else str(spx_price))
+            spx_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.trades_table.setItem(i, 3, spx_item)
+            
+            # Legs details with elegant formatting
+            legs_widget = QWidget()
+            legs_layout = QVBoxLayout()
+            legs_layout.setContentsMargins(6, 6, 6, 6)
+            legs_layout.setSpacing(4)
+            
+            for leg_name, details in trade.contracts.items():
+                # Create a frame for each leg
+                leg_frame = QFrame()
+                leg_frame.setStyleSheet("""
+                    QFrame {
+                        background-color: #F8F9FA;
+                        border: 1px solid #E0E0E0;
+                        border-radius: 4px;
+                        padding: 4px;
+                        margin: 1px;
+                    }
+                """)
+                
+                leg_frame_layout = QVBoxLayout()
+                leg_frame_layout.setContentsMargins(4, 3, 4, 3)
+                leg_frame_layout.setSpacing(2)
+                
+                # Leg name header
+                leg_header = QLabel(leg_name)
+                leg_header.setStyleSheet("""
+                    QLabel {
+                        font-weight: bold; 
+                        color: #1976D2; 
+                        font-size: 10px;
+                        margin-bottom: 2px;
+                    }
+                """)
+                leg_frame_layout.addWidget(leg_header)
+                
+                # Leg details in organized rows
+                details_text = []
+                for key, value in details.items():
+                    if isinstance(value, float):
+                        formatted_value = f"{value:.2f}"
+                    else:
+                        formatted_value = str(value)
+                    details_text.append(f"{key}: {formatted_value}")
+                
+                # Split details into multiple lines for better readability
+                if len(details_text) > 0:
+                    # Group details for better layout
+                    for detail in details_text:
+                        detail_label = QLabel(f"• {detail}")
+                        detail_label.setStyleSheet("""
+                            QLabel {
+                                color: #555; 
+                                font-size: 9px;
+                                margin: 0px;
+                                padding: 1px 0px;
+                            }
+                        """)
+                        detail_label.setWordWrap(True)
+                        leg_frame_layout.addWidget(detail_label)
+                
+                leg_frame.setLayout(leg_frame_layout)
+                legs_layout.addWidget(leg_frame)
+            
+            legs_widget.setLayout(legs_layout)
+            self.trades_table.setCellWidget(i, 4, legs_widget)
+            
             # Size
-            self.trades_table.setItem(i, 5, QTableWidgetItem(str(trade.size)))
-
-            # Entry price
-            if(trade.trade_type == "Iron Condor 1"):
+            size_item = QTableWidgetItem(str(trade.size))
+            size_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.trades_table.setItem(i, 5, size_item)
+            
+            # Net Premium
+            if trade.trade_type == "Iron Condor 1":
                 entry_price = trade.metadata['net_credit']
             else:
-                entry_price = -trade.metadata['total_premium']/ trade.size
-            self.trades_table.setItem(i, 6, QTableWidgetItem(str(entry_price)))
+                entry_price = -trade.metadata['total_premium'] / trade.size
             
-            # P&L
-            pnl_item = QTableWidgetItem(f"${trade.pnl:,.2f}")
-            if trade.pnl >= 0:
-                pnl_item.setForeground(QColor(0, 128, 0))
+            premium_item = QTableWidgetItem(f"${entry_price:,.2f}")
+            premium_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if entry_price >= 0:
+                premium_item.setForeground(QColor("#4CAF50"))
             else:
-                pnl_item.setForeground(QColor(255, 0, 0))
-            self.trades_table.setItem(i, 7, pnl_item)
+                premium_item.setForeground(QColor("#F44336"))
+            self.trades_table.setItem(i, 6, premium_item)
             
-            # Status
-            self.trades_table.setItem(i, 8, QTableWidgetItem(trade.status))
+            # P&L with enhanced styling
+            pnl_item = QTableWidgetItem(f"${trade.pnl:,.2f}")
+            pnl_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            pnl_item.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+            
+            if trade.pnl >= 0:
+                pnl_item.setForeground(QColor("#4CAF50"))
+                pnl_item.setBackground(QColor("#E8F5E8"))
+            else:
+                pnl_item.setForeground(QColor("#F44336"))
+                pnl_item.setBackground(QColor("#FFEBEE"))
+            
+            self.trades_table.setItem(i, 7, pnl_item)
+        
+        # Adjust row heights
+        self.trades_table.resizeRowsToContents()
     
     def _plot_daily_pnl(self, daily_pnl: Dict[datetime, float]):
-        """Plot daily P&L"""
+        """Plot enhanced daily P&L"""
         self.pnl_figure.clear()
         ax = self.pnl_figure.add_subplot(111)
         
         dates = list(daily_pnl.keys())
         pnls = list(daily_pnl.values())
         
-        # Create bar chart
-        colors = ['g' if pnl >= 0 else 'r' for pnl in pnls]
-        ax.bar(dates, pnls, color=colors, alpha=0.7)
+        # Create enhanced bar chart
+        colors = ['#4CAF50' if pnl >= 0 else '#F44336' for pnl in pnls]
+        bars = ax.bar(dates, pnls, color=colors, alpha=0.7, edgecolor='white', linewidth=0.5)
         
-        ax.set_title('Daily P&L', fontsize=14, fontweight='bold')
-        ax.set_xlabel('Date')
-        ax.set_ylabel('P&L ($)')
-        ax.grid(True, alpha=0.3)
+        # Add value labels on bars
+        for bar, pnl in zip(bars, pnls):
+            height = bar.get_height()
+            if abs(height) > max(abs(min(pnls)), max(pnls)) * 0.1:  # Only label significant bars
+                ax.text(bar.get_x() + bar.get_width()/2., height + (50 if height >= 0 else -50),
+                       f'${height:,.0f}', ha='center', va='bottom' if height >= 0 else 'top',
+                       fontsize=8, fontweight='bold')
+        
+        ax.set_title('Daily Profit & Loss', fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel('Date', fontsize=12)
+        ax.set_ylabel('P&L ($)', fontsize=12)
+        ax.grid(True, alpha=0.3, linestyle='--')
         
         # Format y-axis
         ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
+        ax.tick_params(labelsize=10)
         
         # Add zero line
-        ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+        ax.axhline(y=0, color='#424242', linestyle='-', alpha=0.6, linewidth=1)
+        
+        # Add summary statistics
+        if pnls:
+            avg_daily = sum(pnls) / len(pnls)
+            win_days = sum(1 for pnl in pnls if pnl > 0)
+            total_days = len(pnls)
+            win_rate_daily = (win_days / total_days) * 100
+            
+            stats_text = f'Avg Daily P&L: ${avg_daily:,.0f}\nWin Rate: {win_rate_daily:.1f}%\nWin Days: {win_days}/{total_days}'
+            ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10,
+                   verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
         
         self.pnl_figure.tight_layout()
         self.pnl_canvas.draw()
