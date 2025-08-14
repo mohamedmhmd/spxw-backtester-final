@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class IronCondor1:
 
-    def _check_entry_signals_5min(ohloc_data: pd.DataFrame, current_idx: int, 
+    def _check_entry_signals_5min(spx_ohlc_data, spy_ohlc_data: pd.DataFrame, current_idx: int, 
                                   strategy: StrategyConfig) -> Dict[str, Any]:
         """Check entry signals using 5-minute bars only"""
         signals = {
@@ -31,15 +31,15 @@ class IronCondor1:
         }
         
         # Condition 1: Volume check (consecutive candles below threshold)
-        first_candle_volume = ohloc_data.iloc[0]['volume']
+        first_candle_volume = spy_ohlc_data.iloc[0]['volume']
         volume_threshold = first_candle_volume * strategy.volume_threshold
         
         volume_ok = True
         volume_checks = []
         for j in range(strategy.consecutive_candles):
             idx = current_idx - strategy.consecutive_candles + j + 1
-            if idx >= 0 and idx < len(ohloc_data):
-                current_volume = ohloc_data.iloc[idx]['volume']
+            if idx >= 0 and idx < len(spy_ohlc_data):
+                current_volume = spy_ohlc_data.iloc[idx]['volume']
                 volume_checks.append(current_volume)
                 if current_volume > volume_threshold:
                     volume_ok = False
@@ -47,28 +47,33 @@ class IronCondor1:
         signals['volume_condition'] = volume_ok
         signals['details']['volume_checks'] = volume_checks
         signals['details']['volume_threshold'] = volume_threshold
+
+        if not volume_ok:
+            return signals
         
         # Condition 2: Direction check (not all candles in same direction)
         directions = []
         for j in range(strategy.lookback_candles):
             idx = current_idx - strategy.lookback_candles + j + 1
-            if idx >= 0 and idx < len(ohloc_data):
-                open_price = ohloc_data.iloc[idx]['open']
-                close_price = ohloc_data.iloc[idx]['close']
+            if idx >= 0 and idx < len(spy_ohlc_data):
+                open_price = spy_ohlc_data.iloc[idx]['open']
+                close_price = spy_ohlc_data.iloc[idx]['close']
                 directions.append(1 if close_price > open_price else -1)
         
         if directions:
             all_same = all(d == directions[0] for d in directions)
             signals['direction_condition'] = not all_same
             signals['details']['directions'] = directions
+            if all_same:
+                return signals  # Exit early if all same direction
         
         # Condition 3: Range check (recent range below threshold)
         recent_ranges = []
         for j in range(strategy.avg_range_candles):
             idx = current_idx - strategy.avg_range_candles + j + 1
-            if idx >= 0 and idx < len(ohloc_data):
-                high = ohloc_data.iloc[idx]['high']
-                low = ohloc_data.iloc[idx]['low']
+            if idx >= 0 and idx < len(spy_ohlc_data):
+                high = spy_ohlc_data.iloc[idx]['high']
+                low = spy_ohlc_data.iloc[idx]['low']
                 recent_ranges.append(high - low)
         
         if recent_ranges:
@@ -77,8 +82,8 @@ class IronCondor1:
             # Calculate average range for all candles up to current
             all_ranges = []
             for j in range(current_idx + 1):
-                high = ohloc_data.iloc[j]['high']
-                low = ohloc_data.iloc[j]['low']
+                high = spy_ohlc_data.iloc[j]['high']
+                low = spy_ohlc_data.iloc[j]['low']
                 all_ranges.append(high - low)
             
             if all_ranges:
@@ -102,7 +107,7 @@ class IronCondor1:
                                  strategy: StrategyConfig, data_provider : Union[MockDataProvider, PolygonDataProvider]) -> Optional[Dict[str, float]]: # type: ignore
         """Find Iron Condor strikes targeting specific win/loss ratio"""
         # Round ATM to nearest 5
-        atm_strike = int(round(current_price / 5) * 5)*10 #approximation of spx
+        atm_strike = int(round(current_price / 5) * 5) #approximation of spx
         #available_strikes = sorted(option_chain['strike'].unique())
 
         # Configurable search window
@@ -202,7 +207,7 @@ class IronCondor1:
     async def _execute_iron_condor(quotes: Dict[str, Dict], entry_time: datetime,
                                   contracts: Dict[str, str], strategy: StrategyConfig,
                                   signals: Dict,
-                                  net_credit: float) -> Optional[Trade]:
+                                  net_credit: float, current_price) -> Optional[Trade]:
         """Execute Iron Condor trade""" 
         # Check if we have all quotes
         if not all(contract in quotes for contract in contracts.values()):
@@ -250,7 +255,8 @@ class IronCondor1:
             entry_signals=signals,
             metadata={
                 'net_credit': net_credit,
-                'strategy_name': 'iron_1'
+                'strategy_name': 'iron_1',
+                'spx_price': current_price,
             }
         )
         
@@ -271,7 +277,7 @@ class IronCondor1:
         return contracts
     
 
-    async def _find_iron_trade(ohlc_data : pd.DataFrame, i : int, 
+    async def _find_iron_trade(spx_ohlc_data, spy_ohlc_data : pd.DataFrame, i : int, 
                                  strategy : StrategyConfig, 
                                  date: datetime,
                                  current_price,
@@ -280,16 +286,14 @@ class IronCondor1:
                                  ) -> Trade:
         """Find Iron Condor 1 trade based on strategy config"""
         # Check entry conditions for new Iron Condor trades
-        signals = IronCondor1._check_entry_signals_5min(ohlc_data, i, strategy)
+        signals = IronCondor1._check_entry_signals_5min(spx_ohlc_data, spy_ohlc_data, i, strategy)
             
         if signals['entry_signal']:
-            # Prepare for option trades
             if isinstance(date, datetime):
                 option_date = date
             else:
                 option_date = datetime.combine(date, datetime.min.time())
                 
-            # Find Iron Condor strikes
             ic_result = await IronCondor1._find_iron_condor_strikes(current_price, current_bar_time, strategy, data_provider)
                 
             if ic_result:
@@ -300,26 +304,22 @@ class IronCondor1:
                         'long_put': ic_result['long_put']
                 }
                     
-                # Create option contracts for Iron Condor
                 ic_contracts = IronCondor1._create_option_contracts(ic_strikes, option_date)
-                    
-                # Get quotes and calculate net credit BEFORE executing
                 ic_quotes = await data_provider.get_option_quotes(
                     list(ic_contracts.values()), current_bar_time
                 )
                     
-                # Calculate net credit
                 net_credit = IronCondor1._calculate_iron_condor_credit(ic_quotes, ic_contracts)
                     
                 if net_credit > 0:
-                    # Execute Iron Condor trade
                     ic_trade = await IronCondor1._execute_iron_condor(
                             ic_quotes,
                             current_bar_time,
                             ic_contracts,
                             strategy,
                             signals,
-                            net_credit
+                            net_credit,
+                            current_price
                     )
                     logger.info(f"Entered Iron Condor 1 at {current_bar_time}: {ic_strikes}")
                     return ic_trade

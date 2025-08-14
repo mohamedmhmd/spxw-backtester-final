@@ -104,8 +104,8 @@ class ResultsWidget(QWidget):
         self.trades_table = QTableWidget()
         self.trades_table.setColumnCount(8)
         self.trades_table.setHorizontalHeaderLabels([
-            "Entry Time", "Exit Time", "Type", "Legs", "Size", "Net Premium",
-            "Entry Signals", "P&L", "Status"
+            "Entry Time", "Exit Time", "Type", "SPX Price", "Legs", "Size", "Net Premium",
+             "P&L", "Status"
         ])
         
         # Set column widths
@@ -191,6 +191,10 @@ class ResultsWidget(QWidget):
             # Type
             self.trades_table.setItem(i, 2, QTableWidgetItem(trade.trade_type))
 
+            #¸ SPX Price
+            spx_price = trade.metadata.get('spx_price', 'N/A')
+            self.trades_table.setItem(i, 3, QTableWidgetItem(str(spx_price)))
+
             #legs
             legs = ""
             for value in trade.contracts.values():
@@ -198,22 +202,18 @@ class ResultsWidget(QWidget):
                 legs += "\n"
             item = QTableWidgetItem(legs)
             item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-            self.trades_table.setItem(i, 3, item)
+            self.trades_table.setItem(i, 4, item)
             #self.trades_table.setWordWrap(True)
             self.trades_table.resizeRowsToContents()
             # Size
-            self.trades_table.setItem(i, 4, QTableWidgetItem(str(trade.size)))
+            self.trades_table.setItem(i, 5, QTableWidgetItem(str(trade.size)))
 
             # Entry price
             if(trade.trade_type == "Iron Condor 1"):
-                entry_price = trade.metadata['net_credit']*trade.size
+                entry_price = trade.metadata['net_credit']
             else:
-                entry_price = -trade.metadata['total_premium']
-            self.trades_table.setItem(i, 5, QTableWidgetItem(str(entry_price)))
-
-            # Entry signals
-            signals = ", ".join([k for k, v in trade.entry_signals.items() if v and k.endswith('_condition')])
-            self.trades_table.setItem(i, 6, QTableWidgetItem(signals))
+                entry_price = -trade.metadata['total_premium']/ trade.size
+            self.trades_table.setItem(i, 6, QTableWidgetItem(str(entry_price)))
             
             # P&L
             pnl_item = QTableWidgetItem(f"${trade.pnl:,.2f}")

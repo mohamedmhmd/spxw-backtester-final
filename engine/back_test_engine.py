@@ -92,6 +92,7 @@ class BacktestEngine:
         self.open_straddles = []
         
         spy_ohlc_data = await self.data_provider.get_ohlc_data(date, "SPY")
+        spx_ohlc_data = await self.data_provider.get_ohlc_data(date, "I:SPX")
 
         if spy_ohlc_data.empty:
             logger.warning(f"No data available for {date}")
@@ -108,9 +109,9 @@ class BacktestEngine:
         
         active_iron_condors = []
         ic1_found = False
-        for i in range(min_bars_needed, len(spy_ohlc_data)):
-            current_bar_time = spy_ohlc_data.iloc[i]['timestamp']
-            current_price = spy_ohlc_data.iloc[i]['open']
+        for i in range(min_bars_needed, len(spx_ohlc_data)):
+            current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
+            current_price = spx_ohlc_data.iloc[i]['open']
             if current_bar_time.time() < time(9, 30) or current_bar_time.time() >= time(16, 0):
                 continue
             
@@ -118,7 +119,7 @@ class BacktestEngine:
             if(ic1_found):
                 continue
             
-            ic_trade = await IronCondor1._find_iron_trade(spy_ohlc_data, i, strategy, 
+            ic_trade = await IronCondor1._find_iron_trade(spx_ohlc_data, spy_ohlc_data, i, strategy, 
                                                      date, current_price, current_bar_time,
                                                      self.data_provider)
             if ic_trade:
@@ -133,7 +134,7 @@ class BacktestEngine:
                 straddle_trade = await Straddle1._execute_straddle(
                                 option_date,
                                 current_bar_time,
-                                current_price*10,
+                                current_price,
                                 strategy,
                                 ic_trade,
                                 self.data_provider

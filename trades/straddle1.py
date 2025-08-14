@@ -89,7 +89,8 @@ class Straddle1:
                 'put_straddle_strike': p_strike,
                 'total_premium': total_premium,
                 'exit_percentage': strategy.straddle_exit_percentage,
-                'exit_multiplier': strategy.straddle_exit_multiplier
+                'exit_multiplier': strategy.straddle_exit_multiplier,
+                'spx_price': current_price
             }
         )
         

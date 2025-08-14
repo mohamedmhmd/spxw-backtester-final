@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 import aiohttp
 import asyncio
@@ -135,21 +135,7 @@ class PolygonDataProvider:
             
                  if all_results:
                     df = pd.DataFrame(all_results)
-                    df['timestamp'] = pd.to_datetime(df['t'], unit='ms')
-                    df.rename(columns={
-                    'o': 'open',
-                    'h': 'high',
-                    'l': 'low',
-                    'c': 'close',
-                    'v': 'volume'
-                     }, inplace=True)
-                    df = df[['timestamp', 'open', 'high', 'low', 'close', 'volume']]
-                    df = df.sort_values('timestamp').drop_duplicates(subset=['timestamp'])
-                
-                    df = df[
-                            (df['timestamp'].dt.time >= pd.Timestamp('09:30:00').time()) & 
-                            (df['timestamp'].dt.time <= pd.Timestamp('16:00:00').time())
-                             ]
+                    df = await self.process_ohlc_data(df, underlying, date)
                     logger.info(f"Fetched {len(df)} bars for {underlying} on {date}")
                     return df
                  else:
@@ -163,8 +149,60 @@ class PolygonDataProvider:
                logger.error(f"Error fetching {underlying} data: {e}")
                return pd.DataFrame()  
 
-
+    async def get_spx_complete_bars(self, spx_df, date: datetime) -> pd.DataFrame:
+          market_open = pd.Timestamp(date.year, date.month, date.day, 9, 30, 0)
+          timestamps = []
+          current_time = market_open
+          for i in range(79):
+              timestamps.append(current_time)
+              current_time += pd.Timedelta(minutes=5)
+          complete_df = pd.DataFrame({'timestamp': timestamps})
+          complete_df = complete_df.merge(
+                   spx_df[['timestamp', 'open', 'high', 'low', 'close']], 
+                   on='timestamp', 
+                   how='left'
+                      )
+          complete_df['close'] = complete_df['close'].fillna(method='ffill')
+          complete_df['open'] = complete_df['open'].fillna(complete_df['close'])
+          complete_df['high'] = complete_df['high'].fillna(complete_df['close'])
+          complete_df['low'] = complete_df['low'].fillna(complete_df['close'])
     
+
+          if complete_df['close'].isna().any():
+             complete_df['close'] = complete_df['close'].fillna(method='bfill')
+             complete_df['open'] = complete_df['open'].fillna(complete_df['close'])
+             complete_df['high'] = complete_df['high'].fillna(complete_df['close'])
+             complete_df['low'] = complete_df['low'].fillna(complete_df['close'])
+    
+          logger.info(f"Created {len(complete_df)} complete SPX bars for {date} (forward-filled from {len(spx_df)} original bars)")
+    
+          return complete_df
+
+    async def process_ohlc_data(self, df: pd.DataFrame, underlying : str, date: datetime) -> pd.DataFrame:
+        df['timestamp'] = pd.to_datetime(df['t'], unit='ms')
+        df = df.sort_values('timestamp').drop_duplicates(subset=['timestamp'])        
+        df = df[
+                    (df['timestamp'].dt.time >= pd.Timestamp('09:30:00').time()) & 
+                    (df['timestamp'].dt.time <= pd.Timestamp('16:00:00').time())
+                    ]
+        if(underlying == "I:SPX"):
+             df.rename(columns={
+            'o': 'open',
+            'h': 'high',
+            'l': 'low',
+            'c': 'close',
+                     }, inplace=True)
+             df = df[['timestamp', 'open', 'high', 'low', 'close']]
+             df = await self.get_spx_complete_bars(df, date)
+        elif(underlying == "SPY"):
+            df.rename(columns={
+                'o': 'open',
+                'h': 'high',
+                'l': 'low',
+                'c': 'close',
+                'v': 'volume'
+            }, inplace=True)
+        return df
 
     async def _get_option_tick_quote(self, contract: str, timestamp: datetime) -> Dict:
         """
