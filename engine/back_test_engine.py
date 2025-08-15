@@ -206,7 +206,7 @@ class BacktestEngine:
         # Close any remaining open trades at expiry
         for trade in trades:
             if trade.status == "OPEN":
-                await trade._close_trade_at_expiry(spy_ohlc_data, date, config)
+                await trade._close_trade_at_expiry(spx_ohlc_data, date, config)
         
         logger.info(f"Day {date.strftime('%Y-%m-%d')} completed: {len([t for t in trades if t.trade_type == 'Iron Condor 1'])} Iron Condors, {len([t for t in trades if t.trade_type == 'Straddle 1'])} Straddles")
         return trades

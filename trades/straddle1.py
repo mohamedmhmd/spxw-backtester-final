@@ -66,13 +66,13 @@ class Straddle1:
                 straddle_strike = p_strike
             
             trade_contracts[contract] = {
-                'position': strategy.straddle_1_trade_size,  # Long position
+                'position': 1,  # Long position
                 'entry_price': price,
                 'leg_type': leg,
                 'strike': straddle_strike,
-                'remaining_position': strategy.straddle_1_trade_size  # Track for partial exits
+                'remaining_position': 1  # Track for partial exits
             }
-            total_premium += price * strategy.straddle_1_trade_size
+            total_premium += price
         
         # Create straddle trade
         trade = Trade(

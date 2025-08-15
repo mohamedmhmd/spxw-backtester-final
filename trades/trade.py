@@ -62,7 +62,7 @@ class Trade:
             return
         
         # Use official close price
-        settlement_price = ohlc_data.iloc[-1]['close']*10
+        settlement_price = ohlc_data.iloc[-1]['close']
         if isinstance(date, datetime):
             dt = date
         else:

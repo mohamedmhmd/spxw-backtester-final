@@ -584,7 +584,7 @@ class ResultsWidget(QWidget):
             if trade.trade_type == "Iron Condor 1":
                 entry_price = trade.metadata['net_credit']
             else:
-                entry_price = -trade.metadata['total_premium'] / trade.size
+                entry_price = -trade.metadata['total_premium']
             
             premium_item = QTableWidgetItem(f"${entry_price:,.2f}")
             premium_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
