@@ -9,6 +9,7 @@ from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
 import asyncio
+import time as time_module
 
 #Set up logging
 logging.basicConfig(
