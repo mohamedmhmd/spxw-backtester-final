@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import pandas as pd
 import logging
@@ -5,6 +6,7 @@ import asyncio
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
+import json
 
 from engine.statistics import Statistics
 from .back_test_worker import BacktestWorker
@@ -115,6 +117,10 @@ class MainWindow(QMainWindow):
         strategy_group = QGroupBox("Strategy Parameters")
         strategy_layout = QVBoxLayout()
         self.strategy_config_widget = StrategyConfigWidget()
+        self.strategy_config_widget = StrategyConfigWidget()
+        # Connect strategy widget signals
+        self.strategy_config_widget.load_configuration_requested.connect(self.load_configuration)
+        self.strategy_config_widget.export_results_requested.connect(self.export_results)
         strategy_layout.addWidget(self.strategy_config_widget)
         strategy_group.setLayout(strategy_layout)
         layout.addWidget(strategy_group)
@@ -614,65 +620,145 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Error", f"Failed to load configuration: {e}")
     
     def export_results(self):
-        """Export backtest results"""
+        """Export backtest results to JSON file"""
         if not self.last_results:
-            QMessageBox.information(self, "No Results", "Please run a backtest first")
-            return
-        
+           QMessageBox.information(self, "No Results", "Please run a backtest first")
+           return
+    
         filename, _ = QFileDialog.getSaveFileName(
-            self, "Export Results", "", "CSV Files (*.csv);;Excel Files (*.xlsx)"
-        )
-        
+        self, "Export Results", f"backtest_results_{datetime.now().strftime('%Y%m%d_%H%M')}.json", 
+        "JSON Files (*.json)"
+    )
+    
         if filename:
-            try:
-                # Prepare trades data
-                trades_data = []
-                for trade in self.last_results['trades']:
-                    trade_dict = {
-                        'entry_time': trade.entry_time,
-                        'exit_time': trade.exit_time,
-                        'type': trade.trade_type,
-                        'size': trade.size,
-                        'pnl': trade.pnl,
-                        'status': trade.status
-                    }
-                    
-                    # Add strategy-specific details
-                    if trade.trade_type == "Iron Condor":
-                        trade_dict['net_credit'] = trade.metadata.get('net_credit', 0)
-                    elif trade.trade_type == "Straddle":
-                        trade_dict['straddle_strike'] = trade.metadata.get('straddle_strike', 0)
-                        trade_dict['partial_pnl'] = trade.metadata.get('partial_pnl', 0)
-                    
-                    trades_data.append(trade_dict)
-                
-                # Create DataFrame
-                df = pd.DataFrame(trades_data)
-                
-                # Export based on file type
-                if filename.endswith('.xlsx'):
-                    # Create Excel with multiple sheets
-                    with pd.ExcelWriter(filename) as writer:
-                        # Trades sheet
-                        df.to_excel(writer, sheet_name='Trades', index=False)
-                        
-                        # Statistics sheet
-                        stats_df = pd.DataFrame([self.last_results['statistics']])
-                        stats_df.to_excel(writer, sheet_name='Statistics', index=False)
-                        
-                        # Daily P&L sheet
-                        daily_pnl_df = pd.DataFrame(
-                            list(self.last_results['daily_pnl'].items()),
-                            columns=['Date', 'P&L']
-                        )
-                        daily_pnl_df.to_excel(writer, sheet_name='Daily P&L', index=False)
+           try:
+            
+            # Helper function to make objects JSON serializable
+              def make_serializable(obj):
+                """Convert objects to JSON serializable format"""
+                if hasattr(obj, 'isoformat'):  # datetime objects
+                    return obj.isoformat()
+                elif hasattr(obj, 'item'):  # numpy types
+                    return obj.item()
+                elif hasattr(obj, 'tolist'):  # numpy arrays
+                    return obj.tolist()
+                elif isinstance(obj, (int, float, str, bool, type(None))):
+                    return obj
+                elif isinstance(obj, dict):
+                    return {k: make_serializable(v) for k, v in obj.items()}
+                elif isinstance(obj, (list, tuple)):
+                    return [make_serializable(item) for item in obj]
                 else:
-                    # Simple CSV export
-                    df.to_csv(filename, index=False)
+                    return str(obj)  # Convert everything else to string
+            
+            # Get actual unique trades (avoid duplicates)
+              unique_trades = []
+              seen_trades = set()
+            
+              for trade in self.last_results['trades']:
+                # Create unique identifier for trade
+                  trade_id = f"{trade.entry_time}_{trade.trade_type}_{trade.size}"
+                  if trade_id not in seen_trades:
+                     unique_trades.append(trade)
+                     seen_trades.add(trade_id)
+            
+            # Create comprehensive export structure
+              export_data = {
+                "export_info": {
+                    "timestamp": datetime.now().isoformat(),
+                    "system_version": "2.0.0",
+                    "total_trades": len(unique_trades),  # Use unique count
+                    "export_format": "baytides_backtest_v1"
+                },
+                "configuration": {
+                    "backtest_period": {
+                        "start_date": self.backtest_config_widget.start_date.date().toString('yyyy-MM-dd'),
+                        "end_date": self.backtest_config_widget.end_date.date().toString('yyyy-MM-dd')
+                    },
+                    "strategy_parameters": {
+                        "iron_1_trade_size": self.strategy_config_widget.iron_1_trade_size.value(),
+                        "straddle_1_trade_size": self.strategy_config_widget.straddle_1_trade_size.value(),
+                        "target_win_loss_ratio": self.strategy_config_widget.target_win_loss_ratio.value(),
+                        "consecutive_candles": self.strategy_config_widget.consecutive_candles.value(),
+                        "volume_threshold": self.strategy_config_widget.volume_threshold.value(),
+                        "range_threshold": self.strategy_config_widget.range_threshold.value()
+                    },
+                    "trading_parameters": {
+                        "commission_per_contract": self.backtest_config_widget.commission.value(),
+                        "data_provider": "mock" if self.use_mock_data.isChecked() else "polygon"
+                    }
+                },
+                "performance_summary": make_serializable(self.last_results['statistics']),
+                "daily_pnl": {},
+                "equity_curve": [],
+                "trades": []
+            }
+            
+            # Process daily P&L safely
+              for date, pnl in self.last_results['daily_pnl'].items():
+                  if hasattr(date, 'strftime'):
+                    date_str = date.strftime('%Y-%m-%d')
+                  else:
+                    date_str = str(date)
+                  export_data["daily_pnl"][date_str] = round(float(pnl), 2)
+            
+            # Process equity curve safely
+              for date, value in self.last_results['equity_curve']:
+                  if hasattr(date, 'strftime'):
+                    date_str = date.strftime('%Y-%m-%d')
+                  else:
+                    date_str = str(date)
                 
-                self.status_bar.showMessage(f"Results exported to {filename}", 5000)
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"Failed to export results: {e}")
+                  export_data["equity_curve"].append({
+                    "date": date_str,
+                    "portfolio_value": round(float(value), 2)
+                })
+            
+            # Add detailed trade information (using unique trades)
+              for trade in unique_trades:
+                   trade_data = {
+                    "entry_time": trade.entry_time.isoformat() if hasattr(trade.entry_time, 'isoformat') else str(trade.entry_time),
+                    "exit_time": trade.exit_time.isoformat() if trade.exit_time and hasattr(trade.exit_time, 'isoformat') else None,
+                    "trade_type": str(trade.trade_type),
+                    "size": int(trade.size),
+                    "pnl": round(float(trade.pnl), 2),
+                    "status": str(trade.status),
+                    "metadata": make_serializable(trade.metadata) if trade.metadata else {},
+                    "contracts": {}
+                }
+                
+                # Add contract details with proper structure
+                   for contract_symbol, details in trade.contracts.items():
+                       trade_data["contracts"][str(contract_symbol)] = {
+                        "leg_type": str(details.get('leg_type', '')),
+                        "position": int(details.get('position', 0)),
+                        "entry_price": round(float(details.get('entry_price', 0)), 4),
+                        "exit_price": round(float(details.get('exit_price', 0)), 4),
+                        "remaining_position": int(details.get('remaining_position', details.get('position', 0)))
+                    }
+                
+                   export_data["trades"].append(trade_data)
+            
+            # Save JSON file with proper formatting
+              with open(filename, 'w') as f:
+                   json.dump(export_data, f, indent=2, ensure_ascii=False, default=str)
+            
+            # Show success message with correct count
+              QMessageBox.information(
+                self, 
+                "Export Successful", 
+                f"Results exported successfully to:\n{filename}\n\n"
+                f"📊 {len(unique_trades)} trades exported\n"
+                f"📈 Complete performance metrics included\n"
+                f"⚙️ Configuration settings preserved"
+            )
+            
+              self.status_bar.showMessage(f"Results exported to JSON: {filename}", 5000)
+              logger.info(f"JSON export completed: {filename} with {len(unique_trades)} trades")
+            
+           except Exception as e:
+            QMessageBox.warning(self, "Export Error", f"Failed to export results:\n{str(e)}")
+            logger.error(f"JSON export error: {e}")  
     
     def show_about(self):
         """Show about dialog"""

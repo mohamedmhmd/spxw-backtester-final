@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 
 class StrategyConfigWidget(QWidget):
     """Widget for configuring all strategy parameters"""
+    
+    load_configuration_requested = pyqtSignal()
+    export_results_requested = pyqtSignal()
+    
 
     def __init__(self):
         super().__init__()
@@ -162,16 +166,45 @@ class StrategyConfigWidget(QWidget):
         # Add buttons at the bottom
         button_layout = QHBoxLayout()
         
-        self.reset_button = QPushButton("Reset to Defaults")
-        self.reset_button.clicked.connect(self.reset_to_defaults)
-        self.reset_button.setToolTip("Reset all parameters to strategy defaults")
+        # Add buttons at the bottom
+        button_layout = QHBoxLayout()
         
-        self.validate_button = QPushButton("Validate Settings")
-        self.validate_button.clicked.connect(self.validate_settings)
-        self.validate_button.setToolTip("Check if current settings are valid")
+        self.load_config_button = QPushButton("Load Configuration")
+        self.load_config_button.clicked.connect(self.load_configuration_clicked)
+        self.load_config_button.setToolTip("Load strategy configuration from file")
+        self.load_config_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                font-weight: bold;
+                padding: 8px 16px;
+                border-radius: 4px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
         
-        button_layout.addWidget(self.reset_button)
-        button_layout.addWidget(self.validate_button)
+        self.export_results_button = QPushButton("Export Results")
+        self.export_results_button.clicked.connect(self.export_results_clicked)
+        self.export_results_button.setToolTip("Export trades and statistics to CSV files")
+        self.export_results_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                padding: 8px 16px;
+                border-radius: 4px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        
+        button_layout.addWidget(self.load_config_button)
+        button_layout.addWidget(self.export_results_button)
         button_layout.addStretch()
         
         main_layout.addLayout(button_layout)
@@ -182,61 +215,15 @@ class StrategyConfigWidget(QWidget):
         self.setMinimumWidth(400)
         self.setMaximumHeight(600)
 
-    def reset_to_defaults(self):
-        """Reset all parameters to strategy defaults"""
-        self.strategy_name.setText("iron_1")
-        self.consecutive_candles.setValue(3)
-        self.volume_threshold.setValue(0.5)
-        self.lookback_candles.setValue(4)
-        self.avg_range_candles.setValue(2)
-        self.range_threshold.setValue(0.8)
-        self.trade_size.setValue(10)
-        self.target_win_loss_ratio.setValue(1.5)
-        self.min_wing_width.setValue(15)
-        self.max_wing_width.setValue(70)
-        self.wing_width_step.setValue(5)
-        self.straddle_distance_multiplier.setValue(2.5)
-        self.straddle_exit_percentage.setValue(0.5)
-        self.straddle_exit_multiplier.setValue(2.0)
-        
-        logger.info("Reset all parameters to defaults")
+    def load_configuration_clicked(self):
+        """Emit signal to request configuration loading"""
+        self.load_configuration_requested.emit()
+        logger.info("Load configuration requested from strategy widget")
 
-    def validate_settings(self):
-        """Validate current settings and show results"""
-        errors = []
-        warnings = []
-        
-        # Check logical constraints
-        if self.min_wing_width.value() >= self.max_wing_width.value():
-            errors.append("Min wing width must be less than max wing width")
-        
-        if self.wing_width_step.value() > (self.max_wing_width.value() - self.min_wing_width.value()):
-            warnings.append("Wing width step is larger than search range")
-        
-        if self.consecutive_candles.value() > self.lookback_candles.value():
-            warnings.append("Consecutive candles > lookback candles may cause issues")
-        
-        if self.volume_threshold.value() > 0.8:
-            warnings.append("Volume threshold > 80% may result in very few signals")
-        
-        if self.range_threshold.value() > 1.0:
-            warnings.append("Range threshold > 100% may result in very few signals")
-        
-        if self.straddle_exit_percentage.value() > 0.8:
-            warnings.append("Straddle exit percentage > 80% exits most of position")
-        
-        # Show results
-        if errors:
-            QMessageBox.critical(self, "Validation Errors", 
-                               f"Please fix these errors:\n\n" + "\n".join(f"• {error}" for error in errors))
-        elif warnings:
-            QMessageBox.warning(self, "Validation Warnings", 
-                              f"Consider reviewing these settings:\n\n" + "\n".join(f"• {warning}" for warning in warnings))
-        else:
-            QMessageBox.information(self, "Validation Success", 
-                                  "All settings look good!")
-        
-        logger.info(f"Validation complete: {len(errors)} errors, {len(warnings)} warnings")
+    def export_results_clicked(self):
+        """Emit signal to request results export"""
+        self.export_results_requested.emit()
+        logger.info("Export results requested from strategy widget")
 
     def get_config(self) -> StrategyConfig:
         """Get full strategy configuration from widget values."""
