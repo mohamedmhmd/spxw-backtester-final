@@ -596,10 +596,8 @@ class MainWindow(QMainWindow):
                     self.backtest_config_widget.end_date.setDate(
                         QDate.fromString(bc['end_date'][:10], 'yyyy-MM-dd')
                     )
-                    self.backtest_config_widget.initial_capital.setValue(bc['initial_capital'])
+                   
                     self.backtest_config_widget.commission.setValue(bc['commission_per_contract'])
-                    self.backtest_config_widget.use_bid_ask.setChecked(bc['use_bid_ask'])
-                    self.backtest_config_widget.granularity.setCurrentText(bc['data_granularity'])
                 
                 # Load strategy config
                 if 'strategy' in config:
@@ -609,8 +607,10 @@ class MainWindow(QMainWindow):
                     self.strategy_config_widget.lookback_candles.setValue(sc['lookback_candles'])
                     self.strategy_config_widget.avg_range_candles.setValue(sc['avg_range_candles'])
                     self.strategy_config_widget.range_threshold.setValue(sc['range_threshold'])
-                    self.strategy_config_widget.trade_size.setValue(sc['trade_size'])
-                    self.strategy_config_widget.win_loss_ratio.setValue(sc['target_win_loss_ratio'])
+                    self.strategy_config_widget.straddle_1_trade_size.setValue(sc['straddle_1_trade_size'])
+                    self.strategy_config_widget.iron_1_trade_size.setValue(sc['iron_1_trade_size'])
+                    self.strategy_config_widget.target_win_loss_ratio.setValue(sc['target_win_loss_ratio'])
+                    
                     
                     # Load straddle parameters if they exist
                     if 'straddle_distance_multiplier' in sc:
