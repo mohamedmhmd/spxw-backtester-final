@@ -89,7 +89,7 @@ class BacktestEngine:
             self.daily_pnl, 
         )
         
-        logger.info(f"Backtest completed: {len(self.trades)} total trades")
+        logger.info(f"Backtest completed: {len(self.trades)} total trades.")
         total_time = time_module.time() - start_time
         logger.info(f"Total backtest execution time: {total_time:.2f} seconds")
         

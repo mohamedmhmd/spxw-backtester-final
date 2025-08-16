@@ -31,15 +31,6 @@ class BacktestConfigWidget(QWidget):
         self.end_date.setCalendarPopup(True)
         self.end_date.setDate(QDate.currentDate())
         layout.addRow("End Date:", self.end_date)
-        
-        # Capital
-        #self.initial_capital = QDoubleSpinBox()
-        #self.initial_capital.setRange(10000, 10000000)
-        #self.initial_capital.setSingleStep(10000)
-        #self.initial_capital.setValue(100000)
-        #self.initial_capital.setPrefix("$")
-        #layout.addRow("Initial Capital:", self.initial_capital)
-        
         # Commission
         self.commission = QDoubleSpinBox()
         self.commission.setRange(0, 10)

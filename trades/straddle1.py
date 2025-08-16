@@ -141,7 +141,7 @@ class Straddle1:
                                 
                                 if exit_size > 0:
                                     # Calculate P&L for partial exit
-                                    partial_pnl = (exit_price - entry_price) * exit_size * 100  # SPX multiplier
+                                    partial_pnl = (exit_price - entry_price) * exit_size  # SPX multiplier
                                     partial_pnl -= config.commission_per_contract * exit_size  # Exit commission
                                     
                                     # Update position

@@ -4,8 +4,8 @@ from dataclasses import dataclass
 class StrategyConfig:
     """Configuration for Iron Condor and Straddle strategies with all parameters"""
     # General
-    name: str = "iron_1"
-    trade_type: str = "Iron Condor"
+    name: str = "strategy 1"
+    trade_type: str = "Iron Condor 1 & Straddle 1"
     
     # Iron Condor Entry signal parameters
     consecutive_candles: int = 3  # Three consecutive 5min candles

@@ -107,7 +107,7 @@ class PolygonDataProvider:
           timespan = "minute"
           multiplier = 5
           start = date.strftime('%Y-%m-%d')
-          end = start#(date + timedelta(days=1)).strftime('%Y-%m-%d')
+          end = start
           url = f"{self.base_url}/v2/aggs/ticker/{underlying}/range/{multiplier}/{timespan}/{start}/{end}"
           params = {
           "apiKey": self.api_key,
@@ -124,7 +124,6 @@ class PolygonDataProvider:
                  all_results.extend(data['results'])
                  while 'next_url' in data and data['next_url']:
                        logger.info(f"Fetching next page of data for {underlying} on {date}")
-                       # next_url already includes the API key and other parameters
                        next_url = data['next_url']
                        data = await self._rate_limited_request(next_url)
                 
@@ -162,14 +161,14 @@ class PolygonDataProvider:
                    on='timestamp', 
                    how='left'
                       )
-          complete_df['close'] = complete_df['close'].fillna(method='ffill')
+          complete_df['close'] = complete_df['close'].ffill() 
           complete_df['open'] = complete_df['open'].fillna(complete_df['close'])
           complete_df['high'] = complete_df['high'].fillna(complete_df['close'])
           complete_df['low'] = complete_df['low'].fillna(complete_df['close'])
     
 
           if complete_df['close'].isna().any():
-             complete_df['close'] = complete_df['close'].fillna(method='bfill')
+             complete_df['close'] = complete_df['close'].bfill()
              complete_df['open'] = complete_df['open'].fillna(complete_df['close'])
              complete_df['high'] = complete_df['high'].fillna(complete_df['close'])
              complete_df['low'] = complete_df['low'].fillna(complete_df['close'])
