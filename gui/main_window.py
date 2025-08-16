@@ -417,6 +417,7 @@ class MainWindow(QMainWindow):
         scaled_results = copy.deepcopy(original_results)
         total_scaled_pnl = 0.0
         scaled_daily_pnl = {}
+        total_capital_used = 0.0
     
         for trade in scaled_results['trades']:
             if trade.trade_type == "Iron Condor 1":
@@ -429,10 +430,16 @@ class MainWindow(QMainWindow):
             # Scale the trade P&L and size
             original_pnl = trade.pnl/trade.size  # Get per-contract P&L
             trade.pnl = original_pnl * scale_factor
+            original_used_capital = trade.used_capital/trade.size  # Get per-contract capital used
+            trade.used_capital = original_used_capital*scale_factor  # Scale capital used
+            if(trade.trade_type == "Straddle 1"):
+                trade.metadata['total_premium'] = (trade.metadata['total_premium']/trade.size) * scale_factor
+            
             trade.size = scale_factor
-        
             total_scaled_pnl += trade.pnl
     
+    
+        total_capital_used = sum(t.used_capital for t in scaled_results['trades'])
     # Recalculate daily P&L
         for date, trades_that_day in self._group_trades_by_date(scaled_results['trades']).items():
             daily_pnl = sum(trade.pnl for trade in trades_that_day)
@@ -442,7 +449,7 @@ class MainWindow(QMainWindow):
     
         # Recalculate equity curve
         scaled_results['equity_curve'] = self._recalculate_equity_curve(
-        scaled_results['equity_curve'][0][1],  # Initial capital
+        total_capital_used,  # Initial capital
         scaled_daily_pnl
     )
     
@@ -450,9 +457,7 @@ class MainWindow(QMainWindow):
         scaled_results['statistics'] = Statistics._calculate_statistics(
         scaled_results['trades'], 
         scaled_results['equity_curve'], 
-        scaled_results['equity_curve'][-1][1],  # Current capital
         scaled_daily_pnl,
-        self.backtest_config_widget.get_config()
     )
     
         return scaled_results

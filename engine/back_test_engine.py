@@ -31,6 +31,7 @@ class BacktestEngine:
         self.equity_curve: List[Tuple[datetime, float]] = []
         self.current_capital: float = 0.0
         self.open_straddles: List[Trade] = []  # Track open straddles for intraday management
+        self.total_capital_used: float = 0.0
         
     async def run_backtest(self, config: BacktestConfig, strategy: StrategyConfig) -> Dict[str, Any]:
         """Run complete backtest with parallel daily strategy execution"""
@@ -38,7 +39,7 @@ class BacktestEngine:
         logger.info(f"Starting parallel backtest from {config.start_date} to {config.end_date}")
         
         self.trades = []
-        self.current_capital = config.initial_capital
+        self.current_capital = 0.0
         self.daily_pnl = {}
         
         # Collect all trading dates first
@@ -74,18 +75,18 @@ class BacktestEngine:
         # Sort trades by entry time to maintain chronological order
         all_trades.sort(key=lambda trade: trade.entry_time)
         
+        self.total_capital_used = sum(trade.used_capital for trade in all_trades)
+        
         # Build equity curve sequentially (since it depends on cumulative P&L)
         self.trades = all_trades
         self.daily_pnl = daily_pnl_dict
-        self._build_equity_curve(config.initial_capital, trading_dates)
+        self._build_equity_curve(self.total_capital_used, trading_dates)
         
         # Calculate statistics
         stats = Statistics._calculate_statistics(
             self.trades, 
             self.equity_curve, 
-            self.current_capital, 
             self.daily_pnl, 
-            config
         )
         
         logger.info(f"Backtest completed: {len(self.trades)} total trades")

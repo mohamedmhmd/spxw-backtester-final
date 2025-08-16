@@ -6,7 +6,7 @@ from config.back_test_config import BacktestConfig
 
 class Statistics:
     
-    def _calculate_statistics(trades, equity_curve, current_capital, daily_pnl, config: BacktestConfig) -> Dict[str, Any]:
+    def _calculate_statistics(trades, equity_curve, daily_pnl) -> Dict[str, Any]:
         """Calculate comprehensive backtest statistics"""
         if not trades:
             return {
@@ -24,9 +24,13 @@ class Statistics:
                 'avg_trade_pnl': 0.0,
                 'best_trade': 0.0,
                 'worst_trade': 0.0,
+                'total_capital_used': 0.0,
                 'iron_condor_stats': {},
                 'straddle_stats': {}
             }
+            
+        # Calculate total capital used if not provided
+        total_capital_used = sum(t.used_capital for t in trades)
         
         # Separate trades by type
         iron_condor_trades = [t for t in trades if t.trade_type == "Iron Condor 1"]
@@ -54,10 +58,10 @@ class Statistics:
         else:
             max_drawdown = 0
         
-        # Sharpe ratio (simplified - assuming 252 trading days)
-        if len(daily_pnl) > 1:
+        # Sharpe ratio (using capital used instead of initial capital)
+        if len(daily_pnl) > 1 and total_capital_used > 0:
             daily_returns = list(daily_pnl.values())
-            daily_returns_pct = [r / config.initial_capital for r in daily_returns]
+            daily_returns_pct = [r / total_capital_used for r in daily_returns]  # USE total_capital_used
             if np.std(daily_returns_pct) > 0:
                 sharpe_ratio = np.sqrt(252) * np.mean(daily_returns_pct) / np.std(daily_returns_pct)
             else:
@@ -65,8 +69,11 @@ class Statistics:
         else:
             sharpe_ratio = 0
         
-        # Total return
-        return_pct = ((current_capital - config.initial_capital) / config.initial_capital) * 100
+        # Total return based on capital used
+        if total_capital_used > 0:
+            return_pct = (total_pnl / total_capital_used)  # Return on capital used
+        else:
+            return_pct = 0
         
         # Iron Condor specific stats
         ic_stats = {}
@@ -122,6 +129,7 @@ class Statistics:
             'max_drawdown': max_drawdown,
             'sharpe_ratio': sharpe_ratio,
             'return_pct': return_pct,
+            'total_capital_used': total_capital_used, 
             'avg_trade_pnl': total_pnl / len(trades) if trades else 0,
             'best_trade': max(trades, key=lambda t: t.pnl).pnl if trades else 0,
             'worst_trade': min(trades, key=lambda t: t.pnl).pnl if trades else 0,

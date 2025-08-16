@@ -353,6 +353,7 @@ class IronCondor1:
             contracts=trade_contracts,
             size=strategy.iron_1_trade_size,
             entry_signals=signals,
+            used_capital = 0,
             metadata={
                 'net_credit': net_credit,
                 'strategy_name': 'iron_1',

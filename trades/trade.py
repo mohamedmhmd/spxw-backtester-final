@@ -26,6 +26,7 @@ class Trade:
     pnl: float = 0.0
     status: str = "OPEN"  # OPEN, CLOSED
     metadata: Optional[Dict[str, Any]] = None
+    used_capital: float = 0.0  # ADD THIS LINE
     
     def calculate_pnl(self, payoffs: Dict[str, float], commission_per_contract: float):
         """Calculate P&L for the trade"""
@@ -83,8 +84,14 @@ class Trade:
             # Calculate intrinsic value at expiration
             if 'call' in leg_type:
                 value = max(0, settlement_price - strike)
+                if 'short' in leg_type:
+                    if settlement_price - strike > 0:
+                        self.used_capital += (settlement_price - strike)
             else:  # put
                 value = max(0, strike - settlement_price)
+                if 'short' in leg_type:
+                    if settlement_price - strike < 0:
+                        self.used_capital += (strike - settlement_price)
             
             payoffs[contract] = value
         

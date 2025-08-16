@@ -29,7 +29,7 @@ class StatsCard(QFrame):
                 background-color: white;
                 border: 1px solid #E0E0E0;
                 border-radius: 8px;
-                padding: 16px;
+                padding: 12px;
             }}
             QFrame:hover {{
                 border-color: {color};
@@ -37,46 +37,55 @@ class StatsCard(QFrame):
         """)
         
         layout = QVBoxLayout()
-        layout.setSpacing(8)
+        layout.setSpacing(4)  # Reduced spacing
+        layout.setContentsMargins(8, 8, 8, 8)  # Add explicit margins
         
         # Title
         title_label = QLabel(title)
         title_label.setStyleSheet("""
             QLabel {
                 color: #666666;
-                font-size: 12px;
+                font-size: 11px;
                 font-weight: 500;
                 margin: 0;
             }
         """)
+        title_label.setWordWrap(True)  # Allow title to wrap if needed
         
         # Value
         self.value_label = QLabel(value)
         self.value_label.setStyleSheet(f"""
             QLabel {{
                 color: {color};
-                font-size: 24px;
+                font-size: 18px;
                 font-weight: bold;
                 margin: 0;
             }}
         """)
+        self.value_label.setWordWrap(True)  # Allow wrapping for long numbers
+        self.value_label.setMinimumHeight(25)  # Ensure minimum height for text
         
         layout.addWidget(title_label)
         layout.addWidget(self.value_label)
-        layout.addStretch()
+        # Remove the stretch - it can cause text to be compressed
+        # layout.addStretch()  # REMOVE THIS LINE
         
         self.setLayout(layout)
-        self.setMinimumHeight(100)
+        self.setMinimumHeight(80)  # Reduced from 100
+        self.setMinimumWidth(150)  # Add minimum width to prevent squashing
         
     def update_value(self, value: str, color: str = None):
         """Update the value and optionally the color"""
         self.value_label.setText(value)
         if color:
-            current_style = self.value_label.styleSheet()
-            new_style = current_style.replace(self.value_label.styleSheet().split('color: ')[1].split(';')[0], color)
-            self.value_label.setStyleSheet(new_style)
-
-
+            self.value_label.setStyleSheet(f"""
+                QLabel {{
+                    color: {color};
+                    font-size: 18px;
+                    font-weight: bold;
+                    margin: 0;
+                }}
+            """)
 class EnhancedTableWidget(QTableWidget):
     """Enhanced table with better styling and functionality"""
     
@@ -240,46 +249,55 @@ class ResultsWidget(QWidget):
         layout = QVBoxLayout()
         layout.setSpacing(20)
         layout.setContentsMargins(24, 24, 24, 24)
-        
-        # Performance Summary Header
+    
+    # Performance Summary Header
         summary_label = QLabel("Performance Summary")
         summary_label.setStyleSheet("""
-            QLabel {
-                font-size: 20px;
-                font-weight: bold;
-                color: #212121;
-                margin-bottom: 16px;
-            }
-        """)
+        QLabel {
+            font-size: 20px;
+            font-weight: bold;
+            color: #212121;
+            margin-bottom: 16px;
+        }
+    """)
         layout.addWidget(summary_label)
-        
-        # Create cards grid
+    
+    # Create cards grid with better spacing
         cards_layout = QGridLayout()
-        cards_layout.setSpacing(16)
-        
-        # Initialize stat cards
+        cards_layout.setSpacing(12)  # Reduced from 16 for more compact layout
+        cards_layout.setContentsMargins(0, 0, 0, 0)
+    
+    # Initialize stat cards (now with 9 stats including capital used)
         self.stat_cards = {}
         stats_config = [
-            ('total_trades', 'Total Trades', '#2196F3'),
-            ('win_rate', 'Win Rate', '#4CAF50'),
-            ('total_pnl', 'Total P&L', '#FF9800'),
-            ('avg_trade_pnl', 'Avg Trade P&L', '#9C27B0'),
-            ('profit_factor', 'Profit Factor', '#00BCD4'),
-            ('sharpe_ratio', 'Sharpe Ratio', '#795548'),
-            ('max_drawdown', 'Max Drawdown', '#F44336'),
-            ('return_pct', 'Total Return %', '#607D8B')
-        ]
-        
+        ('total_trades', 'Total Trades', '#2196F3'),
+        ('win_rate', 'Win Rate', '#4CAF50'),
+        ('total_pnl', 'Total P&L', '#FF9800'),
+        ('total_capital_used', 'Capital Used', '#9E9E9E'),
+        ('avg_trade_pnl', 'Avg Trade P&L', '#9C27B0'),
+        ('profit_factor', 'Profit Factor', '#00BCD4'),
+        ('sharpe_ratio', 'Sharpe Ratio', '#795548'),
+        ('max_drawdown', 'Max Drawdown', '#F44336'),
+        ('return_pct', 'Return on Capital', '#607D8B')
+    ]
+    
+    # Arrange in 3 rows x 3 columns for better layout
         for i, (key, name, color) in enumerate(stats_config):
             card = StatsCard(name, "--", color)
             self.stat_cards[key] = card
-            cards_layout.addWidget(card, i // 4, i % 4)
-        
+            row = i // 3  # 3 cards per row
+            col = i % 3
+            cards_layout.addWidget(card, row, col)
+    
+    # Make columns stretch equally
+        for i in range(3):
+            cards_layout.setColumnStretch(i, 1)
+    
         layout.addLayout(cards_layout)
         layout.addStretch()
-        
+    
         widget.setLayout(layout)
-        return widget
+        return widget 
     
     def _create_equity_widget(self):
         """Create equity curve chart with enhanced styling"""
@@ -364,26 +382,36 @@ class ResultsWidget(QWidget):
         stats = results['statistics']
         for key, card in self.stat_cards.items():
             if key in stats:
-                value = stats[key]
-                if key in ['total_pnl', 'avg_trade_pnl']:
-                    formatted_value = f"${value:,.2f}"
-                    color = "#4CAF50" if value >= 0 else "#F44336"
-                elif key in ['win_rate', 'max_drawdown', 'return_pct']:
-                    formatted_value = f"{value:.1%}"
-                    if key == 'max_drawdown':
-                        color = "#F44336"
-                    elif key == 'win_rate':
-                        color = "#4CAF50" if value >= 0.5 else "#FF9800"
-                    else:
-                        color = "#4CAF50" if value >= 0 else "#F44336"
-                elif key in ['profit_factor', 'sharpe_ratio']:
-                    formatted_value = f"{value:.2f}"
-                    color = "#4CAF50" if value >= 1.0 else "#FF9800"
+               value = stats[key]
+            if key in ['total_pnl', 'avg_trade_pnl', 'total_capital_used']:
+                # Use shorter format for large numbers
+                if abs(value) >= 1000000:
+                    formatted_value = f"${value/1000000:.2f}M"
+                elif abs(value) >= 1000:
+                    formatted_value = f"${value/1000:.1f}K"
                 else:
-                    formatted_value = str(value)
-                    color = "#2196F3"
+                    formatted_value = f"${value:.2f}"
                 
-                card.update_value(formatted_value, color)
+                if key == 'total_capital_used':
+                    color = "#9E9E9E"
+                else:
+                    color = "#4CAF50" if value >= 0 else "#F44336"
+            elif key in ['win_rate', 'max_drawdown', 'return_pct']:
+                formatted_value = f"{value:.1%}"
+                if key == 'max_drawdown':
+                    color = "#F44336"
+                elif key == 'win_rate':
+                    color = "#4CAF50" if value >= 0.5 else "#FF9800"
+                else:
+                    color = "#4CAF50" if value >= 0 else "#F44336"
+            elif key in ['profit_factor', 'sharpe_ratio']:
+                formatted_value = f"{value:.2f}"
+                color = "#4CAF50" if value >= 1.0 else "#FF9800"
+            else:
+                formatted_value = str(value)
+                color = "#2196F3"
+            
+            card.update_value(formatted_value, color)
         
         # Update charts and table
         self._plot_equity_curve(results['equity_curve'])
@@ -584,7 +612,7 @@ class ResultsWidget(QWidget):
             if trade.trade_type == "Iron Condor 1":
                 entry_price = trade.metadata['net_credit']
             else:
-                entry_price = -trade.metadata['total_premium']
+                entry_price = -trade.metadata['total_premium']/trade.size
             
             premium_item = QTableWidgetItem(f"${entry_price:,.2f}")
             premium_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
