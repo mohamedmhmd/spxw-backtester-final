@@ -5,9 +5,12 @@ import asyncio
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
+
+from engine.statistics import Statistics
 from .back_test_worker import BacktestWorker
 from .strategy_config_widget import StrategyConfigWidget
 from data.mock_data_provider import MockDataProvider
+import copy
 
 # Set up logging
 logging.basicConfig(
@@ -154,6 +157,26 @@ class MainWindow(QMainWindow):
             }
         """)
         button_layout.addWidget(self.stop_backtest_btn)
+
+        self.update_results_btn = QPushButton("Update Results")
+        self.update_results_btn.clicked.connect(self.update_results_with_new_sizes)
+        self.update_results_btn.setEnabled(False)  # Disabled until we have results
+        self.update_results_btn.setStyleSheet("""
+    QPushButton {
+        background-color: #FF9800;
+        color: white;
+        font-weight: bold;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    QPushButton:hover {
+        background-color: #F57C00;
+    }
+    QPushButton:disabled {
+        background-color: #cccccc;
+    }
+""")
+        button_layout.addWidget(self.update_results_btn)
         
         layout.addLayout(button_layout)
         
@@ -268,6 +291,7 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Connection test failed", 5000)
         
         self.test_connection_btn.setEnabled(True)
+
     
     def run_backtest(self):
         """Run backtest"""
@@ -322,6 +346,7 @@ class MainWindow(QMainWindow):
     def on_backtest_finished(self, results):
         """Handle backtest completion"""
         self.run_backtest_btn.setEnabled(True)
+        self.update_results_btn.setEnabled(True)
         self.stop_backtest_btn.setEnabled(False)
         self.progress_bar.setVisible(False)
         
@@ -347,6 +372,159 @@ class MainWindow(QMainWindow):
             logger.info(f"Backtest completed successfully with {total_trades} trades")
         else:
             self.status_bar.showMessage("Backtest stopped", 5000)
+
+
+    def update_results_with_new_sizes(self):
+        if not self.last_results:
+           QMessageBox.information(self, "No Results", "Please run a backtest first")
+           return
+    
+        # Get current trade sizes from strategy config
+        strategy_config = self.strategy_config_widget.get_config()
+        iron_size = strategy_config.iron_1_trade_size
+        straddle_size = strategy_config.straddle_1_trade_size
+    
+        self.status_bar.showMessage("Updating results with new trade sizes...")
+    
+        # Create scaled copy of results
+        scaled_results = self._scale_results(self.last_results, iron_size, straddle_size)
+    
+        # Update results widget
+        self.results_widget.update_results(scaled_results)
+    
+    # Show summary in status bar
+        stats = scaled_results.get('statistics', {})
+        total_trades = stats.get('total_trades', 0)
+        total_pnl = stats.get('total_pnl', 0)
+        win_rate = stats.get('win_rate', 0)
+    
+        self.status_bar.showMessage(
+           f"Results updated: {total_trades} trades, "
+           f"P&L: ${total_pnl:,.2f}, Win Rate: {win_rate:.1%} "
+           f"(Iron: {iron_size}, Straddle: {straddle_size})", 
+        10000
+         )
+    
+        logger.info(f"Results updated with Iron size: {iron_size}, Straddle size: {straddle_size}")
+    
+    def _scale_results(self, original_results, iron_size, straddle_size):
+        scaled_results = copy.deepcopy(original_results)
+        total_scaled_pnl = 0.0
+        scaled_daily_pnl = {}
+    
+        for trade in scaled_results['trades']:
+            if trade.trade_type == "Iron Condor 1":
+               scale_factor = iron_size
+            elif trade.trade_type == "Straddle 1":
+               scale_factor = straddle_size
+            else:
+                scale_factor = 1  # Default fallback
+        
+            # Scale the trade P&L and size
+            original_pnl = trade.pnl/trade.size  # Get per-contract P&L
+            trade.pnl = original_pnl * scale_factor
+            trade.size = scale_factor
+        
+            total_scaled_pnl += trade.pnl
+    
+    # Recalculate daily P&L
+        for date, trades_that_day in self._group_trades_by_date(scaled_results['trades']).items():
+            daily_pnl = sum(trade.pnl for trade in trades_that_day)
+            scaled_daily_pnl[date] = daily_pnl
+    
+        scaled_results['daily_pnl'] = scaled_daily_pnl
+    
+        # Recalculate equity curve
+        scaled_results['equity_curve'] = self._recalculate_equity_curve(
+        scaled_results['equity_curve'][0][1],  # Initial capital
+        scaled_daily_pnl
+    )
+    
+    # Recalculate statistics
+        scaled_results['statistics'] = Statistics._calculate_statistics(
+        scaled_results['trades'], 
+        scaled_results['equity_curve'], 
+        scaled_results['equity_curve'][-1][1],  # Current capital
+        scaled_daily_pnl,
+        self.backtest_config_widget.get_config()
+    )
+    
+        return scaled_results
+
+    def _group_trades_by_date(self, trades):
+        from collections import defaultdict
+        grouped = defaultdict(list)
+    
+        for trade in trades:
+            trade_date = trade.entry_time.date()
+            grouped[trade_date] = grouped[trade_date] + [trade]
+    
+        return dict(grouped)
+
+    def _recalculate_equity_curve(self, initial_capital, daily_pnl):
+        equity_curve = []
+        running_capital = initial_capital
+        sorted_dates = sorted(daily_pnl.keys())
+    
+        if sorted_dates:
+           equity_curve.append((sorted_dates[0], initial_capital))
+        
+        for date in sorted_dates:
+            running_capital += daily_pnl[date]
+            equity_curve.append((date, running_capital))
+    
+        return equity_curve
+
+    def _recalculate_statistics(self, trades, equity_curve, daily_pnl):
+        if not trades:
+           return {}
+    
+        total_trades = len(trades)
+        winning_trades = [t for t in trades if t.pnl > 0]
+        losing_trades = [t for t in trades if t.pnl < 0]
+    
+        win_rate = len(winning_trades) / total_trades if total_trades > 0 else 0
+        total_pnl = sum(t.pnl for t in trades)
+        avg_trade_pnl = total_pnl / total_trades if total_trades > 0 else 0
+    
+    # Profit factor
+        gross_profit = sum(t.pnl for t in winning_trades)
+        gross_loss = abs(sum(t.pnl for t in losing_trades))
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+    
+        initial_capital = equity_curve[0][1] if equity_curve else 100000
+        final_capital = equity_curve[-1][1] if equity_curve else initial_capital
+        return_pct = (final_capital - initial_capital) / initial_capital if initial_capital > 0 else 0
+    
+        # Max drawdown
+        max_drawdown = 0
+        peak = initial_capital
+        for _, value in equity_curve:
+            if value > peak:
+               peak = value
+            drawdown = (peak - value) / peak if peak > 0 else 0
+            max_drawdown = max(max_drawdown, drawdown)
+    
+    # Sharpe ratio (simplified)
+        if daily_pnl:
+           daily_returns = [pnl/initial_capital for pnl in daily_pnl.values()]
+           avg_return = sum(daily_returns) / len(daily_returns)
+           return_std = (sum((r - avg_return)**2 for r in daily_returns) / len(daily_returns))**0.5
+           sharpe_ratio = (avg_return / return_std * (252**0.5)) if return_std > 0 else 0
+        else:
+           sharpe_ratio = 0
+    
+        return {
+        'total_trades': total_trades,
+        'win_rate': win_rate,
+        'total_pnl': total_pnl,
+        'avg_trade_pnl': avg_trade_pnl,
+        'profit_factor': profit_factor,
+        'return_pct': return_pct,
+        'max_drawdown': max_drawdown,
+        'sharpe_ratio': sharpe_ratio
+    }
+    
     
     def on_backtest_error(self, error_msg):
         """Handle backtest error"""

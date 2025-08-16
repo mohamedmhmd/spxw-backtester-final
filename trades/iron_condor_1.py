@@ -325,7 +325,7 @@ class IronCondor1:
             strike = int(contract[-8:]) / 1000  # Extract strike from contract
             
             trade_contracts[contract] = {
-                'position': -1,
+                'position': -strategy.iron_1_trade_size,  # Short position
                 'entry_price': price,
                 'leg_type': leg,
                 'strike': strike
@@ -339,7 +339,7 @@ class IronCondor1:
             strike = int(contract[-8:]) / 1000  # Extract strike from contract
             
             trade_contracts[contract] = {
-                'position': 1,
+                'position': strategy.iron_1_trade_size,  # Long position
                 'entry_price': price,
                 'leg_type': leg,
                 'strike': strike
