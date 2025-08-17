@@ -839,13 +839,13 @@ class MainWindow(QMainWindow):
             "About SPX 0DTE Backtester",
             """<h2>SPX 0DTE Options Backtester</h2>
             <p>Professional backtesting platform for SPX 0DTE options strategies</p>
-            <p><b>Version:</b> 2.0.0</p>
+            <p><b>Version:</b> 1.0.0</p>
             <p><b>Features:</b></p>
             <ul>
                 <li>Iron Condor with configurable win/loss ratios</li>
                 <li>Straddle with partial exit capabilities</li>
                 <li>Mock data provider for testing</li>
-                <li>Real-time data from Polygon.io (Business plan required)</li>
+                <li>Real-time data from Polygon.io</li>
                 <li>Comprehensive performance analytics</li>
                 <li>Professional GUI with real-time updates</li>
             </ul>
@@ -854,5 +854,5 @@ class MainWindow(QMainWindow):
                 <li><b>Iron Condor (Iron 1):</b> ATM short strikes with target 1.5:1 win/loss ratio</li>
                 <li><b>Straddle (Straddle 1):</b> Entered with Iron Condor, partial exits at 2x entry price</li>
             </ul>
-            <p><b>Author:</b> Professional Trading Systems</p>"""
+            <p><b>Author:</b> Mohamed Mahmoud Khouna </p>"""
         )
