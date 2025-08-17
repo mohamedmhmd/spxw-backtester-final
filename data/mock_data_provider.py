@@ -22,8 +22,6 @@ class MockDataProvider:
     """
 
     def __init__(self):
-        self.cache_dir = "data_cache"
-        os.makedirs(self.cache_dir, exist_ok=True)
         
         # Realistic market parameters
         self.spx_base_price = 4500.0
@@ -96,26 +94,6 @@ class MockDataProvider:
         returns[-1] = np.random.normal(0, vol[-1])
         return returns
 
-    def _get_cache_path(self, cache_key: str) -> str:
-        return os.path.join(self.cache_dir, f"{cache_key}.pkl.gz")
-
-    def _load_from_cache(self, cache_key: str) -> Optional[pd.DataFrame]:
-        cache_path = self._get_cache_path(cache_key)
-        if os.path.exists(cache_path):
-            try:
-                with gzip.open(cache_path, 'rb') as f:
-                    return pickle.load(f)
-            except Exception as e:
-                logger.error(f"Error loading cache: {e}")
-        return None
-
-    def _save_to_cache(self, cache_key: str, data: pd.DataFrame):
-        cache_path = self._get_cache_path(cache_key)
-        try:
-            with gzip.open(cache_path, 'wb') as f:
-                pickle.dump(data, f)
-        except Exception as e:
-            logger.error(f"Error saving cache: {e}")
 
     async def test_connection(self) -> bool:
         """Always returns True for mock provider"""
