@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
         api_layout = QVBoxLayout()
         
         self.api_key_input = QLineEdit()
-        self.api_key_input.setText("VGG0V1GnGumf21Yw7mMDwg7_derXxQSP")
+        self.api_key_input.setText("")
         self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         api_layout.addWidget(QLabel("Polygon.io API Key:"))
         api_layout.addWidget(self.api_key_input)
@@ -327,10 +327,30 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Connection test failed", 5000)
         
         self.test_connection_btn.setEnabled(True)
-
+    
+    def _test_connection(self):
+        api_key = self.api_key_input.text()
+        async def test():
+            async with PolygonDataProvider(api_key) as provider:
+                return await provider.test_connection()
+        
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            success = loop.run_until_complete(test())
+            
+            if not success:
+                QMessageBox.information(self, "Error", "API connection failed. Please check your API key.")
+                return False
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Connection test failed: {str(e)}")
+            self.status_bar.showMessage("Connection test failed", 5000)
     
     def run_backtest(self):
         """Run backtest"""
+        if not self._test_connection():
+            return
         # Get configurations
         backtest_config = self.backtest_config_widget.get_config()
         strategy_config = self.strategy_config_widget.get_config()
