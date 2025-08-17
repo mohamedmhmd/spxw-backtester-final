@@ -36,6 +36,12 @@ class MainWindow(QMainWindow):
         self.data_provider = None
         self.backtest_worker = None
         self.last_results = None  # Initialize this to store results
+        
+        # Add artificial progress tracking
+        self.artificial_progress = 0
+        self.progress_timer = QTimer()
+        self.progress_timer.timeout.connect(self.update_artificial_progress)
+        
         self.init_ui()
         self.setup_style()
         
@@ -67,6 +73,30 @@ class MainWindow(QMainWindow):
         
         # Menu bar
         self._create_menu_bar()
+        
+    def update_artificial_progress(self):
+        """Update artificial progress by 5% every 8 seconds"""
+        if self.artificial_progress < 98:
+           self.artificial_progress += 2
+    
+        # Update progress bar
+        self.progress_bar.setValue(self.artificial_progress)
+    
+        # Update status message
+        self.status_bar.showMessage(f"Backtest in progress... {self.artificial_progress}%")
+    
+           
+    def complete_artificial_backtest(self):
+        """Complete the artificial backtest"""
+        # Reset UI state
+        self.run_backtest_btn.setEnabled(True)
+        self.update_results_btn.setEnabled(True)
+        self.stop_backtest_btn.setEnabled(False)
+        self.progress_bar.setVisible(False)
+        self.artificial_progress = 0
+    
+        # Show completion message
+        self.status_bar.showMessage("Backtest completed.", 5000)
     
     def _create_left_panel(self):
         """Create configuration panel"""
@@ -320,19 +350,27 @@ class MainWindow(QMainWindow):
         # Reset results
         self.last_results = None
         
+        # Reset results and progress
+        self.last_results = None
+        self.artificial_progress = 0
+        
         # Disable buttons
         self.run_backtest_btn.setEnabled(False)
         self.stop_backtest_btn.setEnabled(True)
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         
+        # Start artificial progress timer (fires every 8 seconds)
+        self.progress_timer.start(20000)  # 8000 milliseconds = 8 seconds
+        
         # Create and start worker
         self.backtest_worker = BacktestWorker(
             self.data_provider, backtest_config, strategy_config
         )
-        self.backtest_worker.progress.connect(self.update_progress)
+        # Disconnect the original progress signal and connect to finished only
+        # self.backtest_worker.progress.connect(self.update_progress)  # Comment out or remove
         self.backtest_worker.status.connect(self.status_bar.showMessage)
-        self.backtest_worker.finished.connect(self.on_backtest_finished)
+        self.backtest_worker.finished.connect(self.on_backtest_finished_with_progress)
         self.backtest_worker.error.connect(self.on_backtest_error)
         self.backtest_worker.start()
         
@@ -343,41 +381,64 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(value)
     
     def stop_backtest(self):
-        """Stop running backtest"""
-        if self.backtest_worker and self.backtest_worker.isRunning():
-            self.backtest_worker.terminate()
-            self.backtest_worker.wait()
-            self.on_backtest_finished({})
+        """Stop running backtest and artificial progress"""
+        # Stop the progress timer
+        self.progress_timer.stop()
+        self.artificial_progress = 0
     
-    def on_backtest_finished(self, results):
-        """Handle backtest completion"""
+        # Stop the worker if running
+        if self.backtest_worker and self.backtest_worker.isRunning():
+           self.backtest_worker.terminate()
+           self.backtest_worker.wait()
+    
+       # Reset UI
+        self.run_backtest_btn.setEnabled(True)
+        self.stop_backtest_btn.setEnabled(False)
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setValue(0)
+    
+        self.status_bar.showMessage("Backtest stopped", 5000)
+    
+    def on_backtest_finished_with_progress(self, results):
+        """Handle backtest completion with artificial progress"""
+        # Stop the timer if still running
+        self.progress_timer.stop()
+    
+        # Ensure progress shows 100%
+        self.progress_bar.setValue(100)
+        self.status_bar.showMessage("Processing results...")
+    
+        # Small delay for visual effect
+        QTimer.singleShot(500, lambda: self.finish_with_results(results))
+
+    def finish_with_results(self, results):
+        """Complete the backtest with actual results"""
+        # Reset UI
         self.run_backtest_btn.setEnabled(True)
         self.update_results_btn.setEnabled(True)
         self.stop_backtest_btn.setEnabled(False)
         self.progress_bar.setVisible(False)
-        
+        self.artificial_progress = 0
+    
         if results:
-            # Store results for export
-            self.last_results = results
-            
-            # Update results widget
-            self.results_widget.update_results(results)
-            
-            # Show summary in status bar
-            stats = results.get('statistics', {})
-            total_trades = stats.get('total_trades', 0)
-            total_pnl = stats.get('total_pnl', 0)
-            win_rate = stats.get('win_rate', 0)
-            
-            self.status_bar.showMessage(
-                f"Backtest completed: {total_trades} trades, "
-                f"P&L: ${total_pnl:,.2f}, Win Rate: {win_rate:.1%}", 
-                10000
-            )
-            
-            logger.info(f"Backtest completed successfully with {total_trades} trades")
+           # Store and display results
+           self.last_results = results
+           self.results_widget.update_results(results)
+        
+           # Show summary
+           stats = results.get('statistics', {})
+           total_trades = stats.get('total_trades', 0)
+           total_pnl = stats.get('total_pnl', 0)
+           win_rate = stats.get('win_rate', 0)
+        
+           self.status_bar.showMessage(
+            f"Backtest completed: {total_trades} trades, "
+            f"P&L: ${total_pnl:,.2f}, Win Rate: {win_rate:.1%}", 
+            10000
+        )
+           logger.info(f"Backtest completed successfully with {total_trades} trades")
         else:
-            self.status_bar.showMessage("Backtest stopped", 5000)
+           self.status_bar.showMessage("Backtest completed (no results)", 5000)
 
 
     def update_results_with_new_sizes(self):
@@ -539,10 +600,16 @@ class MainWindow(QMainWindow):
     
     def on_backtest_error(self, error_msg):
         """Handle backtest error"""
+        # Stop artificial progress
+        self.progress_timer.stop()
+        self.artificial_progress = 0
+    
+        # Reset UI
         self.run_backtest_btn.setEnabled(True)
         self.stop_backtest_btn.setEnabled(False)
         self.progress_bar.setVisible(False)
-        
+        self.progress_bar.setValue(0)
+    
         QMessageBox.critical(self, "Backtest Error", f"Error: {error_msg}")
         self.status_bar.showMessage("Backtest failed", 5000)
         logger.error(f"Backtest error: {error_msg}")
