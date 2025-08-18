@@ -1,17 +1,17 @@
-name: Build Desktop Apps
+name: Build Desktop Apps (Win EXE + macOS DMG/PKG signed & notarized)
 
 on:
   workflow_dispatch: {}
   push:
-    tags: ["v*"]   # build when you push a tag like v1.0.0
+    tags: ["v*"]
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-14]   # add macos-13 for Intel builds if needed
-        python-version: ["3.13"]         # or "3.11" if your SciPy pin requires it
+        os: [windows-latest, macos-14]   # add macos-13 for Intel builds
+        python-version: ["3.13"]         # or "3.11" if you prefer
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -30,7 +30,7 @@ jobs:
       - name: Verify SciPy import
         run: python -c "import scipy,sys;print('SciPy',scipy.__version__,'Python',sys.version.split()[0])"
 
-      # ---------- Windows build (.exe) ----------
+      # ---------- Windows build (.exe, onefile) ----------
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -64,11 +64,8 @@ jobs:
         shell: bash
         run: |
           if [[ -f "SPX_0DTE_Backtester_fixed.spec" ]]; then
-            # Spec may produce an .app when console=False. If not, fallback below is safe.
             pyinstaller SPX_0DTE_Backtester_fixed.spec || true
           fi
-
-          # If .app not produced by spec, build with CLI to force an .app bundle
           if [[ ! -d "dist/SPX_0DTE_Backtester.app" ]]; then
             pyinstaller --noconfirm --clean --windowed \
               --name SPX_0DTE_Backtester \
@@ -82,26 +79,81 @@ jobs:
               main.py
           fi
 
-      - name: Package .app as zip (macOS)
+      # Import Developer ID certs (Application + Installer) into keychain
+      - name: Import Apple signing certs
+        if: runner.os == 'macOS'
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.MAC_CERT_P12 }}
+          p12-password: ${{ secrets.MAC_CERT_PASSWORD }}
+
+      # Codesign the .app (recursive, hardened runtime, timestamp)
+      - name: Codesign .app
         if: runner.os == 'macOS'
         shell: bash
-        id: pkg
+        env:
+          SIGN_ID: ${{ secrets.MAC_SIGN_IDENTITY }}
+        run: |
+          codesign --deep --force --options runtime --timestamp \
+            --sign "$SIGN_ID" "dist/SPX_0DTE_Backtester.app"
+          codesign --verify --deep --strict --verbose=2 "dist/SPX_0DTE_Backtester.app"
+
+      # Create a DMG from the .app
+      - name: Package .app as DMG (macOS)
+        if: runner.os == 'macOS'
+        id: dmg
+        shell: bash
         run: |
           ARCH="$(uname -m)"
           APP="dist/SPX_0DTE_Backtester.app"
-          ZIP="SPX_0DTE_Backtester-macOS-${ARCH}.zip"
-          if [[ ! -d "$APP" ]]; then
-            echo "Expected $APP but it was not found"; exit 1
-          fi
-          # Create a distributable zip preserving resource forks
-          ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
-          echo "zip=$ZIP" >> $GITHUB_OUTPUT
+          DMG="SPX_0DTE_Backtester-macOS-${ARCH}.dmg"
+          hdiutil create -volname "SPX_0DTE_Backtester" -srcfolder "$APP" -ov -format UDZO "$DMG"
+          echo "dmg=$DMG" >> $GITHUB_OUTPUT
           echo "arch=$ARCH" >> $GITHUB_OUTPUT
 
-      - name: Upload artifact (macOS .app.zip)
+      # Notarize + staple the DMG (uses notarytool)
+      - name: Notarize DMG
+        if: runner.os == 'macOS'
+        uses: GuillaumeFalourd/notary-tools@v1
+        with:
+          product_path: ${{ steps.dmg.outputs.dmg }}
+          apple_id: ${{ secrets.NOTARIZE_APPLE_ID }}
+          password: ${{ secrets.NOTARIZE_APP_PASSWORD }}
+          team_id: ${{ secrets.NOTARIZE_TEAM_ID }}
+          staple: 'true'
+
+      # Build a signed PKG installer (single file to double-click)
+      - name: Build signed PKG
+        if: runner.os == 'macOS'
+        id: pkg
+        shell: bash
+        env:
+          INSTALLER_ID: ${{ secrets.MAC_INSTALLER_IDENTITY }}
+        run: |
+          ARCH="$(uname -m)"
+          APP="dist/SPX_0DTE_Backtester.app"
+          PKG="SPX_0DTE_Backtester-macOS-${ARCH}.pkg"
+          productbuild --component "$APP" /Applications --sign "$INSTALLER_ID" "$PKG"
+          echo "pkg=$PKG" >> $GITHUB_OUTPUT
+          echo "arch=$ARCH" >> $GITHUB_OUTPUT
+
+      # Notarize + staple the PKG
+      - name: Notarize PKG
+        if: runner.os == 'macOS'
+        uses: GuillaumeFalourd/notary-tools@v1
+        with:
+          product_path: ${{ steps.pkg.outputs.pkg }}
+          apple_id: ${{ secrets.NOTARIZE_APPLE_ID }}
+          password: ${{ secrets.NOTARIZE_APP_PASSWORD }}
+          team_id: ${{ secrets.NOTARIZE_TEAM_ID }}
+          staple: 'true'
+
+      - name: Upload artifacts (macOS DMG + PKG)
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: SPX_0DTE_Backtester-macOS-${{ steps.pkg.outputs.arch }}-${{ matrix.python-version }}
-          path: ${{ steps.pkg.outputs.zip }}
+          name: SPX_0DTE_Backtester-macOS-${{ steps.dmg.outputs.arch }}-${{ matrix.python-version }}
+          path: |
+            ${{ steps.dmg.outputs.dmg }}
+            ${{ steps.pkg.outputs.pkg }}
           if-no-files-found: error
