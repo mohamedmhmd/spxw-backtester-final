@@ -10,8 +10,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-14]   # macos-14 = Apple Silicon; add macos-13 for Intel if needed
-        python-version: ["3.13"]         # use "3.11" if you stuck with older SciPy
+        os: [windows-latest, macos-14]   # add macos-13 for Intel builds if needed
+        python-version: ["3.13"]         # or "3.11" if your SciPy pin requires it
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -30,30 +30,32 @@ jobs:
       - name: Verify SciPy import
         run: python -c "import scipy,sys;print('SciPy',scipy.__version__,'Python',sys.version.split()[0])"
 
-      # ---------- Windows build (.exe, onefile) ----------
+      # ---------- Windows build (.exe) ----------
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: >
+        run: |
           if (Test-Path 'SPX_0DTE_Backtester_fixed.spec') {
             pyinstaller SPX_0DTE_Backtester_fixed.spec
           } else {
-            pyinstaller --noconfirm --clean --windowed --onefile
-            --name SPX_0DTE_Backtester
-            --collect-submodules scipy --collect-data scipy
-            --collect-submodules numpy --collect-data numpy
-            --hidden-import=scipy._lib.messagestream
-            --hidden-import=PyQt6 --hidden-import=matplotlib
-            --hidden-import=pandas --hidden-import=aiohttp
-            main.py
+            pyinstaller --noconfirm --clean --windowed --onefile `
+              --name SPX_0DTE_Backtester `
+              --collect-submodules scipy --collect-data scipy `
+              --collect-submodules numpy --collect-data numpy `
+              --hidden-import=scipy._lib.messagestream `
+              --hidden-import=PyQt6 `
+              --hidden-import=matplotlib `
+              --hidden-import=pandas `
+              --hidden-import=aiohttp `
+              main.py
           }
 
-      - name: Upload artifact (Windows .exe)
+      - name: Upload artifact (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: SPX_0DTE_Backtester-Windows-${{ matrix.python-version }}
-          path: dist/SPX_0DTE_Backtester.exe
+          path: dist/**
           if-no-files-found: error
 
       # ---------- macOS build (.app) ----------
@@ -73,8 +75,10 @@ jobs:
               --collect-submodules scipy --collect-data scipy \
               --collect-submodules numpy --collect-data numpy \
               --hidden-import=scipy._lib.messagestream \
-              --hidden-import=PyQt6 --hidden-import=matplotlib \
-              --hidden-import=pandas --hidden-import=aiohttp \
+              --hidden-import=PyQt6 \
+              --hidden-import=matplotlib \
+              --hidden-import=pandas \
+              --hidden-import=aiohttp \
               main.py
           fi
 
