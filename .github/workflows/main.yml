@@ -1,15 +1,19 @@
-name: Build Windows EXE
+name: Build Desktop Apps
+
 on:
   workflow_dispatch: {}
   push:
     tags: ["v*"]   # build when you push a tag like v1.0.0
 
 jobs:
-  win-build:
-    runs-on: windows-latest
+  build:
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.11"]   # or "3.13" if you updated SciPy to >=1.14.1
+        os: [windows-latest, macos-14]   # macos-14 = Apple Silicon; add macos-13 for Intel if needed
+        python-version: ["3.13"]         # use "3.11" if you stuck with older SciPy
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -18,21 +22,53 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip wheel setuptools
-          pip install -r requirements.txt "pyinstaller>=6.6"
+          pip install -r requirements.txt "pyinstaller>=6.6" pyinstaller-hooks-contrib
 
       - name: Verify SciPy import
         run: python -c "import scipy,sys;print('SciPy',scipy.__version__,'Python',sys.version.split()[0])"
 
-      - name: Build (spec if present, else CLI)
+      # ---------- Windows build (.exe, onefile) ----------
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >
+          if (Test-Path 'SPX_0DTE_Backtester_fixed.spec') {
+            pyinstaller SPX_0DTE_Backtester_fixed.spec
+          } else {
+            pyinstaller --noconfirm --clean --windowed --onefile
+            --name SPX_0DTE_Backtester
+            --collect-submodules scipy --collect-data scipy
+            --collect-submodules numpy --collect-data numpy
+            --hidden-import=scipy._lib.messagestream
+            --hidden-import=PyQt6 --hidden-import=matplotlib
+            --hidden-import=pandas --hidden-import=aiohttp
+            main.py
+          }
+
+      - name: Upload artifact (Windows .exe)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SPX_0DTE_Backtester-Windows-${{ matrix.python-version }}
+          path: dist/SPX_0DTE_Backtester.exe
+          if-no-files-found: error
+
+      # ---------- macOS build (.app) ----------
+      - name: Build (macOS .app)
+        if: runner.os == 'macOS'
         shell: bash
         run: |
-          if [ -f "SPX_0DTE_Backtester_fixed.spec" ]; then
-            pyinstaller SPX_0DTE_Backtester_fixed.spec
-          else
-            pyinstaller --noconfirm --clean --windowed --onefile \
+          if [[ -f "SPX_0DTE_Backtester_fixed.spec" ]]; then
+            # Spec may produce an .app when console=False. If not, fallback below is safe.
+            pyinstaller SPX_0DTE_Backtester_fixed.spec || true
+          fi
+
+          # If .app not produced by spec, build with CLI to force an .app bundle
+          if [[ ! -d "dist/SPX_0DTE_Backtester.app" ]]; then
+            pyinstaller --noconfirm --clean --windowed \
               --name SPX_0DTE_Backtester \
               --collect-submodules scipy --collect-data scipy \
               --collect-submodules numpy --collect-data numpy \
@@ -42,9 +78,26 @@ jobs:
               main.py
           fi
 
-      - name: Upload artifact
+      - name: Package .app as zip (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        id: pkg
+        run: |
+          ARCH="$(uname -m)"
+          APP="dist/SPX_0DTE_Backtester.app"
+          ZIP="SPX_0DTE_Backtester-macOS-${ARCH}.zip"
+          if [[ ! -d "$APP" ]]; then
+            echo "Expected $APP but it was not found"; exit 1
+          fi
+          # Create a distributable zip preserving resource forks
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
+          echo "zip=$ZIP" >> $GITHUB_OUTPUT
+          echo "arch=$ARCH" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact (macOS .app.zip)
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: SPX_0DTE_Backtester-${{ matrix.python-version }}
-          path: dist/**
+          name: SPX_0DTE_Backtester-macOS-${{ steps.pkg.outputs.arch }}-${{ matrix.python-version }}
+          path: ${{ steps.pkg.outputs.zip }}
           if-no-files-found: error
