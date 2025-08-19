@@ -23,7 +23,7 @@ class PolygonDataProvider:
     """
 
     def __init__(self, api_key: str):
-        self.api_key = "VGG0V1GnGumf21Yw7mMDwg7_derXxQSP"
+        self.api_key = api_key
         self.base_url = "https://api.polygon.io"
         self.session: Optional[aiohttp.ClientSession] = None
         

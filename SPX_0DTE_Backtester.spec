@@ -6,7 +6,7 @@ hidden = ['PyQt6', 'matplotlib', 'pandas', 'numpy', 'aiohttp']
 
 # Collect all SciPy + NumPy submodules and data files
 hidden += collect_submodules('scipy') + collect_submodules('numpy')
-datas = [('*.py', '.'), *collect_data_files('scipy'), *collect_data_files('numpy')]
+datas = [('*.py', '.'), *collect_data_files('scipy'), *collect_data_files('numpy'), *collect_data_files('certifi')]
 
 a = Analysis(
     ['main.py'],
