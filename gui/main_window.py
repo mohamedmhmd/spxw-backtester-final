@@ -325,10 +325,10 @@ class MainWindow(QMainWindow):
             success = loop.run_until_complete(test())
             
             if success:
-                QMessageBox.information(self, "Success", "API connection successful!")
+                QMessageBox.information(self, "Success", f"API connection successful! {api_key}")
                 self.status_bar.showMessage("API connection successful", 5000)
             else:
-                QMessageBox.warning(self, "Error", "API connection failed. Please check your API key.")
+                QMessageBox.warning(self, "Error", f"API connection failed. Please check your API key : {api_key}.")
                 self.status_bar.showMessage("API connection failed", 5000)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Connection test failed: {str(e)}")
