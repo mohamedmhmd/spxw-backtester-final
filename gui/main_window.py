@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
 import json
+import unicodedata 
 
 from engine.statistics import Statistics
 from .back_test_worker import BacktestWorker
@@ -287,6 +288,13 @@ class MainWindow(QMainWindow):
         else:
             self.api_key_input.setEnabled(True)
             self.status_bar.showMessage("Using real Polygon.io API", 3000)
+            
+    def _sanitize_api_key(self, s: str) -> str:
+          # Trim, drop any whitespace (including zero-width) and control chars
+          s = s.strip()
+          s = ''.join(ch for ch in s if not ch.isspace())
+          s = ''.join(ch for ch in s if unicodedata.category(ch)[0] != 'C')
+          return s
     
     def test_api_connection(self):
         """Test API connection"""
@@ -305,7 +313,7 @@ class MainWindow(QMainWindow):
             self.test_connection_btn.setEnabled(True)
             return
         
-        api_key = self.api_key_input.text()
+        api_key = self._sanitize_api_key(self.api_key_input.text())
         
         async def test():
             async with PolygonDataProvider(api_key) as provider:
@@ -329,7 +337,7 @@ class MainWindow(QMainWindow):
         self.test_connection_btn.setEnabled(True)
     
     def _test_connection(self):
-        api_key = self.api_key_input.text()
+        api_key = self._sanitize_api_key(self.api_key_input.text())
         async def test():
             async with PolygonDataProvider(api_key) as provider:
                 return await provider.test_connection()
@@ -360,7 +368,7 @@ class MainWindow(QMainWindow):
             self.data_provider = MockDataProvider()
             logger.info("Using mock data provider for backtest")
         else:
-            api_key = self.api_key_input.text()
+            api_key = self._sanitize_api_key(self.api_key_input.text())
             if not api_key:
                 QMessageBox.warning(self, "Error", "Please enter API key")
                 return

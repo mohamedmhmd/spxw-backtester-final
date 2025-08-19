@@ -24,11 +24,13 @@ class BacktestConfigWidget(QWidget):
         # Date range
         self.start_date = QDateEdit()
         self.start_date.setCalendarPopup(True)
+        self.start_date.setDisplayFormat("yyyy-MM-dd")
         self.start_date.setDate(QDate.currentDate().addYears(-4))
         layout.addRow("Start Date:", self.start_date)
         
         self.end_date = QDateEdit()
         self.end_date.setCalendarPopup(True)
+        self.end_date.setDisplayFormat("yyyy-MM-dd")
         self.end_date.setDate(QDate.currentDate())
         layout.addRow("End Date:", self.end_date)
         # Commission
