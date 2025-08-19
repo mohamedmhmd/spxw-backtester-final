@@ -114,7 +114,7 @@ class MainWindow(QMainWindow):
         api_layout = QVBoxLayout()
         
         self.api_key_input = QLineEdit()
-        self.api_key_input.setText("")
+        self.api_key_input.setText("VGG0V1GnGumf21Yw7mMDwg7_derXxQSP")
         self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         api_layout.addWidget(QLabel("Polygon.io API Key:"))
         api_layout.addWidget(self.api_key_input)
