@@ -1,0 +1,146 @@
+name: Build Desktop Apps (Win EXE + macOS .app via py2app)
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags: ["v*"]   # build when you push a tag like v1.0.0
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]   # add macos-13 for Intel builds if needed
+        python-version: ["3.13"]         # adjust if your stack needs 3.11, etc.
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          pip install -r requirements.txt
+
+      - name: Verify SciPy import
+        run: python -c "import scipy,sys;print('SciPy',scipy.__version__,'Python',sys.version.split()[0])"
+
+      # ---------------- Windows (PyInstaller) ----------------
+      - name: Install PyInstaller (Windows)
+        if: runner.os == 'Windows'
+        run: pip install "pyinstaller>=6.6" pyinstaller-hooks-contrib
+
+      - name: Build (Windows, onefile)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path 'SPX_0DTE_Backtester_fixed.spec') {
+            pyinstaller SPX_0DTE_Backtester_fixed.spec
+          } else {
+            pyinstaller --noconfirm --clean --windowed --onefile `
+              --name SPX_0DTE_Backtester `
+              --collect-submodules scipy --collect-data scipy `
+              --collect-submodules numpy --collect-data numpy `
+              --hidden-import=scipy._lib.messagestream `
+              --hidden-import=PyQt6 `
+              --hidden-import=matplotlib `
+              --hidden-import=pandas `
+              --hidden-import=aiohttp `
+              main.py
+          }
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SPX_0DTE_Backtester-Windows-${{ matrix.python-version }}
+          path: dist/**
+          if-no-files-found: error
+
+      # ---------------- macOS (py2app) ----------------
+      - name: Install py2app (macOS)
+        if: runner.os == 'macOS'
+        run: pip install py2app
+
+      # Create a self-contained py2app setup script on-the-fly.
+      # If you already have setup.py for py2app, you can delete this step and the next "Build (.app)" will use yours instead.
+      - name: Generate setup-mac.py (py2app)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cat > setup-mac.py << 'PY'
+          from setuptools import setup
+          from pathlib import Path
+          import os
+
+          APP_NAME = "SPX_0DTE_Backtester"
+          ENTRY = "main.py"  # change if your entrypoint is different
+          VERSION = os.getenv("GITHUB_REF_NAME", "0.0.0").lstrip("v")
+
+          # py2app options
+          OPTIONS = {
+              # Makes a standalone .app with all deps
+              "argv_emulation": False,
+              "packages": [
+                  "numpy","scipy","PyQt6","matplotlib","pandas","aiohttp","certifi"
+              ],
+              "includes": [
+                  "scipy._lib.messagestream"
+              ],
+              # If you have data files (icons, .ui, etc.), add them here:
+              # "resources": ["resources", "icons/app.icns"],
+              "plist": {
+                  "CFBundleName": APP_NAME,
+                  "CFBundleDisplayName": APP_NAME,
+                  "CFBundleIdentifier": "com.yourorg." + APP_NAME.lower(),
+                  "CFBundleShortVersionString": VERSION,
+                  "CFBundleVersion": VERSION,
+                  # Add NS* permissions if you need them; networking over HTTPS is fine by default.
+              },
+              # Uncomment to reduce size by excluding tests/examples:
+              # "excludes": ["matplotlib.tests", "numpy.random._examples", "scipy.tests"],
+          }
+
+          setup(
+              app=[ENTRY],
+              name=APP_NAME,
+              options={"py2app": OPTIONS},
+          )
+          PY
+
+      - name: Build (macOS .app via py2app)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          # Build: creates dist/SPX_0DTE_Backtester.app
+          python setup-mac.py py2app -O2
+
+          # Quick sanity: ensure .app exists
+          APP="dist/SPX_0DTE_Backtester.app"
+          [[ -d "$APP" ]] || { echo "Expected $APP but it was not found"; exit 1; }
+
+      # Zip the .app properly for distribution
+      - name: Package .app as zip (macOS)
+        if: runner.os == 'macOS'
+        id: zip
+        shell: bash
+        run: |
+          ARCH="$(uname -m)"
+          APP="dist/SPX_0DTE_Backtester.app"
+          ZIP="SPX_0DTE_Backtester-macOS-${ARCH}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
+          echo "zip=$ZIP" >> $GITHUB_OUTPUT
+          echo "arch=$ARCH" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact (macOS .app.zip)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SPX_0DTE_Backtester-macOS-${{ steps.zip.outputs.arch }}-${{ matrix.python-version }}
+          path: ${{ steps.zip.outputs.zip }}
+          if-no-files-found: error
