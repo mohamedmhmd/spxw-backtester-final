@@ -14,6 +14,9 @@ from .back_test_worker import BacktestWorker
 from .strategy_config_widget import StrategyConfigWidget
 from data.mock_data_provider import MockDataProvider
 import copy
+import sys
+import platform
+
 
 # Set up logging
 logging.basicConfig(
@@ -28,7 +31,44 @@ from gui.back_test_config_widget import BacktestConfigWidget
 from gui.results_widget import ResultsWidget
 from data.polygon_data_provider import PolygonDataProvider
 
-
+class ConnectionTestWorker(QThread):
+    finished = pyqtSignal(bool, str)  # success, message
+    
+    def __init__(self, api_key: str, use_mock: bool):
+        super().__init__()
+        self.api_key = api_key
+        self.use_mock = use_mock
+        
+        
+    def run(self):
+        try:
+            if self.use_mock:
+                self.finished.emit(True, "Mock data provider ready!")
+                return
+            
+            success = self._test_polygon_connection()
+            if success:
+                self.finished.emit(True, "API connection successful!")
+            else:
+                self.finished.emit(False, "API connection failed. Please check your API key.")
+        except Exception as e:
+            self.finished.emit(False, f"Connection test failed: {str(e)}")
+    
+    def _test_polygon_connection(self) -> bool:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            async def test_async():
+                async with PolygonDataProvider(self.api_key) as provider:
+                    return await provider.test_connection()
+            
+            result = loop.run_until_complete(test_async())
+            loop.close()
+            return result
+        except Exception as e:
+            logger.error(f"Polygon connection test failed: {e}")
+            return False
 class MainWindow(QMainWindow):
     """Main application window"""
     
@@ -37,6 +77,9 @@ class MainWindow(QMainWindow):
         self.data_provider = None
         self.backtest_worker = None
         self.last_results = None  # Initialize this to store results
+        self.connection_worker = None
+        logger.info(f"Platform: {platform.system()} {platform.release()}")
+        logger.info(f"Python: {sys.version}")
         
         # Add artificial progress tracking
         self.artificial_progress = 0
@@ -297,12 +340,35 @@ class MainWindow(QMainWindow):
           return s
     
     def test_api_connection(self):
-        """Test API connection"""
-        self.test_connection_btn.setEnabled(False)
-        self.status_bar.showMessage("Testing connection...")
-        
-        # Run test in thread
-        QTimer.singleShot(100, self._test_connection_async)
+       self.test_connection_btn.setEnabled(False)
+       self.test_connection_btn.setText("Testing...")
+       self.status_bar.showMessage("Testing connection...")
+    
+       api_key = self._sanitize_api_key(self.api_key_input.text())
+       use_mock = self.use_mock_data.isChecked()
+    
+       self.connection_worker = ConnectionTestWorker(api_key, use_mock)
+       self.connection_worker.finished.connect(self.on_connection_test_finished)
+       self.connection_worker.start()
+       
+    def on_connection_test_finished(self, success: bool, message: str):
+        self.test_connection_btn.setEnabled(True)
+        self.test_connection_btn.setText("Test Connection")
+    
+        if success:
+           QMessageBox.information(self, "Success", message)
+           self.status_bar.showMessage(message, 5000)
+        else:
+           QMessageBox.warning(self, "Error", message)
+           self.status_bar.showMessage("Connection test failed", 5000)
+    
+        if self.connection_worker:
+           self.connection_worker.deleteLater()
+           self.connection_worker = None
+           
+    def _quick_validation(self) -> bool:
+        api_key = self._sanitize_api_key(self.api_key_input.text())
+        return len(api_key) > 10
     
     def _test_connection_async(self):
         """Test connection asynchronously"""

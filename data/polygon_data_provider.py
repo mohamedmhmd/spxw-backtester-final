@@ -8,6 +8,8 @@ import pickle
 import gzip
 import logging
 import time
+import ssl
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,16 +33,52 @@ class PolygonDataProvider:
         self.rate_limiter = asyncio.Semaphore(5)  # 5 concurrent requests
         self.last_request_time = 0
         self.min_request_interval = 0.2  # 200ms between requests
+        self.ssl_context = self._create_ssl_context()
 
     async def __aenter__(self):
         if not self.session:
-            self.session = aiohttp.ClientSession()
+            connector = aiohttp.TCPConnector(
+            ssl=self.ssl_context,
+            limit=100,
+            limit_per_host=10,
+            ttl_dns_cache=300,
+            use_dns_cache=True,
+        )
+        
+        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        
+        self.session = aiohttp.ClientSession(
+            connector=connector,
+            timeout=timeout,
+            headers={
+                'User-Agent': 'SPX-0DTE-Backtester/1.0.0',
+                'Accept': 'application/json',
+                'Accept-Encoding': 'gzip, deflate'
+            }
+        )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
             self.session = None
+            
+    def _create_ssl_context(self):
+        """Create SSL context with proper configuration for macOS"""
+        try:
+           ssl_context = ssl.create_default_context()
+           if hasattr(ssl, 'Purpose'):
+              ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+           ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+           if os.name == 'posix':  # Unix-like systems including macOS
+              try:
+                ssl_context.load_default_certs()
+              except Exception as e:
+                logger.warning(f"Could not load default certificates: {e}")
+           return ssl_context
+        except Exception as e:
+            logger.error(f"Error creating SSL context: {e}")
+            return None
 
     async def _rate_limited_request(self, url: str, params: dict = None) -> dict:
           """Make rate-limited request to Polygon API"""
