@@ -171,8 +171,6 @@ class BacktestEngine:
         for i in range(min_bars_needed, len(spx_ohlc_data)):
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
             current_price = spx_ohlc_data.iloc[i]['open']
-            if current_bar_time.time() < time(9, 30) or current_bar_time.time() >= time(16, 0):
-                continue
             
             await Straddle1._check_straddle_exits(open_straddles, current_price, current_bar_time, config, self.data_provider)
             if(ic1_found):

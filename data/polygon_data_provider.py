@@ -195,7 +195,8 @@ class PolygonDataProvider:
           return complete_df
 
     async def process_ohlc_data(self, df: pd.DataFrame, underlying : str, date: datetime) -> pd.DataFrame:
-        df['timestamp'] = pd.to_datetime(df['t'], unit='ms')
+        df["timestamp_et"] = pd.to_datetime(df["t"], unit="ms", utc=True).dt.tz_convert("America/New_York")
+        df["timestamp"] = df["timestamp_et"].dt.tz_localize(None)
         df = df.sort_values('timestamp').drop_duplicates(subset=['timestamp'])        
         df = df[
                     (df['timestamp'].dt.time >= pd.Timestamp('09:30:00').time()) & 
