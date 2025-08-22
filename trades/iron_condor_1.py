@@ -57,9 +57,9 @@ class IronCondor1:
         directions = []
         for j in range(strategy.lookback_candles):
             idx = current_idx - strategy.lookback_candles + j
-            if idx >= 0 and idx < len(spy_ohlc_data):
-                open_price = spy_ohlc_data.iloc[idx]['open']
-                close_price = spy_ohlc_data.iloc[idx]['close']
+            if idx >= 0 and idx < len(spx_ohlc_data):
+                open_price = spx_ohlc_data.iloc[idx]['open']
+                close_price = spx_ohlc_data.iloc[idx]['close']
                 directions.append(1 if close_price > open_price else -1)
         
         if directions:
@@ -73,9 +73,9 @@ class IronCondor1:
         recent_ranges = []
         for j in range(strategy.avg_range_candles):
             idx = current_idx - strategy.avg_range_candles + j
-            if idx >= 0 and idx < len(spy_ohlc_data):
-                high = spy_ohlc_data.iloc[idx]['high']
-                low = spy_ohlc_data.iloc[idx]['low']
+            if idx >= 0 and idx < len(spx_ohlc_data):
+                high = spx_ohlc_data.iloc[idx]['high']
+                low = spx_ohlc_data.iloc[idx]['low']
                 recent_ranges.append(high - low)
         
         if recent_ranges:
@@ -84,8 +84,8 @@ class IronCondor1:
             # Calculate average range for all candles up to current
             all_ranges = []
             for j in range(current_idx):
-                high = spy_ohlc_data.iloc[j]['high']
-                low = spy_ohlc_data.iloc[j]['low']
+                high = spx_ohlc_data.iloc[j]['high']
+                low = spx_ohlc_data.iloc[j]['low']
                 all_ranges.append(high - low)
             
             if all_ranges:
