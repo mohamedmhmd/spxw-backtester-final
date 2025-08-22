@@ -39,7 +39,7 @@ class IronCondor1:
         volume_ok = True
         volume_checks = []
         for j in range(strategy.consecutive_candles):
-            idx = current_idx - strategy.consecutive_candles + j + 1
+            idx = current_idx - strategy.consecutive_candles + j
             if idx >= 0 and idx < len(spy_ohlc_data):
                 current_volume = spy_ohlc_data.iloc[idx]['volume']
                 volume_checks.append(current_volume)
@@ -56,7 +56,7 @@ class IronCondor1:
         # Condition 2: Direction check (not all candles in same direction)
         directions = []
         for j in range(strategy.lookback_candles):
-            idx = current_idx - strategy.lookback_candles + j + 1
+            idx = current_idx - strategy.lookback_candles + j
             if idx >= 0 and idx < len(spy_ohlc_data):
                 open_price = spy_ohlc_data.iloc[idx]['open']
                 close_price = spy_ohlc_data.iloc[idx]['close']
@@ -72,7 +72,7 @@ class IronCondor1:
         # Condition 3: Range check (recent range below threshold)
         recent_ranges = []
         for j in range(strategy.avg_range_candles):
-            idx = current_idx - strategy.avg_range_candles + j + 1
+            idx = current_idx - strategy.avg_range_candles + j
             if idx >= 0 and idx < len(spy_ohlc_data):
                 high = spy_ohlc_data.iloc[idx]['high']
                 low = spy_ohlc_data.iloc[idx]['low']
@@ -83,7 +83,7 @@ class IronCondor1:
             
             # Calculate average range for all candles up to current
             all_ranges = []
-            for j in range(current_idx + 1):
+            for j in range(current_idx):
                 high = spy_ohlc_data.iloc[j]['high']
                 low = spy_ohlc_data.iloc[j]['low']
                 all_ranges.append(high - low)
