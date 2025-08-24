@@ -35,6 +35,10 @@ class Statistics:
         # Separate trades by type
         iron_condor_trades = [t for t in trades if t.trade_type == "Iron Condor 1"]
         straddle_trades = [t for t in trades if t.trade_type == "Straddle 1"]
+        ic = {t.entry_time: t.pnl for t in trades if t.trade_type == "Iron Condor 1"}
+        st = {t.entry_time: t.pnl for t in trades if t.trade_type == "Straddle 1"}
+        couples = [(ic[t] + st[t]) > 0 for t in ic if t in st]
+        win_rate = sum(couples) / len(couples) if couples else 0
         
         # Overall statistics
         winning_trades = [t for t in trades if t.pnl > 0]
@@ -118,10 +122,10 @@ class Statistics:
             }
         
         return {
-            'total_trades': len(trades),
+            'total_trades': len(trades)/2,
             'winning_trades': len(winning_trades),
             'losing_trades': len(losing_trades),
-            'win_rate': len(winning_trades) / len(trades) if trades else 0,
+            'win_rate': win_rate,
             'total_pnl': total_pnl,
             'avg_win': avg_win,
             'avg_loss': avg_loss,

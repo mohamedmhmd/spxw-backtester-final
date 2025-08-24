@@ -64,6 +64,7 @@ class Trade:
         
         # Use official close price
         settlement_price = ohlc_data.iloc[-1]['close']
+        self.metadata['exit_spx_price'] = settlement_price
         if isinstance(date, datetime):
             dt = date
         else:

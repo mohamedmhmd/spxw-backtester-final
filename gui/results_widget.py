@@ -333,9 +333,9 @@ class ResultsWidget(QWidget):
         
         # Create enhanced table
         self.trades_table = EnhancedTableWidget()
-        self.trades_table.setColumnCount(8)
+        self.trades_table.setColumnCount(9)
         self.trades_table.setHorizontalHeaderLabels([
-            "Entry Time", "Exit Time", "Type", "SPX Price", "Strategy Details", 
+            "Entry Time", "Exit Time", "Type", "Entry SPX Price", "Exit SPX Price", "Strategy Details", 
             "Size", "Net Premium", "P&L"
         ])
         
@@ -346,11 +346,12 @@ class ResultsWidget(QWidget):
         self.trades_table.setColumnWidth(0, 120)  # Entry Time
         self.trades_table.setColumnWidth(1, 120)  # Exit Time  
         self.trades_table.setColumnWidth(2, 150)  # Type
-        self.trades_table.setColumnWidth(3, 100)  # SPX Price
-        self.trades_table.setColumnWidth(4, 200)  # Strategy Details
-        self.trades_table.setColumnWidth(5, 80)   # Size
-        self.trades_table.setColumnWidth(6, 120)  # Net Premium
-        self.trades_table.setColumnWidth(7, 100)  # P&L
+        self.trades_table.setColumnWidth(3, 100)  # Entry SPX Price
+        self.trades_table.setColumnWidth(4, 100)  # Exit SPX Price
+        self.trades_table.setColumnWidth(5, 200)  # Strategy Details - Made much wider
+        self.trades_table.setColumnWidth(6, 80)   # Size
+        self.trades_table.setColumnWidth(7, 120)  # Net Premium
+        self.trades_table.setColumnWidth(8, 100)  # P&L
         
         # Allow manual column resizing
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
@@ -526,16 +527,22 @@ class ResultsWidget(QWidget):
             self.trades_table.setItem(i, 1, exit_item)
             
             # Type with color coding
-            type_item = QTableWidgetItem(trade.trade_type)
+            type_item = QTableWidgetItem(f"{trade.trade_type} \n {trade.metadata.get('representation', '')}")
             type_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             type_item.setBackground(QColor("#E3F2FD"))
             self.trades_table.setItem(i, 2, type_item)
             
-            # SPX Price
-            spx_price = trade.metadata.get('spx_price', 'N/A')
-            spx_item = QTableWidgetItem(f"${spx_price:,.2f}" if isinstance(spx_price, (int, float)) else str(spx_price))
+            # Entry SPX Price
+            entry_spx_price = trade.metadata.get('entry_spx_price', 'N/A')
+            spx_item = QTableWidgetItem(f"${entry_spx_price:,.2f}" if isinstance(entry_spx_price, (int, float)) else str(entry_spx_price))
             spx_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.trades_table.setItem(i, 3, spx_item)
+            
+            # Exit SPX Price
+            exit_spx_price = trade.metadata.get('exit_spx_price', 'N/A')
+            spx_item = QTableWidgetItem(f"${exit_spx_price:,.2f}" if isinstance(exit_spx_price, (int, float)) else str(exit_spx_price))
+            spx_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.trades_table.setItem(i, 4, spx_item)
             
             # Legs details with elegant formatting
             legs_widget = QWidget()
@@ -601,18 +608,18 @@ class ResultsWidget(QWidget):
                 legs_layout.addWidget(leg_frame)
             
             legs_widget.setLayout(legs_layout)
-            self.trades_table.setCellWidget(i, 4, legs_widget)
+            self.trades_table.setCellWidget(i, 5, legs_widget)
             
             # Size
             size_item = QTableWidgetItem(str(trade.size))
             size_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.trades_table.setItem(i, 5, size_item)
+            self.trades_table.setItem(i, 6, size_item)
             
             # Net Premium
             if trade.trade_type == "Iron Condor 1":
                 entry_price = trade.metadata['net_credit']
             else:
-                entry_price = -trade.metadata['total_premium']/trade.size
+                entry_price = -trade.metadata['total_premium']/trade.size if trade.size != 0 else 0
             
             premium_item = QTableWidgetItem(f"${entry_price:,.2f}")
             premium_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -620,7 +627,7 @@ class ResultsWidget(QWidget):
                 premium_item.setForeground(QColor("#4CAF50"))
             else:
                 premium_item.setForeground(QColor("#F44336"))
-            self.trades_table.setItem(i, 6, premium_item)
+            self.trades_table.setItem(i, 7, premium_item)
             
             # P&L with enhanced styling
             pnl_item = QTableWidgetItem(f"${trade.pnl:,.2f}")
@@ -634,7 +641,7 @@ class ResultsWidget(QWidget):
                 pnl_item.setForeground(QColor("#F44336"))
                 pnl_item.setBackground(QColor("#FFEBEE"))
             
-            self.trades_table.setItem(i, 7, pnl_item)
+            self.trades_table.setItem(i, 8, pnl_item)
         
         # Adjust row heights
         self.trades_table.resizeRowsToContents()

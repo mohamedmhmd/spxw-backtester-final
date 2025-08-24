@@ -575,6 +575,8 @@ class MainWindow(QMainWindow):
         total_capital_used = 0.0
     
         for trade in scaled_results['trades']:
+            if(trade.size == 0):
+                continue
             if trade.trade_type == "Iron Condor 1":
                scale_factor = iron_size
             elif trade.trade_type == "Straddle 1":

@@ -55,6 +55,7 @@ class Straddle1:
         # Build trade positions (buy both legs)
         trade_contracts = {}
         total_premium = 0
+        strikes_dict = {}
         
         for leg, contract in contracts.items():
             quote = quotes[contract]
@@ -64,6 +65,7 @@ class Straddle1:
                 straddle_strike = c_strike
             else:  # put
                 straddle_strike = p_strike
+            strikes_dict[leg] = straddle_strike
             
             trade_contracts[contract] = {
                 'position': strategy.straddle_1_trade_size,  # Long position
@@ -75,6 +77,7 @@ class Straddle1:
             total_premium += price* strategy.straddle_1_trade_size  # SPX multiplier
         
         # Create straddle trade
+        representation = f"{strikes_dict["straddle_put"]}/{strikes_dict["straddle_call"]}"
         trade = Trade(
             entry_time=entry_time,
             exit_time=None,
@@ -91,7 +94,8 @@ class Straddle1:
                 'total_premium': total_premium,
                 'exit_percentage': strategy.straddle_exit_percentage,
                 'exit_multiplier': strategy.straddle_exit_multiplier,
-                'spx_price': current_price
+                'entry_spx_price': current_price,
+                'representation': representation
             }
         )
         

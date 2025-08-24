@@ -115,7 +115,7 @@ class IronCondor1:
     
          min_wing = getattr(strategy, 'min_wing_width', 15)
          max_wing = getattr(strategy, 'max_wing_width', 70)
-         step = getattr(strategy, 'wing_width_step', 5)
+         step = 5
          target_ratio = getattr(strategy, 'target_win_loss_ratio', 1.5)
 
          distances = list(range(min_wing, max_wing + 1, step))
@@ -316,13 +316,14 @@ class IronCondor1:
         
         # Build trade positions
         trade_contracts = {}
-        
+        strikes_dict = {}
         # Short positions
         for leg, contract in [('short_call', contracts['short_call']), 
                             ('short_put', contracts['short_put'])]:
             quote = quotes[contract]
             price = quote['bid']
             strike = int(contract[-8:]) / 1000  # Extract strike from contract
+            strikes_dict[leg] = strike
             
             trade_contracts[contract] = {
                 'position': -strategy.iron_1_trade_size,  # Short position
@@ -337,6 +338,7 @@ class IronCondor1:
             quote = quotes[contract]
             price = quote['ask']
             strike = int(contract[-8:]) / 1000  # Extract strike from contract
+            strikes_dict[leg] = strike
             
             trade_contracts[contract] = {
                 'position': strategy.iron_1_trade_size,  # Long position
@@ -345,6 +347,7 @@ class IronCondor1:
                 'strike': strike
             }
         
+        representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']}  {strikes_dict['short_call']}/{strikes_dict['long_call']}"
         # Create trade with metadata
         trade = Trade(
             entry_time=entry_time,
@@ -357,7 +360,8 @@ class IronCondor1:
             metadata={
                 'net_credit': net_credit,
                 'strategy_name': 'iron_1',
-                'spx_price': current_price,
+                'entry_spx_price': current_price,
+                'representation': representation
             }
         )
         

@@ -21,7 +21,6 @@ class StrategyConfig:
     # Iron Condor strike selection parameters
     min_wing_width: int = 15  # Minimum distance from ATM
     max_wing_width: int = 70  # Maximum distance from ATM
-    wing_width_step: int = 5   # Step size for searching
     
     # Straddle parameters
     straddle_1_trade_size: int = 2
@@ -43,7 +42,6 @@ class StrategyConfig:
             'target_win_loss_ratio': self.target_win_loss_ratio,
             'min_wing_width': self.min_wing_width,
             'max_wing_width': self.max_wing_width,
-            'wing_width_step': self.wing_width_step,
             'straddle_distance_multiplier': self.straddle_distance_multiplier,
             'straddle_exit_percentage': self.straddle_exit_percentage,
             'straddle_exit_multiplier': self.straddle_exit_multiplier
