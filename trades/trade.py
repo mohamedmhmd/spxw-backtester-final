@@ -40,9 +40,9 @@ class Trade:
             
             # Calculate raw P&L
             if remaining > 0:  # Long
-                pnl = (payoff - entry_price) * remaining  # SPX multiplier is 100
+                pnl = (payoff - entry_price) * remaining*100  # SPX multiplier is 100
             else:  # Short
-                pnl = (entry_price - payoff) * abs(remaining)
+                pnl = (entry_price - payoff) * abs(remaining)*100
             
             total_pnl += pnl
             total_commissions += abs(remaining) * commission_per_contract * 2  # Entry and exit
