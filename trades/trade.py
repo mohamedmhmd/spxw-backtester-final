@@ -45,7 +45,9 @@ class Trade:
                 pnl = (entry_price - payoff) * abs(remaining)*100
             
             total_pnl += pnl
-            total_commissions += abs(remaining) * commission_per_contract * 2  # Entry and exit
+            total_commissions += abs(remaining) * commission_per_contract #entry
+            if(payoff > 0):
+                total_commissions += abs(remaining) * commission_per_contract #exit
             
             # Update exit price
             details['exit_price'] = payoff
