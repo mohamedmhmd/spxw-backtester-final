@@ -549,7 +549,7 @@ class MainWindow(QMainWindow):
     
         # Create scaled copy of results
         scaled_results = self._scale_results(self.last_results, iron_size, straddle_size)
-    
+        self.last_results = scaled_results  # Update last_results to the scaled version
         # Update results widget
         self.results_widget.update_results(scaled_results)
     

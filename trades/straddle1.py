@@ -102,64 +102,79 @@ class Straddle1:
         return trade
     
 
-    async def _check_straddle_exits(open_straddles, current_price: float, current_time: datetime,
-                                   config: BacktestConfig, data_provider: Union[MockDataProvider, PolygonDataProvider]) -> None:
-        """Check if any straddle positions should be partially exited"""
-        for straddle in open_straddles:
-            if straddle.status != "OPEN":
+    async def _check_straddle_exits(
+    open_straddles,
+    current_price: float,
+    current_time: datetime,
+    config: BacktestConfig,
+    data_provider: Union["MockDataProvider", "PolygonDataProvider"]
+) -> None:
+         """Check if any straddle positions should be partially exited."""
+    
+         for straddle in open_straddles:
+             if straddle.status != "OPEN":
                 continue
-            
-            call_straddle_strike = straddle.metadata['call_straddle_strike']
-            put_straddle_strike = straddle.metadata['put_straddle_strike']
-            exit_percentage = straddle.metadata['exit_percentage']
-            exit_multiplier = straddle.metadata['exit_multiplier']
-            
-            # Check if price hit the straddle strike
-            if abs(current_price - call_straddle_strike) < 0.01 or abs(current_price - put_straddle_strike) < 0.01:  # Within penny of strike
-                # Determine which leg is ITM
-                for contract, details in straddle.contracts.items():
-                    if details['remaining_position'] <= 0:
-                        continue
-                    
-                    leg_type = details['leg_type']
-                    entry_price = details['entry_price']
-                    
-                    # Check which leg to potentially exit
-                    should_exit = False
-                    if 'call' in leg_type and current_price >= call_straddle_strike:
-                        should_exit = True
-                    elif 'put' in leg_type and current_price <= put_straddle_strike:
-                        should_exit = True
-                    
-                    if should_exit:
-                        # Get current quote
-                        quotes = await data_provider.get_option_quotes([contract], current_time)
-                        if contract in quotes:
-                            current_quote = quotes[contract]
-                            exit_price = current_quote['bid']
-                            
-                            # Check if price is 2x or more of entry
-                            if exit_price >= entry_price * exit_multiplier:
-                                # Execute partial exit
-                                exit_size = int(details['position'] * exit_percentage)
-                                
-                                if exit_size > 0:
-                                    # Calculate P&L for partial exit
-                                    partial_pnl = (exit_price - entry_price) * exit_size  # SPX multiplier
-                                    partial_pnl -= config.commission_per_contract * exit_size  # Exit commission
-                                    
-                                    # Update position
-                                    details['remaining_position'] -= exit_size
-                                    details['partial_exits'] = details.get('partial_exits', [])
-                                    details['partial_exits'].append({
-                                        'time': current_time,
-                                        'size': exit_size,
-                                        'price': exit_price,
-                                        'pnl': partial_pnl
-                                    })
-                                    
-                                    # Add to trade's running P&L
-                                    straddle.metadata['partial_pnl'] = straddle.metadata.get('partial_pnl', 0) + partial_pnl
-                                    
-                                    logger.info(f"Partial straddle exit: {leg_type} at ${exit_price:.2f} "
-                                              f"(entry: ${entry_price:.2f}), Size: {exit_size}, P&L: ${partial_pnl:.2f}")
+
+             # Ensure metadata exists
+             if straddle.metadata is None:
+                straddle.metadata = {}
+
+             call_straddle_strike = straddle.metadata.get("call_straddle_strike")
+             put_straddle_strike = straddle.metadata.get("put_straddle_strike")
+             exit_percentage = straddle.metadata.get("exit_percentage", 0.5)
+             exit_multiplier = straddle.metadata.get("exit_multiplier", 2.0)
+
+             # --- Strike hit condition ---
+             call_hit = current_price >= call_straddle_strike if call_straddle_strike else False
+             put_hit = current_price <= put_straddle_strike if put_straddle_strike else False
+
+             if not (call_hit or put_hit):
+                continue
+
+             for contract, details in straddle.contracts.items():
+                 if details.get("remaining_position", details["position"]) <= 0:
+                    continue
+
+                 leg_type = details["leg_type"]
+                 entry_price = details["entry_price"]  # raw option price (not *100)
+
+                 # Determine if this leg should be checked for exit
+                 should_check = (
+                (call_hit and "call" in leg_type) or
+                (put_hit and "put" in leg_type)
+            )
+
+                 if not should_check:
+                   continue
+
+                 # --- Get current quote ---
+                 quotes = await data_provider.get_option_quotes([contract], current_time)
+                 if contract not in quotes:
+                    continue
+
+                 current_quote = quotes[contract]
+                 exit_price = current_quote["bid"]  # raw option price
+
+                 # --- Exit condition ---
+                 if exit_price >= entry_price * exit_multiplier:
+                    exit_size = int(details["position"] * exit_percentage)
+
+                    if exit_size <= 0:
+                       continue  # avoid zero-sized exits
+
+                    # Calculate partial P&L (SPX = 100× multiplier)
+                    partial_pnl = (exit_price - entry_price) * exit_size * 100
+                  # Apply only exit commission (entry commission assumed at open)
+                    partial_pnl -= config.commission_per_contract * exit_size
+
+                # Update position
+                    details["remaining_position"] = details.get("remaining_position", details["position"]) - exit_size
+
+                # Update running P&L at trade level
+                    straddle.metadata["partial_pnl"] = straddle.metadata.get("partial_pnl", 0) + partial_pnl
+                    straddle.contracts[contract] = details
+                    logger.info(
+                    f"Partial straddle exit: {leg_type.upper()} at ${exit_price:.2f} "
+                    f"(entry: ${entry_price:.2f}, x{exit_multiplier:.1f}), "
+                    f"Size: {exit_size}, P&L: ${partial_pnl:.2f}"
+                   )
