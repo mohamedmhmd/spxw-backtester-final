@@ -33,7 +33,7 @@ class Straddle1:
                                current_price: float,
                                strategy: StrategyConfig,
                                iron_condor_trade: Trade,
-                               data_provider: Union[MockDataProvider, PolygonDataProvider]) -> Optional[Trade]:
+                               data_provider: Union[MockDataProvider, PolygonDataProvider], config : BacktestConfig) -> Optional[Trade]:
         """Execute Straddle trade"""
         # Create straddle contracts
         exp_str = date.strftime('%y%m%d')
@@ -76,6 +76,9 @@ class Straddle1:
             }
             total_premium += price* strategy.straddle_1_trade_size  # SPX multiplier
         
+        
+        total_commissions = len(contracts) * config.commission_per_contract * strategy.straddle_1_trade_size
+        entry_used_capital = total_premium*100 + total_commissions
         # Create straddle trade
         representation = f"{strikes_dict["straddle_put"]}/{strikes_dict["straddle_call"]}"
         trade = Trade(
@@ -85,7 +88,7 @@ class Straddle1:
             contracts=trade_contracts,
             size=strategy.straddle_1_trade_size,
             entry_signals={'triggered_by': 'iron_condor'},
-            used_capital=total_premium,
+            used_capital=entry_used_capital,
             metadata={
                 'strategy_name': 'straddle_1',
                 'iron_condor_ref': iron_condor_trade,

@@ -178,7 +178,7 @@ class BacktestEngine:
             
             ic_trade = await IronCondor1._find_iron_trade(spx_ohlc_data, spy_ohlc_data, i, strategy, 
                                                      date, current_price, current_bar_time,
-                                                     self.data_provider)
+                                                     self.data_provider, config)
             if ic_trade:
                 trades.append(ic_trade)
                 active_iron_condors.append(ic_trade)
@@ -194,7 +194,7 @@ class BacktestEngine:
                                 current_price,
                                 strategy,
                                 ic_trade,
-                                self.data_provider
+                                self.data_provider, config
                 )
                             
                 if straddle_trade:

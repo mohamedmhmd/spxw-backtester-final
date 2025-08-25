@@ -85,14 +85,17 @@ class Trade:
             # Calculate intrinsic value at expiration
             if 'call' in leg_type:
                 value = max(0, settlement_price - strike)
-                if 'short' in leg_type:
-                    if settlement_price - strike > 0:
-                        self.used_capital += (settlement_price - strike)
+                if 'short' in leg_type and value > 0:
+                   # add cash required to settle short calls
+                   self.used_capital += value * abs(details['position']) * 100
             else:  # put
                 value = max(0, strike - settlement_price)
-                if 'short' in leg_type:
-                    if settlement_price - strike < 0:
-                        self.used_capital += (strike - settlement_price)
+                if 'short' in leg_type and value > 0:
+                   # add cash required to settle short puts
+                   self.used_capital += value * abs(details['position']) * 100
+                   
+            exit_commissions = sum(abs(d['position']) for d in self.contracts.values()) * config.commission_per_contract
+            self.used_capital += exit_commissions
             
             payoffs[contract] = value
         

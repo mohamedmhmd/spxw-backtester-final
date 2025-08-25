@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import pandas as pd
 from pyparsing import Union
+from config.back_test_config import BacktestConfig
 from config.strategy_config import StrategyConfig
 from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
@@ -307,7 +308,7 @@ class IronCondor1:
     async def _execute_iron_condor(quotes: Dict[str, Dict], entry_time: datetime,
                                   contracts: Dict[str, str], strategy: StrategyConfig,
                                   signals: Dict,
-                                  net_credit: float, current_price) -> Optional[Trade]:
+                                  net_credit: float, current_price, config : BacktestConfig) -> Optional[Trade]:
         """Execute Iron Condor trade""" 
         # Check if we have all quotes
         if not all(contract in quotes for contract in contracts.values()):
@@ -317,6 +318,8 @@ class IronCondor1:
         # Build trade positions
         trade_contracts = {}
         strikes_dict = {}
+        entry_used_capital = 0.0
+        entry_commissions = 0.0
         # Short positions
         for leg, contract in [('short_call', contracts['short_call']), 
                             ('short_put', contracts['short_put'])]:
@@ -339,6 +342,7 @@ class IronCondor1:
             price = quote['ask']
             strike = int(contract[-8:]) / 1000  # Extract strike from contract
             strikes_dict[leg] = strike
+            entry_used_capital += price * strategy.iron_1_trade_size * 100
             
             trade_contracts[contract] = {
                 'position': strategy.iron_1_trade_size,  # Long position
@@ -346,8 +350,10 @@ class IronCondor1:
                 'leg_type': leg,
                 'strike': strike
             }
+            entry_commissions += strategy.iron_1_trade_size * config.commission_per_contract
         
         representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']}  {strikes_dict['short_call']}/{strikes_dict['long_call']}"
+        entry_used_capital += entry_commissions
         # Create trade with metadata
         trade = Trade(
             entry_time=entry_time,
@@ -356,7 +362,7 @@ class IronCondor1:
             contracts=trade_contracts,
             size=strategy.iron_1_trade_size,
             entry_signals=signals,
-            used_capital = 0,
+            used_capital = entry_used_capital,
             metadata={
                 'net_credit': net_credit,
                 'strategy_name': 'iron_1',
@@ -388,7 +394,7 @@ class IronCondor1:
                                  current_price,
                                  current_bar_time,
                                  data_provider : Union[MockDataProvider, PolygonDataProvider],
-                                 ) -> Trade:
+                                 config : BacktestConfig) -> Trade:
         """Find Iron Condor 1 trade based on strategy config"""
         # Check entry conditions for new Iron Condor trades
         signals = IronCondor1._check_entry_signals_5min(spx_ohlc_data, spy_ohlc_data, i, strategy)
@@ -424,7 +430,7 @@ class IronCondor1:
                             strategy,
                             signals,
                             net_credit,
-                            current_price
+                            current_price, config
                     )
                     logger.info(f"Entered Iron Condor 1 at {current_bar_time}: {ic_strikes}")
                     return ic_trade
