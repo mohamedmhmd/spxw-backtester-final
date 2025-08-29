@@ -240,14 +240,14 @@ class IronCondor1:
              valid_combos_checked += 1
         
         # Calculate net credit
-             net_credit = sc_mid + sp_mid - lc_mid - lp_mid
-             max_loss = d - net_credit
+             net_premium = sc_mid + sp_mid - lc_mid - lp_mid
+             max_loss = d - net_premium
         
         # Avoid division by zero/bad combos
-             if net_credit <= 0 or max_loss <= 0:
+             if net_premium <= 0 or max_loss <= 0:
                continue
         
-             ratio = net_credit / max_loss
+             ratio = net_premium / max_loss
              diff = abs(ratio - target_ratio)
         
              if diff < best_diff:
@@ -257,7 +257,7 @@ class IronCondor1:
                 'long_call': lc,
                 'short_put': sp,
                 'long_put': lp,
-                'net_credit': net_credit,
+                'net_premium': net_premium,
                 'max_loss': max_loss,
                 'ratio': ratio,
                 'distance': d
@@ -266,7 +266,7 @@ class IronCondor1:
             # Early termination if we find a very good match
                 if diff <= tolerance:
                    logger.info(f"Found excellent match early (tolerance={tolerance:.1%}): "
-                           f"Wing=${d}, Credit=${net_credit:.2f}, Ratio={ratio:.2f}")
+                           f"Wing=${d}, Credit=${net_premium:.2f}, Ratio={ratio:.2f}")
                    break
     
          logger.info(f"Processed {valid_combos_checked} valid combinations out of {len(distances)} distances")
@@ -274,7 +274,7 @@ class IronCondor1:
          # Step 7: Return best result
          if best_combo:
             logger.info(f"Selected Iron Condor: Wing=${best_combo['distance']}, "
-                   f"Credit=${best_combo['net_credit']:.2f}, Ratio={best_combo['ratio']:.2f} "
+                   f"Net Premium=${best_combo['net_premium']:.2f}, Ratio={best_combo['ratio']:.2f} "
                    f"(Target: {target_ratio:.2f})")
             return best_combo
          else:
@@ -308,7 +308,7 @@ class IronCondor1:
     async def _execute_iron_condor(quotes: Dict[str, Dict], entry_time: datetime,
                                   contracts: Dict[str, str], strategy: StrategyConfig,
                                   signals: Dict,
-                                  net_credit: float, current_price, config : BacktestConfig) -> Optional[Trade]:
+                                  net_premium: float, current_price, config : BacktestConfig) -> Optional[Trade]:
         """Execute Iron Condor trade""" 
         # Check if we have all quotes
         if not all(contract in quotes for contract in contracts.values()):
@@ -364,7 +364,7 @@ class IronCondor1:
             entry_signals=signals,
             used_capital = entry_used_capital,
             metadata={
-                'net_credit': net_credit,
+                'net_premium': net_premium,
                 'strategy_name': 'iron_1',
                 'entry_spx_price': current_price,
                 'representation': representation
@@ -420,16 +420,16 @@ class IronCondor1:
                     list(ic_contracts.values()), current_bar_time
                 )
                     
-                net_credit = IronCondor1._calculate_iron_condor_credit(ic_quotes, ic_contracts)
+                net_premium = IronCondor1._calculate_iron_condor_credit(ic_quotes, ic_contracts)
                     
-                if net_credit > 0:
+                if net_premium > 0:
                     ic_trade = await IronCondor1._execute_iron_condor(
                             ic_quotes,
                             current_bar_time,
                             ic_contracts,
                             strategy,
                             signals,
-                            net_credit,
+                            net_premium,
                             current_price, config
                     )
                     logger.info(f"Entered Iron Condor 1 at {current_bar_time}: {ic_strikes}")

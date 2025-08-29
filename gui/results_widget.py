@@ -616,14 +616,12 @@ class ResultsWidget(QWidget):
             self.trades_table.setItem(i, 6, size_item)
             
             # Net Premium
-            if trade.trade_type == "Iron Condor 1":
-                entry_price = trade.metadata['net_credit']
-            else:
-                entry_price = -trade.metadata['total_premium']/trade.size if trade.size != 0 else 0
+            sign = 1 if trade.trade_type == "Iron Condor 1" else -1
+            net_premium = trade.metadata['net_premium']*sign if trade.size != 0 else 0
             
-            premium_item = QTableWidgetItem(f"${entry_price:,.2f}")
+            premium_item = QTableWidgetItem(f"${net_premium:,.2f}")
             premium_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            if entry_price >= 0:
+            if net_premium >= 0:
                 premium_item.setForeground(QColor("#4CAF50"))
             else:
                 premium_item.setForeground(QColor("#F44336"))

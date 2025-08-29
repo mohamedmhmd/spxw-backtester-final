@@ -585,14 +585,9 @@ class MainWindow(QMainWindow):
                 scale_factor = 1  # Default fallback
         
             # Scale the trade P&L and size
-            original_pnl = trade.pnl/trade.size  # Get per-contract P&L
-            trade.pnl = original_pnl * scale_factor
             original_used_capital = trade.used_capital/trade.size  # Get per-contract capital used
             trade.used_capital = original_used_capital*scale_factor  # Scale capital used
-            if(trade.trade_type == "Straddle 1"):
-                trade.metadata['total_premium'] = (trade.metadata['total_premium']/trade.size) * scale_factor
-            
-            trade.size = scale_factor
+            trade.calculate_pnl(scale_factor)
             total_scaled_pnl += trade.pnl
     
     
@@ -821,7 +816,7 @@ class MainWindow(QMainWindow):
                 "Size": trade.size,
                 "Entry SPX Price": trade.metadata.get("entry_spx_price", ""),
                 "Exit SPX Price": trade.metadata.get("exit_spx_price", ""),
-                "Net Premium": trade.metadata.get("net_credit", trade.metadata.get("total_premium", "")),
+                "Net Premium": trade.metadata.get("net_premium"),
                 "P&L": trade.pnl,
                 "Status": trade.status,
                 "Strategy Details": strategy_details

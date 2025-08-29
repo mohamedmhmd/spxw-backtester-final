@@ -172,7 +172,10 @@ class BacktestEngine:
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
             current_price = spx_ohlc_data.iloc[i]['open']
             
-            await Straddle1._check_straddle_exits(open_straddles, current_price, current_bar_time, config, self.data_provider)
+            if not Straddle1.Straddle1_exited:
+               await Straddle1._check_straddle_exits(open_straddles, current_price, current_bar_time, config, self.data_provider)
+            else:
+                break
             if(ic1_found):
                 continue
             

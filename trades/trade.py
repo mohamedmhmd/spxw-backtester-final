@@ -24,35 +24,44 @@ class Trade:
     entry_signals: Dict[str, Any]
     exit_signals: Optional[Dict[str, Any]] = None
     pnl: float = 0.0
+    unit_pnl: float = 0.0
     status: str = "OPEN"  # OPEN, CLOSED
     metadata: Optional[Dict[str, Any]] = None
     used_capital: float = 0.0  # ADD THIS LINE
+    unit_used_capital: float = 0.0  # Capital used per unit size
+    exit_percentage: float = 0.0 # For partial exits
     
-    def calculate_pnl(self, payoffs: Dict[str, float], commission_per_contract: float):
-        """Calculate P&L for the trade"""
-        total_pnl = self.metadata.get('partial_pnl', 0.0)
-        total_commissions = 0.0
+    def calculate_used_capital(self) -> float:
+        self.used_capital = self.size*self.unit_used_capital
+        return self.used_capital
+    
+    def calculate_option_pnl(self, contract, details, payoffs: Dict[str, float]) -> float:
+        entry_price = details['entry_price']
+        payoff = payoffs.get(contract)
+        exit_factor = 1 - self.exit_percentage if details.get("exited", False) else 1
+        if "long" in details['leg_type']:
+            pnl = (payoff - entry_price) *100*exit_factor
+        else:  # short
+            pnl = (entry_price - payoff) *100*exit_factor
+        details['exit_price'] = payoff
+        return pnl
+    
+    def calculate_option_commission(self, contract, details, payoffs: Dict[str, float], commission_per_contract: float) -> float:
+        exit_factor = 1 - self.exit_percentage if details.get("exited", False) else 1
+        return commission_per_contract*exit_factor if payoffs.get(contract) <= 0 else 2*commission_per_contract*exit_factor
         
+    def calculate_unit_pnl(self, payoffs: Dict[str, float], commission_per_contract) -> float:
+        self.unit_pnl = 0.0
         for contract, details in self.contracts.items():
-            remaining = details.get('remaining_position', details['position'])
-            entry_price = details['entry_price']
-            payoff = payoffs.get(contract)
+            pnl = self.calculate_option_pnl(contract, details, payoffs) - self.calculate_option_commission(contract, details, payoffs, commission_per_contract)
+            self.unit_pnl += pnl
             
-            # Calculate raw P&L
-            if remaining > 0:  # Long
-                pnl = (payoff - entry_price) * remaining*100  # SPX multiplier is 100
-            else:  # Short
-                pnl = (entry_price - payoff) * abs(remaining)*100
             
-            total_pnl += pnl
-            total_commissions += abs(remaining) * commission_per_contract #entry
-            if(payoff > 0):
-                total_commissions += abs(remaining) * commission_per_contract #exit
-            
-            # Update exit price
-            details['exit_price'] = payoff
-        
-        self.pnl = total_pnl - total_commissions
+    
+    def calculate_pnl(self, size : int ) -> float:
+        """Calculate P&L for the trade"""
+        self.pnl = self.metadata.get('partial_pnl', 0.0)* size  +  size * self.unit_pnl
+        self.size = size
         return self.pnl
     
 
@@ -76,6 +85,7 @@ class Trade:
         # Calculate settlement values for each option
 
         payoffs = {}
+        exit_commissions = 0.0
         
         for contract, details in self.contracts.items():
             leg_type = details['leg_type']
@@ -89,19 +99,20 @@ class Trade:
                 value = max(0, settlement_price - strike)
                 if 'short' in leg_type and value > 0:
                    # add cash required to settle short calls
-                   self.used_capital += value * abs(details['position']) * 100
+                   self.unit_used_capital += value * 100
             else:  # put
                 value = max(0, strike - settlement_price)
                 if 'short' in leg_type and value > 0:
                    # add cash required to settle short puts
-                   self.used_capital += value * abs(details['position']) * 100
+                   self.unit_used_capital += value* 100
                    
             exit_commissions = sum(abs(d['position']) for d in self.contracts.values()) * config.commission_per_contract
             self.used_capital += exit_commissions
             
             payoffs[contract] = value
         
-        self.calculate_pnl(payoffs, config.commission_per_contract)
+        self.calculate_unit_pnl(payoffs, config.commission_per_contract)
+        self.calculate_pnl(self.size)
         
         self.exit_time = exit_time
         self.status = "CLOSED"

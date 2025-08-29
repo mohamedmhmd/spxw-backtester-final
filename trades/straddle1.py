@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 class Straddle1:
     
+    Straddle1_exited = False  # Class variable to track if straddle has been exited
+    
     def _calculate_straddle_strike(current_price: float, distance: float) -> int:
         """Calculate straddle strike based on distance from current price"""
         # Distance is in dollar terms from Iron Condor credit
@@ -37,12 +39,12 @@ class Straddle1:
         """Execute Straddle trade"""
         # Create straddle contracts
         exp_str = date.strftime('%y%m%d')
-        straddle_distance = iron_condor_trade.metadata['net_credit'] * strategy.straddle_distance_multiplier
+        straddle_distance = iron_condor_trade.metadata['net_premium'] * strategy.straddle_distance_multiplier
         c_strike = Straddle1._calculate_straddle_strike(current_price, straddle_distance)
         p_strike = Straddle1._calculate_straddle_strike(current_price, -straddle_distance)
         contracts = {
-            'straddle_call': f"O:SPXW{exp_str}C{c_strike*1000:08d}",
-            'straddle_put': f"O:SPXW{exp_str}P{p_strike*1000:08d}"
+            'long_straddle_call': f"O:SPXW{exp_str}C{c_strike*1000:08d}",
+            'long_straddle_put': f"O:SPXW{exp_str}P{p_strike*1000:08d}"
         }
         
         # Get quotes
@@ -54,7 +56,7 @@ class Straddle1:
         
         # Build trade positions (buy both legs)
         trade_contracts = {}
-        total_premium = 0
+        net_premium = 0
         strikes_dict = {}
         
         for leg, contract in contracts.items():
@@ -72,15 +74,15 @@ class Straddle1:
                 'entry_price': price,
                 'leg_type': leg,
                 'strike': straddle_strike,
-                'remaining_position': strategy.straddle_1_trade_size  # Track for partial exits
+                'remaining_position': "100%"  # Track for partial exits
             }
-            total_premium += price* strategy.straddle_1_trade_size  # SPX multiplier
+            net_premium += price
         
         
         total_commissions = len(contracts) * config.commission_per_contract * strategy.straddle_1_trade_size
-        entry_used_capital = total_premium*100 + total_commissions
+        entry_used_capital = net_premium*100*strategy.straddle_1_trade_size + total_commissions
         # Create straddle trade
-        representation = f"{strikes_dict["straddle_put"]}/{strikes_dict["straddle_call"]}"
+        representation = f"{strikes_dict["long_straddle_put"]}/{strikes_dict["long_straddle_call"]}"
         trade = Trade(
             entry_time=entry_time,
             exit_time=None,
@@ -94,7 +96,7 @@ class Straddle1:
                 'iron_condor_ref': iron_condor_trade,
                 'call_straddle_strike': c_strike,
                 'put_straddle_strike': p_strike,
-                'total_premium': total_premium,
+                'net_premium': net_premium,
                 'exit_percentage': strategy.straddle_exit_percentage,
                 'exit_multiplier': strategy.straddle_exit_multiplier,
                 'entry_spx_price': current_price,
@@ -133,23 +135,19 @@ class Straddle1:
 
              if not (call_hit or put_hit):
                 continue
+             if call_hit:
+                 leg_type = "call"
+             else:
+                 leg_type = "put"
 
              for contract, details in straddle.contracts.items():
-                 if details.get("remaining_position", details["position"]) <= 0:
+                 if not leg_type in details["leg_type"]:
                     continue
-
+                
                  leg_type = details["leg_type"]
                  entry_price = details["entry_price"]  # raw option price (not *100)
 
-                 # Determine if this leg should be checked for exit
-                 should_check = (
-                (call_hit and "call" in leg_type) or
-                (put_hit and "put" in leg_type)
-            )
-
-                 if not should_check:
-                   continue
-
+                
                  # --- Get current quote ---
                  quotes = await data_provider.get_option_quotes([contract], current_time)
                  if contract not in quotes:
@@ -160,7 +158,7 @@ class Straddle1:
 
                  # --- Exit condition ---
                  if exit_price >= entry_price * exit_multiplier:
-                    exit_size = int(details["position"] * exit_percentage)
+                    exit_size = exit_percentage
 
                     if exit_size <= 0:
                        continue  # avoid zero-sized exits
@@ -171,11 +169,14 @@ class Straddle1:
                     partial_pnl -= config.commission_per_contract * exit_size
 
                 # Update position
-                    details["remaining_position"] = details.get("remaining_position", details["position"]) - exit_size
+                    details["remaining_position"] = f"{(1 - exit_size) * 100:.1f}%"
+                    details["exited"] = True
 
                 # Update running P&L at trade level
-                    straddle.metadata["partial_pnl"] = straddle.metadata.get("partial_pnl", 0) + partial_pnl
+                    straddle.metadata["partial_pnl"] = partial_pnl
                     straddle.contracts[contract] = details
+                    straddle.exit_percentage = exit_percentage
+                    Straddle1.Straddle1_exited = True  # Mark that a partial exit has occurred
                     logger.info(
                     f"Partial straddle exit: {leg_type.upper()} at ${exit_price:.2f} "
                     f"(entry: ${entry_price:.2f}, x{exit_multiplier:.1f}), "
