@@ -74,14 +74,11 @@ class Straddle1:
                 'entry_price': price,
                 'leg_type': leg,
                 'strike': straddle_strike,
-                'remaining_position': "100%"  # Track for partial exits
+                'remaining_position': "100%",  # Track for partial exits
+                'used_capital': price * 100 + config.commission_per_contract
             }
             net_premium += price
         
-        
-        total_commissions = len(contracts) * config.commission_per_contract * strategy.straddle_1_trade_size
-        entry_used_capital = net_premium*100*strategy.straddle_1_trade_size + total_commissions
-        # Create straddle trade
         representation = f"{strikes_dict["long_straddle_put"]}/{strikes_dict["long_straddle_call"]}"
         trade = Trade(
             entry_time=entry_time,
@@ -90,7 +87,7 @@ class Straddle1:
             contracts=trade_contracts,
             size=strategy.straddle_1_trade_size,
             entry_signals={'triggered_by': 'iron_condor'},
-            used_capital=entry_used_capital,
+            used_capital=0.0,
             metadata={
                 'strategy_name': 'straddle_1',
                 'iron_condor_ref': iron_condor_trade,
@@ -167,6 +164,7 @@ class Straddle1:
                     partial_pnl = (exit_price - entry_price) * exit_size * 100
                   # Apply only exit commission (entry commission assumed at open)
                     partial_pnl -= config.commission_per_contract * exit_size
+                    details["used_capital"] += config.commission_per_contract * exit_size
 
                 # Update position
                     details["remaining_position"] = f"{(1 - exit_size) * 100:.1f}%"

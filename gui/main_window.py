@@ -570,13 +570,10 @@ class MainWindow(QMainWindow):
     
     def _scale_results(self, original_results, iron_size, straddle_size):
         scaled_results = copy.deepcopy(original_results)
-        total_scaled_pnl = 0.0
         scaled_daily_pnl = {}
         total_capital_used = 0.0
     
         for trade in scaled_results['trades']:
-            if(trade.size == 0):
-                continue
             if trade.trade_type == "Iron Condor 1":
                scale_factor = iron_size
             elif trade.trade_type == "Straddle 1":
@@ -585,10 +582,8 @@ class MainWindow(QMainWindow):
                 scale_factor = 1  # Default fallback
         
             # Scale the trade P&L and size
-            original_used_capital = trade.used_capital/trade.size  # Get per-contract capital used
-            trade.used_capital = original_used_capital*scale_factor  # Scale capital used
             trade.calculate_pnl(scale_factor)
-            total_scaled_pnl += trade.pnl
+            trade.calculate_used_capital()
     
     
         total_capital_used = sum(t.used_capital for t in scaled_results['trades'])

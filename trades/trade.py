@@ -31,6 +31,13 @@ class Trade:
     unit_used_capital: float = 0.0  # Capital used per unit size
     exit_percentage: float = 0.0 # For partial exits
     
+    
+    def calculate_unit_used_capital(self) -> float:
+        self.unit_used_capital = 0.0
+        for contract, details in self.contracts.items():
+            self.unit_used_capital += details['used_capital']
+        return self.unit_used_capital
+    
     def calculate_used_capital(self) -> float:
         self.used_capital = self.size*self.unit_used_capital
         return self.used_capital
@@ -85,7 +92,6 @@ class Trade:
         # Calculate settlement values for each option
 
         payoffs = {}
-        exit_commissions = 0.0
         
         for contract, details in self.contracts.items():
             leg_type = details['leg_type']
@@ -99,20 +105,26 @@ class Trade:
                 value = max(0, settlement_price - strike)
                 if 'short' in leg_type and value > 0:
                    # add cash required to settle short calls
-                   self.unit_used_capital += value * 100
+                   details["used_capital"] += value * 100 + config.commission_per_contract
+                elif value > 0:
+                     exit_factor = 1 - self.exit_percentage if details.get("exited", False) else 1
+                     details["used_capital"] += config.commission_per_contract* exit_factor
             else:  # put
                 value = max(0, strike - settlement_price)
                 if 'short' in leg_type and value > 0:
                    # add cash required to settle short puts
-                   self.unit_used_capital += value* 100
-                   
-            exit_commissions = sum(abs(d['position']) for d in self.contracts.values()) * config.commission_per_contract
-            self.used_capital += exit_commissions
-            
+                   details["used_capital"] += value* 100 + config.commission_per_contract
+                elif value > 0:
+                     exit_factor = 1 - self.exit_percentage if details.get("exited", False) else 1
+                     details["used_capital"] += config.commission_per_contract*exit_factor
+            self.contracts[contract] = details
+                    
             payoffs[contract] = value
         
         self.calculate_unit_pnl(payoffs, config.commission_per_contract)
         self.calculate_pnl(self.size)
+        self.calculate_unit_used_capital()
+        self.calculate_used_capital()
         
         self.exit_time = exit_time
         self.status = "CLOSED"

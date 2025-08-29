@@ -318,8 +318,6 @@ class IronCondor1:
         # Build trade positions
         trade_contracts = {}
         strikes_dict = {}
-        entry_used_capital = 0.0
-        entry_commissions = 0.0
         # Short positions
         for leg, contract in [('short_call', contracts['short_call']), 
                             ('short_put', contracts['short_put'])]:
@@ -332,7 +330,8 @@ class IronCondor1:
                 'position': -strategy.iron_1_trade_size,  # Short position
                 'entry_price': price,
                 'leg_type': leg,
-                'strike': strike
+                'strike': strike,
+                'used_capital': config.commission_per_contract
             }
         
         # Long positions
@@ -342,18 +341,16 @@ class IronCondor1:
             price = quote['ask']
             strike = int(contract[-8:]) / 1000  # Extract strike from contract
             strikes_dict[leg] = strike
-            entry_used_capital += price * strategy.iron_1_trade_size * 100
             
             trade_contracts[contract] = {
                 'position': strategy.iron_1_trade_size,  # Long position
                 'entry_price': price,
                 'leg_type': leg,
-                'strike': strike
+                'strike': strike,
+                'used_capital': price * 100 + config.commission_per_contract
             }
-            entry_commissions += strategy.iron_1_trade_size * config.commission_per_contract
         
         representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']}  {strikes_dict['short_call']}/{strikes_dict['long_call']}"
-        entry_used_capital += entry_commissions
         # Create trade with metadata
         trade = Trade(
             entry_time=entry_time,
@@ -362,7 +359,7 @@ class IronCondor1:
             contracts=trade_contracts,
             size=strategy.iron_1_trade_size,
             entry_signals=signals,
-            used_capital = entry_used_capital,
+            used_capital = 0.0,
             metadata={
                 'net_premium': net_premium,
                 'strategy_name': 'iron_1',
