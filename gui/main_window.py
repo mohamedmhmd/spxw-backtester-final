@@ -755,23 +755,23 @@ class MainWindow(QMainWindow):
                 # Load strategy config
                 if 'strategy' in config:
                     sc = config['strategy']
-                    self.strategy_config_widget.consecutive_candles.setValue(sc['consecutive_candles'])
-                    self.strategy_config_widget.volume_threshold.setValue(sc['volume_threshold'])
-                    self.strategy_config_widget.lookback_candles.setValue(sc['lookback_candles'])
-                    self.strategy_config_widget.avg_range_candles.setValue(sc['avg_range_candles'])
-                    self.strategy_config_widget.range_threshold.setValue(sc['range_threshold'])
+                    self.strategy_config_widget.iron_1_consecutive_candles.setValue(sc['consecutive_candles'])
+                    self.strategy_config_widget.iron_1_volume_threshold.setValue(sc['volume_threshold'])
+                    self.strategy_config_widget.iron_1_lookback_candles.setValue(sc['lookback_candles'])
+                    self.strategy_config_widget.iron_1_avg_range_candles.setValue(sc['avg_range_candles'])
+                    self.strategy_config_widget.iron_1_range_threshold.setValue(sc['range_threshold'])
                     self.strategy_config_widget.straddle_1_trade_size.setValue(sc['straddle_1_trade_size'])
                     self.strategy_config_widget.iron_1_trade_size.setValue(sc['iron_1_trade_size'])
-                    self.strategy_config_widget.target_win_loss_ratio.setValue(sc['target_win_loss_ratio'])
+                    self.strategy_config_widget.iron_1_target_win_loss_ratio.setValue(sc['target_win_loss_ratio'])
                     
                     
                     # Load straddle parameters if they exist
                     if 'straddle_distance_multiplier' in sc:
-                        self.strategy_config_widget.straddle_distance_multiplier.setValue(sc['straddle_distance_multiplier'])
+                        self.strategy_config_widget.straddle_1_distance_multiplier.setValue(sc['straddle_distance_multiplier'])
                     if 'straddle_exit_percentage' in sc:
-                        self.strategy_config_widget.straddle_exit_percentage.setValue(sc['straddle_exit_percentage'])
+                        self.strategy_config_widget.straddle_1_exit_percentage.setValue(sc['straddle_exit_percentage'])
                     if 'straddle_exit_multiplier' in sc:
-                        self.strategy_config_widget.straddle_exit_multiplier.setValue(sc['straddle_exit_multiplier'])
+                        self.strategy_config_widget.straddle_1_exit_multiplier.setValue(sc['straddle_exit_multiplier'])
                 
                 self.status_bar.showMessage(f"Configuration loaded from {filename}", 5000)
             except Exception as e:

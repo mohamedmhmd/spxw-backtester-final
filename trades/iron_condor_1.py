@@ -35,12 +35,12 @@ class IronCondor1:
         
         # Condition 1: Volume check (consecutive candles below threshold)
         first_candle_volume = spy_ohlc_data.iloc[0]['volume']
-        volume_threshold = first_candle_volume * strategy.volume_threshold
+        volume_threshold = first_candle_volume * strategy.iron_1_volume_threshold
         
         volume_ok = True
         volume_checks = []
-        for j in range(strategy.consecutive_candles):
-            idx = current_idx - strategy.consecutive_candles + j
+        for j in range(strategy.iron_1_consecutive_candles):
+            idx = current_idx - strategy.iron_1_consecutive_candles + j
             if idx >= 0 and idx < len(spy_ohlc_data):
                 current_volume = spy_ohlc_data.iloc[idx]['volume']
                 volume_checks.append(current_volume)
@@ -56,8 +56,8 @@ class IronCondor1:
         
         # Condition 2: Direction check (not all candles in same direction)
         directions = []
-        for j in range(strategy.lookback_candles):
-            idx = current_idx - strategy.lookback_candles + j
+        for j in range(strategy.iron_1_lookback_candles):
+            idx = current_idx - strategy.iron_1_lookback_candles + j
             if idx >= 0 and idx < len(spx_ohlc_data):
                 open_price = spx_ohlc_data.iloc[idx]['open']
                 close_price = spx_ohlc_data.iloc[idx]['close']
@@ -72,8 +72,8 @@ class IronCondor1:
         
         # Condition 3: Range check (recent range below threshold)
         recent_ranges = []
-        for j in range(strategy.avg_range_candles):
-            idx = current_idx - strategy.avg_range_candles + j
+        for j in range(strategy.iron_1_avg_range_candles):
+            idx = current_idx - strategy.iron_1_avg_range_candles + j
             if idx >= 0 and idx < len(spx_ohlc_data):
                 high = spx_ohlc_data.iloc[idx]['high']
                 low = spx_ohlc_data.iloc[idx]['low']
@@ -91,7 +91,7 @@ class IronCondor1:
             
             if all_ranges:
                 avg_day_range = np.mean(all_ranges)
-                range_threshold = avg_day_range * strategy.range_threshold
+                range_threshold = avg_day_range * strategy.iron_1_range_threshold
                 signals['range_condition'] = avg_recent_range < range_threshold
                 signals['details']['avg_recent_range'] = avg_recent_range
                 signals['details']['avg_day_range'] = avg_day_range

@@ -9,6 +9,7 @@ from config.strategy_config import StrategyConfig
 from trades.trade import Trade
 from engine.statistics import Statistics
 from trades.iron_condor_1 import IronCondor1
+from trades.iron_condor_2 import IronCondor2
 from trades.straddle1 import Straddle1
 from utilities.utilities import Utilities
 import time as time_module
@@ -153,58 +154,79 @@ class BacktestEngine:
         spy_ohlc_data = await self.data_provider.get_ohlc_data(date, "SPY")
         spx_ohlc_data = await self.data_provider.get_ohlc_data(date, "I:SPX")
 
-        if spy_ohlc_data.empty:
+        if spy_ohlc_data.empty or spx_ohlc_data.empty:
             logger.warning(f"No data available for {date}")
             return trades
         
-        min_bars_needed = max(
-            strategy.consecutive_candles,
-            strategy.lookback_candles,
-            strategy.avg_range_candles
+        #iron 1 and straddle 1
+        iron_1_min_bars_needed = max(
+            strategy.iron_1_consecutive_candles,
+            strategy.iron_1_lookback_candles,
+            strategy.iron_1_avg_range_candles
         )
-        if len(spy_ohlc_data) < min_bars_needed:
-            logger.warning(f"Insufficient bars for {date}: {len(spy_ohlc_data)} < {min_bars_needed}")
+        if len(spy_ohlc_data) < iron_1_min_bars_needed:
+            logger.warning(f"Insufficient bars for {date}: {len(spy_ohlc_data)} < {iron_1_min_bars_needed}")
             return trades
         
         active_iron_condors = []
         ic1_found = False
-        for i in range(min_bars_needed, len(spx_ohlc_data)):
+        ic2_found = False
+        for i in range(iron_1_min_bars_needed, len(spx_ohlc_data)):
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
             current_price = spx_ohlc_data.iloc[i]['open']
             
             if not Straddle1.Straddle1_exited:
                await Straddle1._check_straddle_exits(open_straddles, current_price, current_bar_time, config, self.data_provider)
-            else:
-                break
-            if(ic1_found):
-                continue
             
-            ic_trade = await IronCondor1._find_iron_trade(spx_ohlc_data, spy_ohlc_data, i, strategy, 
+            
+            if(ic1_found):
+                if not ic2_found:
+                    #iron 2
+                    iron_2_trade = await IronCondor2._find_iron_trade(spx_ohlc_data, i, strategy, 
+                                                         date, current_price, current_bar_time,
+                                                         self.data_provider, config,
+                                                         active_iron_condors)
+                    if iron_2_trade:
+                        trades.append(iron_2_trade)
+                        active_iron_condors.append(iron_2_trade)
+                        ic2_found = True
+                else:
+                    continue
+            else:
+            
+                ic_1_trade = await IronCondor1._find_iron_trade(spx_ohlc_data, spy_ohlc_data, i, strategy, 
                                                      date, current_price, current_bar_time,
                                                      self.data_provider, config)
-            if ic_trade:
-                trades.append(ic_trade)
-                active_iron_condors.append(ic_trade)
-                ic1_found = True 
-                if isinstance(date, datetime):
-                   option_date = date
-                else:
-                   option_date = datetime.combine(date, datetime.min.time())
+                if ic_1_trade:
+                   trades.append(ic_1_trade)
+                   active_iron_condors.append(ic_1_trade)
+                   ic1_found = True 
+                   if isinstance(date, datetime):
+                      option_date = date
+                   else:
+                      option_date = datetime.combine(date, datetime.min.time())
                 
-                straddle_trade = await Straddle1._execute_straddle(
+                   straddle_1_trade = await Straddle1._execute_straddle(
                                 option_date,
                                 current_bar_time,
                                 current_price,
                                 strategy,
-                                ic_trade,
+                                ic_1_trade,
                                 self.data_provider, config
                 )
                             
-                if straddle_trade:
-                    trades.append(straddle_trade)
-                    open_straddles.append(straddle_trade)
-                    logger.info(f"Entered Straddle 1 at {current_bar_time}.")
-        
+                   if straddle_1_trade:
+                      trades.append(straddle_1_trade)
+                      open_straddles.append(straddle_1_trade)
+                      logger.info(f"Entered Straddle 1 at {current_bar_time}.")
+            
+            
+            #break condition - all trades found for the day
+            if ic1_found and ic2_found and Straddle1.Straddle1_exited:
+                break
+                    
+                    
+                        
         # Close any remaining open trades at expiry
         for trade in trades:
             if trade.status == "OPEN":

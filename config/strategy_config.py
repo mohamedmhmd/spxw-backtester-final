@@ -7,44 +7,49 @@ class StrategyConfig:
     name: str = "strategy 1"
     trade_type: str = "Iron Condor 1 & Straddle 1"
     
-    # Iron Condor Entry signal parameters
-    consecutive_candles: int = 3  # Three consecutive 5min candles
-    volume_threshold: float = 0.5  # 50% of first candle volume
-    lookback_candles: int = 4  # Last four 5min candles for direction check
-    avg_range_candles: int = 2  # Last two 5min candles for range check
-    range_threshold: float = 0.8  # 80% of day's average range
-    
-    # Iron Condor Trade parameters
+    # Iron Condor 1 Entry signal parameters
+    iron_1_consecutive_candles: int = 3  # Three consecutive 5min candles
+    iron_1_volume_threshold: float = 0.5  # 50% of first candle volume
+    iron_1_lookback_candles: int = 4  # Last four 5min candles for direction check
+    iron_1_avg_range_candles: int = 2  # Last two 5min candles for range check
+    iron_1_range_threshold: float = 0.8  # 80% of day's average range
     iron_1_trade_size: int = 10  # 10 contracts (configurable)
-    target_win_loss_ratio: float = 1.5  # Target 1.5:1 win/loss ratio
-    
-    # Iron Condor strike selection parameters
+    iron_1_target_win_loss_ratio: float = 1.5  # Target 1.5:1 win/loss ratio
     min_wing_width: int = 15  # Minimum distance from ATM
     max_wing_width: int = 70  # Maximum distance from ATM
     
-    # Straddle parameters
+    # Straddle 1 parameters
     straddle_1_trade_size: int = 2
-    straddle_distance_multiplier: float = 2.5  # Multiply IC credit by 2.5 for distance
-    straddle_exit_percentage: float = 0.5  # Exit 50% of position
-    straddle_exit_multiplier: float = 2.0  # Exit when price is 2x entry
+    straddle_1_distance_multiplier: float = 2.5  # Multiply IC credit by 2.5 for distance
+    straddle_1_exit_percentage: float = 0.5  # Exit 50% of position
+    straddle_1_exit_multiplier: float = 2.0  # Exit when price is 2x entry
+    
+    # Iron Condor 2 parameters
+    iron_2_trade_size: int = 10 
+    iron_2_trigger_multiplier  : float = 1.0
+    iron_2_direction_lookback: int = 4
+    iron_2_range_recent_candles: int = 2
+    iron_2_range_reference_candles: int = 10
+    iron_2_range_threshold: float = 1.25
+    iron_2_min_distance: int = 5
     
     def to_dict(self) -> dict:
         return {
             'name': self.name,
             'trade_type': self.trade_type,
-            'consecutive_candles': self.consecutive_candles,
-            'volume_threshold': self.volume_threshold,
-            'lookback_candles': self.lookback_candles,
-            'avg_range_candles': self.avg_range_candles,
-            'range_threshold': self.range_threshold,
+            'consecutive_candles': self.iron_1_consecutive_candles,
+            'volume_threshold': self.iron_1_volume_threshold,
+            'lookback_candles': self.iron_1_lookback_candles,
+            'avg_range_candles': self.iron_1_avg_range_candles,
+            'range_threshold': self.iron_1_range_threshold,
             'iron_1_trade_size': self.iron_1_trade_size,
             'straddle_1_trade_size': self.straddle_1_trade_size,
-            'target_win_loss_ratio': self.target_win_loss_ratio,
+            'target_win_loss_ratio': self.iron_1_target_win_loss_ratio,
             'min_wing_width': self.min_wing_width,
             'max_wing_width': self.max_wing_width,
-            'straddle_distance_multiplier': self.straddle_distance_multiplier,
-            'straddle_exit_percentage': self.straddle_exit_percentage,
-            'straddle_exit_multiplier': self.straddle_exit_multiplier
+            'straddle_distance_multiplier': self.straddle_1_distance_multiplier,
+            'straddle_exit_percentage': self.straddle_1_exit_percentage,
+            'straddle_exit_multiplier': self.straddle_1_exit_multiplier
         }
     
     @classmethod

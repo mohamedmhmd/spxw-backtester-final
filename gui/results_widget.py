@@ -616,7 +616,7 @@ class ResultsWidget(QWidget):
             self.trades_table.setItem(i, 6, size_item)
             
             # Net Premium
-            sign = 1 if trade.trade_type == "Iron Condor 1" else -1
+            sign = 1 if "Iron" in trade.trade_type else -1
             net_premium = trade.metadata['net_premium']*sign if trade.size != 0 else 0
             
             premium_item = QTableWidgetItem(f"${net_premium:,.2f}")

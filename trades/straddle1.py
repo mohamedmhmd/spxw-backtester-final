@@ -39,7 +39,7 @@ class Straddle1:
         """Execute Straddle trade"""
         # Create straddle contracts
         exp_str = date.strftime('%y%m%d')
-        straddle_distance = iron_condor_trade.metadata['net_premium'] * strategy.straddle_distance_multiplier
+        straddle_distance = iron_condor_trade.metadata['net_premium'] * strategy.straddle_1_distance_multiplier
         c_strike = Straddle1._calculate_straddle_strike(current_price, straddle_distance)
         p_strike = Straddle1._calculate_straddle_strike(current_price, -straddle_distance)
         contracts = {
@@ -94,8 +94,8 @@ class Straddle1:
                 'call_straddle_strike': c_strike,
                 'put_straddle_strike': p_strike,
                 'net_premium': net_premium,
-                'exit_percentage': strategy.straddle_exit_percentage,
-                'exit_multiplier': strategy.straddle_exit_multiplier,
+                'exit_percentage': strategy.straddle_1_exit_percentage,
+                'exit_multiplier': strategy.straddle_1_exit_multiplier,
                 'entry_spx_price': current_price,
                 'representation': representation
             }
