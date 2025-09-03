@@ -38,9 +38,9 @@ class StrategyConfigWidget(QWidget):
         
     
         # === IRON  CONDOR 1 settings ===
-        entry_label = QLabel("=== IRON CONDOR 1 SETTINGS ===")
-        entry_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
-        layout.addRow(entry_label)
+        iron_1_label = QLabel("=== IRON CONDOR 1 SETTINGS ===")
+        iron_1_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+        layout.addRow(iron_1_label)
         
         self.iron_1_trade_size = QSpinBox()
         self.iron_1_trade_size.setRange(0, 1000000)
@@ -103,9 +103,9 @@ class StrategyConfigWidget(QWidget):
         layout.addRow("Max Wing Width ($):", self.max_wing_width)
 
         # === STRADDLE 1 PARAMETERS ===
-        straddle_label = QLabel("=== STRADDLE 1 SETTINGS ===")
-        straddle_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
-        layout.addRow(straddle_label)
+        straddle_1_label = QLabel("=== STRADDLE 1 SETTINGS ===")
+        straddle_1_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+        layout.addRow(straddle_1_label)
 
         self.straddle_1_trade_size = QSpinBox()
         self.straddle_1_trade_size.setRange(0, 1000000)
@@ -133,6 +133,76 @@ class StrategyConfigWidget(QWidget):
         self.straddle_1_exit_multiplier.setValue(2.0)
         self.straddle_1_exit_multiplier.setToolTip("Exit when current price >= entry price × this multiplier")
         layout.addRow("Straddle 1 Exit Price Multiplier (x entry):", self.straddle_1_exit_multiplier)
+        
+        
+        # === IRON  CONDOR 2 settings ===
+        iron_2_label = QLabel("=== IRON CONDOR 2 SETTINGS ===")
+        iron_2_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+        layout.addRow(iron_2_label)
+        
+        # iron_2_trade_size: int = 10
+        self.iron_2_trade_size = QSpinBox()
+        self.iron_2_trade_size.setRange(0, 1000000)
+        self.iron_2_trade_size.setSingleStep(1)
+        self.iron_2_trade_size.setValue(10)
+        self.iron_2_trade_size.setToolTip("Number of contracts to trade for Iron Condor 2")
+        layout.addRow("Iron 2 Trade Size:", self.iron_2_trade_size)
+
+        # iron_2_trigger_multiplier: float = 1.0
+        self.iron_2_trigger_multiplier = QDoubleSpinBox()
+        self.iron_2_trigger_multiplier.setRange(0.0, 10000)
+        self.iron_2_trigger_multiplier.setSingleStep(0.1)
+        self.iron_2_trigger_multiplier.setValue(1.0)
+        self.iron_2_trigger_multiplier.setToolTip("Multiplier to trigger Iron Condor 2 entry")
+        layout.addRow("Iron 2 Trigger Multiplier:", self.iron_2_trigger_multiplier)
+
+        # iron_2_direction_lookback: int = 4
+        self.iron_2_direction_lookback = QSpinBox()
+        self.iron_2_direction_lookback.setRange(1, 50)
+        self.iron_2_direction_lookback.setSingleStep(1)
+        self.iron_2_direction_lookback.setValue(4)
+        self.iron_2_direction_lookback.setToolTip("Lookback period for direction analysis in Iron Condor 2")
+        layout.addRow("Iron 2 Direction Lookback:", self.iron_2_direction_lookback)
+
+        # iron_2_range_recent_candles: int = 2
+        self.iron_2_range_recent_candles = QSpinBox()
+        self.iron_2_range_recent_candles.setRange(1, 50)
+        self.iron_2_range_recent_candles.setSingleStep(1)
+        self.iron_2_range_recent_candles.setValue(2)
+        self.iron_2_range_recent_candles.setToolTip("Number of recent candles for range calculation in Iron Condor 2")
+        layout.addRow("Iron 2 Range Recent Candles:", self.iron_2_range_recent_candles)
+
+        # iron_2_range_reference_candles: int = 10
+        self.iron_2_range_reference_candles = QSpinBox()
+        self.iron_2_range_reference_candles.setRange(1, 100)
+        self.iron_2_range_reference_candles.setSingleStep(1)
+        self.iron_2_range_reference_candles.setValue(10)
+        self.iron_2_range_reference_candles.setToolTip("Number of reference candles for range calculation in Iron Condor 2")
+        layout.addRow("Iron 2 Range Reference Candles:", self.iron_2_range_reference_candles)
+
+        # iron_2_range_threshold: float = 1.25
+        self.iron_2_range_threshold = QDoubleSpinBox()
+        self.iron_2_range_threshold.setRange(0.0, 100)
+        self.iron_2_range_threshold.setSingleStep(0.25)
+        self.iron_2_range_threshold.setValue(1.25)
+        self.iron_2_range_threshold.setToolTip("Range threshold for Iron Condor 2")
+        layout.addRow("Iron 2 Range Threshold:", self.iron_2_range_threshold)
+
+        # iron_2_min_distance: int = 5
+        self.iron_2_min_distance = QSpinBox()
+        self.iron_2_min_distance.setRange(0, 1000)
+        self.iron_2_min_distance.setSingleStep(1)
+        self.iron_2_min_distance.setValue(5)
+        self.iron_2_min_distance.setToolTip("Minimum distance between strikes for Iron Condor 2")
+        layout.addRow("Iron 2 Min Distance:", self.iron_2_min_distance)
+        
+        self.iron_2_target_win_loss_ratio = QDoubleSpinBox()
+        self.iron_2_target_win_loss_ratio.setRange(0.1, 10.0)
+        self.iron_2_target_win_loss_ratio.setSingleStep(0.1)
+        self.iron_2_target_win_loss_ratio.setValue(1.5)
+        self.iron_2_target_win_loss_ratio.setToolTip("Target win/loss ratio for Iron Condor 2")
+        layout.addRow("Iron 2 Target Win/Loss Ratio:", self.iron_2_target_win_loss_ratio)
+        
         
         # Add some spacing at the end
         spacer_label = QLabel("")
@@ -225,7 +295,16 @@ class StrategyConfigWidget(QWidget):
             max_wing_width=self.max_wing_width.value(),
             straddle_1_distance_multiplier=self.straddle_1_distance_multiplier.value(),
             straddle_1_exit_percentage=self.straddle_1_exit_percentage.value(),
-            straddle_1_exit_multiplier=self.straddle_1_exit_multiplier.value()
+            straddle_1_exit_multiplier=self.straddle_1_exit_multiplier.value(),
+            iron_2_trade_size = self.iron_2_trade_size.value(),
+            iron_2_trigger_multiplier = self.iron_2_trigger_multiplier.value(),
+            iron_2_direction_lookback = self.iron_2_direction_lookback.value(),
+            iron_2_range_recent_candles = self.iron_2_range_recent_candles.value(),
+            iron_2_range_reference_candles = self.iron_2_range_reference_candles.value(),
+            iron_2_range_threshold = self.iron_2_range_threshold.value(),
+            iron_2_min_distance = self.iron_2_min_distance.value(),
+            iron_2_target_win_loss_ratio = self.iron_2_target_win_loss_ratio.value()
+            
         )
     
     def set_config(self, config: StrategyConfig):
@@ -245,3 +324,11 @@ class StrategyConfigWidget(QWidget):
         self.straddle_1_distance_multiplier.setValue(config.straddle_1_distance_multiplier)
         self.straddle_1_exit_percentage.setValue(config.straddle_1_exit_percentage)
         self.straddle_1_exit_multiplier.setValue(config.straddle_1_exit_multiplier)
+        self.iron_2_trade_size.setValue(config.iron_2_trade_size)
+        self.iron_2_trigger_multiplier.setValue(config.iron_2_trigger_multiplier)
+        self.iron_2_direction_lookback.setValue(config.iron_2_direction_lookback)
+        self.iron_2_range_recent_candles.setValue(config.iron_2_range_recent_candles)
+        self.iron_2_range_reference_candles.setValue(config.iron_2_range_reference_candles)
+        self.iron_2_range_threshold.setValue(config.iron_2_range_threshold)
+        self.iron_2_min_distance.setValue(config.iron_2_min_distance)
+        self.iron_2_target_win_loss_ratio.setValue(config.iron_2_target_win_loss_ratio)

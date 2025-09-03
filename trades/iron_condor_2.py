@@ -192,7 +192,7 @@ class IronCondor2:
         min_wing = getattr(strategy, 'min_wing_width', 10)
         max_wing = getattr(strategy, 'max_wing_width', 50)
         step = 5
-        target_ratio = getattr(strategy, 'target_win_loss_ratio', 1.5)
+        target_ratio = getattr(strategy, 'iron_2_target_win_loss_ratio', 1.5)
         
         distances = list(range(min_wing, max_wing + 1, step))
         

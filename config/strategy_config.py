@@ -32,24 +32,33 @@ class StrategyConfig:
     iron_2_range_reference_candles: int = 10
     iron_2_range_threshold: float = 1.25
     iron_2_min_distance: int = 5
+    iron_2_target_win_loss_ratio: float = 1.5
     
     def to_dict(self) -> dict:
         return {
             'name': self.name,
             'trade_type': self.trade_type,
-            'consecutive_candles': self.iron_1_consecutive_candles,
-            'volume_threshold': self.iron_1_volume_threshold,
-            'lookback_candles': self.iron_1_lookback_candles,
-            'avg_range_candles': self.iron_1_avg_range_candles,
-            'range_threshold': self.iron_1_range_threshold,
+            'iron_1_consecutive_candles': self.iron_1_consecutive_candles,
+            'iron_1_volume_threshold': self.iron_1_volume_threshold,
+            'iron_1_lookback_candles': self.iron_1_lookback_candles,
+            'iron_1_avg_range_candles': self.iron_1_avg_range_candles,
+            'iron_1_range_threshold': self.iron_1_range_threshold,
             'iron_1_trade_size': self.iron_1_trade_size,
             'straddle_1_trade_size': self.straddle_1_trade_size,
-            'target_win_loss_ratio': self.iron_1_target_win_loss_ratio,
+            'iron_1_target_win_loss_ratio': self.iron_1_target_win_loss_ratio,
             'min_wing_width': self.min_wing_width,
             'max_wing_width': self.max_wing_width,
-            'straddle_distance_multiplier': self.straddle_1_distance_multiplier,
-            'straddle_exit_percentage': self.straddle_1_exit_percentage,
-            'straddle_exit_multiplier': self.straddle_1_exit_multiplier
+            'straddle_1_distance_multiplier': self.straddle_1_distance_multiplier,
+            'straddle_1_exit_percentage': self.straddle_1_exit_percentage,
+            'straddle_1_exit_multiplier': self.straddle_1_exit_multiplier,
+            'iron_2_trade_size': self.iron_2_trade_size,
+            'iron_2_trigger_multiplier': self.iron_2_trigger_multiplier,
+            'iron_2_direction_lookback': self.iron_2_direction_lookback,
+            'iron_2_range_recent_candles': self.iron_2_range_recent_candles,
+            'iron_2_range_reference_candles': self.iron_2_range_reference_candles,
+            'iron_2_range_threshold': self.iron_2_range_threshold,
+            'iron_2_min_distance': self.iron_2_min_distance,
+            'iron_2_target_win_loss_ratio': self.iron_2_target_win_loss_ratio,
         }
     
     @classmethod
