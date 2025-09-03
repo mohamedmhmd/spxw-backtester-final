@@ -185,7 +185,7 @@ class BacktestEngine:
                     iron_2_trade = await IronCondor2._find_iron_trade(spx_ohlc_data, i, strategy, 
                                                          date, current_price, current_bar_time,
                                                          self.data_provider, config,
-                                                         active_iron_condors)
+                                                         active_iron_condors[0])
                     if iron_2_trade:
                         trades.append(iron_2_trade)
                         active_iron_condors.append(iron_2_trade)

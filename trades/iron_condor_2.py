@@ -22,31 +22,24 @@ logger = logging.getLogger(__name__)
 
 class IronCondor2:
     @staticmethod
-    def _check_iron2_trigger_price(current_price: float, existing_iron1_trades: List[Trade], strategy_config : StrategyConfig) -> bool:
+    def _check_iron2_trigger_price(current_price: float, iron1_trade: Trade, strategy_config : StrategyConfig) -> bool:
         """
         Check if current price triggers Iron 2 entry based on Iron 1 positions
         
         Trigger: SPX moves to Iron 1 short strikes +/- 100% net premium collected
         """
-        if not existing_iron1_trades:
-            return False
+        # Get Iron 1 trade details
+        net_premium = iron1_trade.metadata.get('net_premium', 0)
             
-        for trade in existing_iron1_trades:
-            if trade.exit_time is not None:  # Skip closed trades
-                continue
-                
-            # Get Iron 1 trade details
-            net_premium = trade.metadata.get('net_premium', 0)
+        # Find short strikes from trade contracts
+        short_call_strike = None
+        short_put_strike = None
             
-            # Find short strikes from trade contracts
-            short_call_strike = None
-            short_put_strike = None
-            
-            for contract_symbol, contract_data in trade.contracts.items():
-                if contract_data['leg_type'] == 'short_call':
-                    short_call_strike = contract_data['strike']
-                elif contract_data['leg_type'] == 'short_put':
-                    short_put_strike = contract_data['strike']
+        for contract_symbol, contract_data in iron1_trade.contracts.items():
+            if contract_data['leg_type'] == 'short_call':
+                short_call_strike = contract_data['strike']
+            elif contract_data['leg_type'] == 'short_put':
+                short_put_strike = contract_data['strike']
             
             if short_call_strike is None or short_put_strike is None:
                 continue
@@ -135,28 +128,20 @@ class IronCondor2:
 
     @staticmethod
     def _check_minimum_distance_from_iron1(current_price: float, 
-                                         existing_iron1_trades: List[Trade], strategy_config : StrategyConfig) -> bool:
+                                         iron1_trade: Trade, strategy_config : StrategyConfig) -> bool:
         """
         Ensure Iron 2 is not set too close to Iron 1 short strikes +/- 100% net premium
-        """
-        if not existing_iron1_trades:
-            return True
+        """              
+        net_premium = iron1_trade.metadata.get('net_premium', 0)
+        # Find short strikes
+        short_call_strike = None
+        short_put_strike = None
             
-        for trade in existing_iron1_trades:
-            if trade.exit_time is not None:  # Skip closed trades
-                continue
-                
-            net_premium = trade.metadata.get('net_premium', 0)
-            
-            # Find short strikes
-            short_call_strike = None
-            short_put_strike = None
-            
-            for contract_symbol, contract_data in trade.contracts.items():
-                if contract_data['leg_type'] == 'short_call':
-                    short_call_strike = contract_data['strike']
-                elif contract_data['leg_type'] == 'short_put':
-                    short_put_strike = contract_data['strike']
+        for contract_symbol, contract_data in iron1_trade.contracts.items():
+            if contract_data['leg_type'] == 'short_call':
+                short_call_strike = contract_data['strike']
+            elif contract_data['leg_type'] == 'short_put':
+                short_put_strike = contract_data['strike']
             
             if short_call_strike is None or short_put_strike is None:
                 continue
@@ -173,6 +158,7 @@ class IronCondor2:
                 logger.info(f"Iron 2 too close to Iron 1 boundaries: {current_price:.2f} "
                            f"(boundaries: {lower_boundary:.2f} - {upper_boundary:.2f})")
                 return False
+            
                 
         return True
 
@@ -446,19 +432,17 @@ class IronCondor2:
                               current_price: float, current_bar_time: datetime,
                               data_provider: Union[MockDataProvider, PolygonDataProvider],
                               config: BacktestConfig, 
-                              existing_iron1_trades: List[Trade] = None) -> Optional[Trade]:
+                              iron1_trade: Trade = None) -> Optional[Trade]:
         """
         Find Iron Butterfly (Iron 2) trade based on strategy config and existing Iron 1 trades
         """
-        if existing_iron1_trades is None:
-            existing_iron1_trades = []
         
         # Check if price triggers Iron 2 entry based on Iron 1 positions
-        if not IronCondor2._check_iron2_trigger_price(current_price, existing_iron1_trades, strategy):
+        if not IronCondor2._check_iron2_trigger_price(current_price, iron1_trade, strategy):
             return None
         
         # Check minimum distance from Iron 1
-        if not IronCondor2._check_minimum_distance_from_iron1(current_price, existing_iron1_trades, strategy):
+        if not IronCondor2._check_minimum_distance_from_iron1(current_price, iron1_trade, strategy):
             return None
         
         # Check Iron 2 specific entry conditions
