@@ -119,7 +119,7 @@ class Straddle2:
                                data_provider: Union[MockDataProvider, PolygonDataProvider], 
                                config: BacktestConfig) -> Optional[Trade]:
         """Execute Straddle 2 trade - enters at same time as Iron 2"""
-        
+        Straddle2.Straddle2_exited = False
         # Determine strike prices
         strike_info = Straddle2._determine_straddle_strikes(iron1_trade, iron2_trade, straddle1_trade, strategy)
         

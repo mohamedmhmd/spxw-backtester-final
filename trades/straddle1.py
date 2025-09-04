@@ -38,6 +38,7 @@ class Straddle1:
                                data_provider: Union[MockDataProvider, PolygonDataProvider], config : BacktestConfig) -> Optional[Trade]:
         """Execute Straddle trade"""
         # Create straddle contracts
+        Straddle1.Straddle1_exited = False
         exp_str = date.strftime('%y%m%d')
         straddle_distance = iron_condor_trade.metadata['net_premium'] * strategy.straddle_1_distance_multiplier
         c_strike = Straddle1._calculate_straddle_strike(current_price, straddle_distance)

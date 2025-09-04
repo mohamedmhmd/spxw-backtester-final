@@ -33,12 +33,15 @@ class Statistics:
         total_capital_used = sum(t.used_capital for t in trades)
         
         # Separate trades by type
-        iron_condor_trades = [t for t in trades if t.trade_type == "Iron Condor 1"]
-        straddle_trades = [t for t in trades if t.trade_type == "Straddle 1"]
-        ic = {t.entry_time: t.pnl for t in trades if t.trade_type == "Iron Condor 1"}
-        st = {t.entry_time: t.pnl for t in trades if t.trade_type == "Straddle 1"}
-        couples = [(ic[t] + st[t]) > 0 for t in ic if t in st]
-        win_rate = sum(couples) / len(couples) if couples else 0
+        iron_1_condor_trades = [t for t in trades if t.trade_type == "Iron Condor 1"]
+        straddle_2_trades = [t for t in trades if t.trade_type == "Straddle 1"]
+        ic1 = {t.entry_time: t.pnl for t in trades if t.trade_type == "Iron Condor 1"}
+        st1 = {t.entry_time: t.pnl for t in trades if t.trade_type == "Straddle 1"}
+        couples1 = [(ic1[t] + st1[t]) > 0 for t in ic1 if t in st1] 
+        ic2 = {t.entry_time: t.pnl for t in trades if t.trade_type == "Iron Condor 2"}
+        st2 = {t.entry_time: t.pnl for t in trades if t.trade_type == "Straddle 2"}
+        couples2 = [(ic2[t] + st2[t]) > 0 for t in ic2 if t in st2]
+        win_rate = (sum(couples1) + sum(couples2))/ (len(couples1) + len(couples2)) if couples1 and couples2 else 0
         
         # Overall statistics
         winning_trades = [t for t in trades if t.pnl > 0]
@@ -81,29 +84,29 @@ class Statistics:
         
         # Iron Condor specific stats
         ic_stats = {}
-        if iron_condor_trades:
-            ic_wins = [t for t in iron_condor_trades if t.pnl > 0]
-            ic_losses = [t for t in iron_condor_trades if t.pnl < 0]
+        if iron_1_condor_trades:
+            ic_wins = [t for t in iron_1_condor_trades if t.pnl > 0]
+            ic_losses = [t for t in iron_1_condor_trades if t.pnl < 0]
             ic_stats = {
-                'total_trades': len(iron_condor_trades),
+                'total_trades': len(iron_1_condor_trades),
                 'winning_trades': len(ic_wins),
                 'losing_trades': len(ic_losses),
-                'win_rate': len(ic_wins) / len(iron_condor_trades),
-                'total_pnl': sum(t.pnl for t in iron_condor_trades),
-                'avg_pnl': np.mean([t.pnl for t in iron_condor_trades]),
-                'avg_credit': np.mean([t.metadata.get('net_credit', 0) for t in iron_condor_trades])
+                'win_rate': len(ic_wins) / len(iron_1_condor_trades),
+                'total_pnl': sum(t.pnl for t in iron_1_condor_trades),
+                'avg_pnl': np.mean([t.pnl for t in iron_1_condor_trades]),
+                'avg_credit': np.mean([t.metadata.get('net_credit', 0) for t in iron_1_condor_trades])
             }
         
         # Straddle specific stats
         straddle_stats = {}
-        if straddle_trades:
-            straddle_wins = [t for t in straddle_trades if t.pnl > 0]
-            straddle_losses = [t for t in straddle_trades if t.pnl < 0]
+        if straddle_2_trades:
+            straddle_wins = [t for t in straddle_2_trades if t.pnl > 0]
+            straddle_losses = [t for t in straddle_2_trades if t.pnl < 0]
             
             # Count partial exits
             partial_exit_count = 0
             total_partial_pnl = 0
-            for trade in straddle_trades:
+            for trade in straddle_2_trades:
                 for contract, details in trade.contracts.items():
                     if 'partial_exits' in details:
                         partial_exit_count += len(details['partial_exits'])
@@ -111,12 +114,12 @@ class Statistics:
                             total_partial_pnl += exit['pnl']
             
             straddle_stats = {
-                'total_trades': len(straddle_trades),
+                'total_trades': len(straddle_2_trades),
                 'winning_trades': len(straddle_wins),
                 'losing_trades': len(straddle_losses),
-                'win_rate': len(straddle_wins) / len(straddle_trades),
-                'total_pnl': sum(t.pnl for t in straddle_trades),
-                'avg_pnl': np.mean([t.pnl for t in straddle_trades]),
+                'win_rate': len(straddle_wins) / len(straddle_2_trades),
+                'total_pnl': sum(t.pnl for t in straddle_2_trades),
+                'avg_pnl': np.mean([t.pnl for t in straddle_2_trades]),
                 'partial_exits': partial_exit_count,
                 'partial_exit_pnl': total_partial_pnl
             }

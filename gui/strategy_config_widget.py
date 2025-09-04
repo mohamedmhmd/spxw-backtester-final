@@ -204,6 +204,45 @@ class StrategyConfigWidget(QWidget):
         layout.addRow("Iron 2 Target Win/Loss Ratio:", self.iron_2_target_win_loss_ratio)
         
         
+        # === STRADDLE 2 settings ===
+        straddle_2_label = QLabel("=== STRADDLE 2 SETTINGS ===")
+        straddle_2_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+        layout.addRow(straddle_2_label)
+        
+        # straddle_2_trade_size: int = 2
+        self.straddle_2_trade_size = QSpinBox()
+        self.straddle_2_trade_size.setRange(1, 1000)
+        self.straddle_2_trade_size.setSingleStep(1)
+        self.straddle_2_trade_size.setValue(2)
+        self.straddle_2_trade_size.setToolTip("Number of contracts to trade for Straddle 2")
+        layout.addRow("Straddle 2 Trade Size:", self.straddle_2_trade_size)
+
+        # straddle_2_trigger_multiplier: float = 1.0
+        self.straddle_2_trigger_multiplier = QDoubleSpinBox()
+        self.straddle_2_trigger_multiplier.setRange(0.1, 5.0)
+        self.straddle_2_trigger_multiplier.setSingleStep(0.1)
+        self.straddle_2_trigger_multiplier.setValue(1.0)
+        self.straddle_2_trigger_multiplier.setToolTip("Trigger multiplier for Straddle 2 (1.0 = 100%)")
+        layout.addRow("Straddle 2 Trigger Multiplier:", self.straddle_2_trigger_multiplier)
+
+        # straddle_2_exit_percentage: float = 0.5
+        self.straddle_2_exit_percentage = QDoubleSpinBox()
+        self.straddle_2_exit_percentage.setRange(0.01, 1.0)
+        self.straddle_2_exit_percentage.setSingleStep(0.05)
+        self.straddle_2_exit_percentage.setValue(0.5)
+        self.straddle_2_exit_percentage.setToolTip("Fraction of position to exit for Straddle 2 (0.5 = 50%)")
+        layout.addRow("Straddle 2 Exit Percentage:", self.straddle_2_exit_percentage)
+
+        # straddle_2_exit_multiplier: float = 2.0
+        self.straddle_2_exit_multiplier = QDoubleSpinBox()
+        self.straddle_2_exit_multiplier.setRange(0.1, 10.0)
+        self.straddle_2_exit_multiplier.setSingleStep(0.1)
+        self.straddle_2_exit_multiplier.setValue(2.0)
+        self.straddle_2_exit_multiplier.setToolTip("Exit multiplier for Straddle 2 (2.0 = 2x entry price)")
+        layout.addRow("Straddle 2 Exit Multiplier:", self.straddle_2_exit_multiplier)
+
+        
+        
         # Add some spacing at the end
         spacer_label = QLabel("")
         spacer_label.setMinimumHeight(20)
@@ -303,7 +342,11 @@ class StrategyConfigWidget(QWidget):
             iron_2_range_reference_candles = self.iron_2_range_reference_candles.value(),
             iron_2_range_threshold = self.iron_2_range_threshold.value(),
             iron_2_min_distance = self.iron_2_min_distance.value(),
-            iron_2_target_win_loss_ratio = self.iron_2_target_win_loss_ratio.value()
+            iron_2_target_win_loss_ratio = self.iron_2_target_win_loss_ratio.value(),
+            straddle_2_trade_size = self.straddle_2_trade_size.value(),
+            straddle_2_trigger_multiplier = self.straddle_2_trigger_multiplier.value(),
+            straddle_2_exit_percentage = self.straddle_2_exit_percentage.value(),
+            straddle_2_exit_multiplier = self.straddle_2_exit_multiplier.value(),
             
         )
     
@@ -332,3 +375,7 @@ class StrategyConfigWidget(QWidget):
         self.iron_2_range_threshold.setValue(config.iron_2_range_threshold)
         self.iron_2_min_distance.setValue(config.iron_2_min_distance)
         self.iron_2_target_win_loss_ratio.setValue(config.iron_2_target_win_loss_ratio)
+        self.straddle_2_trade_size.setValue(config.straddle_2_trade_size)
+        self.straddle_2_trigger_multiplier.setValue(config.straddle_2_trigger_multiplier)
+        self.straddle_2_exit_percentage.setValue(config.straddle_2_exit_percentage)
+        self.straddle_2_exit_multiplier.setValue(config.straddle_2_exit_multiplier)

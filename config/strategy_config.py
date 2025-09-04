@@ -69,6 +69,11 @@ class StrategyConfig:
             'straddle_2_trigger_multiplier': self.straddle_2_trigger_multiplier,
             'straddle_2_exit_percentage': self.straddle_2_exit_percentage,
             'straddle_2_exit_multiplier': self.straddle_2_exit_multiplier,
+            'straddle_2_trade_size': self.straddle_2_trade_size,
+            'straddle_2_trigger_multiplier': self.straddle_2_trigger_multiplier,
+            'straddle_2_exit_percentage': self.straddle_2_exit_percentage,
+            'straddle_2_exit_multiplier': self.straddle_2_exit_multiplier,
+
         }
     
     @classmethod
