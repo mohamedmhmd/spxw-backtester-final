@@ -34,6 +34,12 @@ class StrategyConfig:
     iron_2_min_distance: int = 5
     iron_2_target_win_loss_ratio: float = 1.5
     
+    # Straddle 2 parameters
+    straddle_2_trade_size: int = 2
+    straddle_2_trigger_multiplier: float = 1.0  # 100% in entry rules
+    straddle_2_exit_percentage: float = 0.5  # Exit 50% of position
+    straddle_2_exit_multiplier: float = 2.0  # Exit when price is 2x entry
+    
     def to_dict(self) -> dict:
         return {
             'name': self.name,
@@ -59,6 +65,10 @@ class StrategyConfig:
             'iron_2_range_threshold': self.iron_2_range_threshold,
             'iron_2_min_distance': self.iron_2_min_distance,
             'iron_2_target_win_loss_ratio': self.iron_2_target_win_loss_ratio,
+            'straddle_2_trade_size': self.straddle_2_trade_size,
+            'straddle_2_trigger_multiplier': self.straddle_2_trigger_multiplier,
+            'straddle_2_exit_percentage': self.straddle_2_exit_percentage,
+            'straddle_2_exit_multiplier': self.straddle_2_exit_multiplier,
         }
     
     @classmethod

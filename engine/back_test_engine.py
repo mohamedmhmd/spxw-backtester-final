@@ -6,6 +6,7 @@ from data.mock_data_provider import MockDataProvider
 from config.back_test_config import BacktestConfig
 from data.polygon_data_provider import PolygonDataProvider
 from config.strategy_config import StrategyConfig
+from trades.straddle2 import Straddle2
 from trades.trade import Trade
 from engine.statistics import Statistics
 from trades.iron_condor_1 import IronCondor1
@@ -175,9 +176,11 @@ class BacktestEngine:
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
             current_price = spx_ohlc_data.iloc[i]['open']
             
-            if not Straddle1.Straddle1_exited:
-               await Straddle1._check_straddle_exits(open_straddles, current_price, current_bar_time, config, self.data_provider)
+            if not Straddle1.Straddle1_exited and len(open_straddles) > 0:
+               await Straddle1._check_straddle_exits(open_straddles[0], current_price, current_bar_time, config, self.data_provider)
             
+            if not Straddle2.Straddle2_exited and len(open_straddles) > 1:
+               await Straddle2._check_straddle_exits(open_straddles[1], current_price, current_bar_time, config, self.data_provider)
             
             if(ic1_found):
                 if not ic2_found:
@@ -190,6 +193,25 @@ class BacktestEngine:
                         trades.append(iron_2_trade)
                         active_iron_condors.append(iron_2_trade)
                         ic2_found = True
+                        logger.info(f"Entered Iron Condor 2 at {current_bar_time}.")
+                        if isinstance(date, datetime):
+                           option_date = date
+                        else:
+                           option_date = datetime.combine(date, datetime.min.time())
+                
+                        straddle_2_trade = await Straddle2._execute_straddle(option_date,
+                                current_bar_time,
+                                current_price,
+                                strategy,
+                                ic_1_trade,
+                                iron_2_trade,
+                                open_straddles[0],
+                                self.data_provider, config
+                        )
+                        if straddle_2_trade:
+                            trades.append(straddle_2_trade)
+                            open_straddles.append(straddle_2_trade)
+                            logger.info(f"Entered Straddle 2 at {current_bar_time}.")
                 else:
                     continue
             else:
@@ -222,7 +244,7 @@ class BacktestEngine:
             
             
             #break condition - all trades found for the day
-            if ic1_found and ic2_found and Straddle1.Straddle1_exited:
+            if ic1_found and ic2_found and Straddle1.Straddle1_exited and Straddle2.Straddle2_exited:
                 break
                     
                     

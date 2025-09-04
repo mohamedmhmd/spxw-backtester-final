@@ -105,18 +105,13 @@ class Straddle1:
     
 
     async def _check_straddle_exits(
-    open_straddles,
+    straddle,
     current_price: float,
     current_time: datetime,
     config: BacktestConfig,
     data_provider: Union["MockDataProvider", "PolygonDataProvider"]
 ) -> None:
-         """Check if any straddle positions should be partially exited."""
-    
-         for straddle in open_straddles:
-             if straddle.status != "OPEN":
-                continue
-
+             """Check if any straddle positions should be partially exited."""
              # Ensure metadata exists
              if straddle.metadata is None:
                 straddle.metadata = {}
@@ -131,7 +126,7 @@ class Straddle1:
              put_hit = current_price <= put_straddle_strike if put_straddle_strike else False
 
              if not (call_hit or put_hit):
-                continue
+                return
              if call_hit:
                  leg_type = "call"
              else:
