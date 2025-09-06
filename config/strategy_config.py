@@ -40,6 +40,17 @@ class StrategyConfig:
     straddle_2_exit_percentage: float = 0.5  # Exit 50% of position
     straddle_2_exit_multiplier: float = 2.0  # Exit when price is 2x entry
     
+    # Iron Condor 3(a) parameters - Iron Butterfly
+    iron_3_trade_size: int = 10
+    iron_3_trigger_multiplier: float = 1.0  # 100% of Iron 2 net premium
+    iron_3_distance_multiplier: float = 1.0  # 100% of Iron 1 net premium for exclusion zone
+    iron_3_min_distance: int = 2  # Minimum distance from exclusion boundaries
+    iron_3_target_win_loss_ratio: float = 1.5
+    iron_3_direction_lookback: int = 4  # Last 4 candles not all same direction
+    iron_3_range_recent_candles: int = 2  # Last 2 candles for range check
+    iron_3_range_reference_candles: int = 10  # Last 10 candles for reference
+    iron_3_range_threshold: float = 1.25  # 125% threshold
+    
     def to_dict(self) -> dict:
         return {
             'name': self.name,
@@ -73,6 +84,16 @@ class StrategyConfig:
             'straddle_2_trigger_multiplier': self.straddle_2_trigger_multiplier,
             'straddle_2_exit_percentage': self.straddle_2_exit_percentage,
             'straddle_2_exit_multiplier': self.straddle_2_exit_multiplier,
+            # Iron 3 parameters
+            'iron_3_trade_size': self.iron_3_trade_size,
+            'iron_3_trigger_multiplier': self.iron_3_trigger_multiplier,
+            'iron_3_distance_multiplier': self.iron_3_distance_multiplier,
+            'iron_3_min_distance': self.iron_3_min_distance,
+            'iron_3_target_win_loss_ratio': self.iron_3_target_win_loss_ratio,
+            'iron_3_direction_lookback': self.iron_3_direction_lookback,
+            'iron_3_range_recent_candles': self.iron_3_range_recent_candles,
+            'iron_3_range_reference_candles': self.iron_3_range_reference_candles,
+            'iron_3_range_threshold': self.iron_3_range_threshold,
 
         }
     

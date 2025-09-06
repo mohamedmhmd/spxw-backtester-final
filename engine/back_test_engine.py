@@ -6,6 +6,7 @@ from data.mock_data_provider import MockDataProvider
 from config.back_test_config import BacktestConfig
 from data.polygon_data_provider import PolygonDataProvider
 from config.strategy_config import StrategyConfig
+from trades.iron_condor_3 import IronCondor3
 from trades.straddle2 import Straddle2
 from trades.trade import Trade
 from engine.statistics import Statistics
@@ -172,6 +173,7 @@ class BacktestEngine:
         active_iron_condors = []
         ic1_found = False
         ic2_found = False
+        ic3_found = False
         for i in range(iron_1_min_bars_needed, len(spx_ohlc_data)):
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
             current_price = spx_ohlc_data.iloc[i]['open']
@@ -184,7 +186,6 @@ class BacktestEngine:
             
             if(ic1_found):
                 if not ic2_found:
-                    #iron 2
                     iron_2_trade = await IronCondor2._find_iron_trade(spx_ohlc_data, i, strategy, 
                                                          date, current_price, current_bar_time,
                                                          self.data_provider, config,
@@ -213,7 +214,22 @@ class BacktestEngine:
                             open_straddles.append(straddle_2_trade)
                             logger.info(f"Entered Straddle 2 at {current_bar_time}.")
                 else:
-                    continue
+                    if not ic3_found:
+                        iron_3_trade = await IronCondor3._find_iron_trade(spx_ohlc_data, i,
+                              strategy, date,
+                              current_price, current_bar_time,
+                              self.data_provider,
+                              config,
+                              ic_1_trade,
+                              iron_2_trade,
+                              )
+                        if iron_3_trade:
+                            trades.append(iron_3_trade)
+                            active_iron_condors.append(iron_3_trade)
+                            ic3_found = True 
+                            logger.info(f"Entered Iron Condor 3  at {current_bar_time}.")
+                    else:
+                        continue
             else:
             
                 ic_1_trade = await IronCondor1._find_iron_trade(spx_ohlc_data, spy_ohlc_data, i, strategy, 

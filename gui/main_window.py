@@ -546,11 +546,12 @@ class MainWindow(QMainWindow):
         straddle_1_size = strategy_config.straddle_1_trade_size
         iron_2_size = strategy_config.iron_2_trade_size
         straddle_2_size = strategy_config.straddle_2_trade_size
+        iron_3_size = strategy_config.iron_3_trade_size
     
         self.status_bar.showMessage("Updating results with new trade sizes...")
     
         # Create scaled copy of results
-        scaled_results = self._scale_results(self.last_results, iron_1_size, straddle_1_size, iron_2_size, straddle_2_size)
+        scaled_results = self._scale_results(self.last_results, iron_1_size, straddle_1_size, iron_2_size, straddle_2_size, iron_3_size)
         self.last_results = scaled_results  # Update last_results to the scaled version
         # Update results widget
         self.results_widget.update_results(scaled_results)
@@ -571,7 +572,7 @@ class MainWindow(QMainWindow):
     
         logger.info(f"Results updated with Iron 1 size: {iron_1_size}, Straddle 1 size: {straddle_1_size}, Iron 2 size: {iron_2_size} Straddle 2 size: {straddle_2_size}")
     
-    def _scale_results(self, original_results, iron_1_size, straddle_1_size, iron_2_size, straddle_2_size):
+    def _scale_results(self, original_results, iron_1_size, straddle_1_size, iron_2_size, straddle_2_size, iron_3_size):
         scaled_results = copy.deepcopy(original_results)
         scaled_daily_pnl = {}
         total_capital_used = 0.0
@@ -585,6 +586,8 @@ class MainWindow(QMainWindow):
                scale_factor = iron_2_size
             elif trade.trade_type == "Straddle 2":
                scale_factor = straddle_2_size
+            elif "Iron Condor 3" in trade.trade_type:
+               scale_factor = iron_3_size
             else:
                 scale_factor = 1  # Default fallback
         
@@ -785,6 +788,16 @@ class MainWindow(QMainWindow):
                     self.strategy_config_widget.straddle_1_distance_multiplier.setValue(sc['straddle_1_distance_multiplier'])
                     self.strategy_config_widget.straddle_1_exit_percentage.setValue(sc['straddle_1_exit_percentage'])
                     self.strategy_config_widget.straddle_1_exit_multiplier.setValue(sc['straddle_1_exit_multiplier'])
+                    self.strategy_config_widget.iron_3_trade_size.setValue(sc['iron_3_trade_size'])
+                    self.strategy_config_widget.iron_3_trigger_multiplier.setValue(sc['iron_3_trigger_multiplier'])
+                    self.strategy_config_widget.iron_3_distance_multiplier.setValue(sc['iron_3_distance_multiplier'])
+                    self.strategy_config_widget.iron_3_min_distance.setValue(sc['iron_3_min_distance'])
+                    self.strategy_config_widget.iron_3_target_win_loss_ratio.setValue(sc['iron_3_target_win_loss_ratio'])
+                    self.strategy_config_widget.iron_3_direction_lookback.setValue(sc['iron_3_direction_lookback'])
+                    self.strategy_config_widget.iron_3_range_recent_candles.setValue(sc['iron_3_range_recent_candles'])
+                    self.strategy_config_widget.iron_3_range_reference_candles.setValue(sc['iron_3_range_reference_candles'])
+                    self.strategy_config_widget.iron_3_range_threshold.setValue(sc['iron_3_range_threshold'])
+
                         
                 
                 self.status_bar.showMessage(f"Configuration loaded from {filename}", 5000)

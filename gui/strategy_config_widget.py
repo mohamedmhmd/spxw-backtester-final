@@ -240,6 +240,85 @@ class StrategyConfigWidget(QWidget):
         self.straddle_2_exit_multiplier.setValue(2.0)
         self.straddle_2_exit_multiplier.setToolTip("Exit multiplier for Straddle 2 (2.0 = 2x entry price)")
         layout.addRow("Straddle 2 Exit Multiplier:", self.straddle_2_exit_multiplier)
+        
+        
+        # === IRON  CONDOR 3 settings ===
+        iron_3_label = QLabel("=== IRON CONDOR 3 SETTINGS ===")
+        iron_3_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+        layout.addRow(iron_3_label)
+        
+        # iron_3_trade_size: int = 10
+        self.iron_3_trade_size = QSpinBox()
+        self.iron_3_trade_size.setRange(1, 1000)
+        self.iron_3_trade_size.setSingleStep(1)
+        self.iron_3_trade_size.setValue(10)
+        self.iron_3_trade_size.setToolTip("Number of contracts to trade for Iron Condor 3")
+        layout.addRow("Iron 3 Trade Size:", self.iron_3_trade_size)
+
+        # iron_3_trigger_multiplier: float = 1.0
+        self.iron_3_trigger_multiplier = QDoubleSpinBox()
+        self.iron_3_trigger_multiplier.setRange(0.1, 5.0)
+        self.iron_3_trigger_multiplier.setSingleStep(0.1)
+        self.iron_3_trigger_multiplier.setValue(1.0)
+        self.iron_3_trigger_multiplier.setToolTip("Trigger multiplier for Iron Condor 3 (1.0 = 100%)")
+        layout.addRow("Iron 3 Trigger Multiplier:", self.iron_3_trigger_multiplier)
+
+        # iron_3_distance_multiplier: float = 1.0
+        self.iron_3_distance_multiplier = QDoubleSpinBox()
+        self.iron_3_distance_multiplier.setRange(0.1, 5.0)
+        self.iron_3_distance_multiplier.setSingleStep(0.1)
+        self.iron_3_distance_multiplier.setValue(1.0)
+        self.iron_3_distance_multiplier.setToolTip("Distance multiplier for Iron Condor 3 (1.0 = 100%)")
+        layout.addRow("Iron 3 Distance Multiplier:", self.iron_3_distance_multiplier)
+
+        # iron_3_min_distance: int = 2
+        self.iron_3_min_distance = QSpinBox()
+        self.iron_3_min_distance.setRange(1, 1000)
+        self.iron_3_min_distance.setSingleStep(1)
+        self.iron_3_min_distance.setValue(2)
+        self.iron_3_min_distance.setToolTip("Minimum distance from exclusion boundaries for Iron Condor 3")
+        layout.addRow("Iron 3 Min Distance:", self.iron_3_min_distance)
+
+        # iron_3_target_win_loss_ratio: float = 1.5
+        self.iron_3_target_win_loss_ratio = QDoubleSpinBox()
+        self.iron_3_target_win_loss_ratio.setRange(0.1, 10.0)
+        self.iron_3_target_win_loss_ratio.setSingleStep(0.1)
+        self.iron_3_target_win_loss_ratio.setValue(1.5)
+        self.iron_3_target_win_loss_ratio.setToolTip("Target win/loss ratio for Iron Condor 3")
+        layout.addRow("Iron 3 Target Win/Loss Ratio:", self.iron_3_target_win_loss_ratio)
+
+        # iron_3_direction_lookback: int = 4
+        self.iron_3_direction_lookback = QSpinBox()
+        self.iron_3_direction_lookback.setRange(1, 100)
+        self.iron_3_direction_lookback.setSingleStep(1)
+        self.iron_3_direction_lookback.setValue(4)
+        self.iron_3_direction_lookback.setToolTip("Lookback period for direction analysis in Iron Condor 3")
+        layout.addRow("Iron 3 Direction Lookback:", self.iron_3_direction_lookback)
+
+        # iron_3_range_recent_candles: int = 2
+        self.iron_3_range_recent_candles = QSpinBox()
+        self.iron_3_range_recent_candles.setRange(1, 100)
+        self.iron_3_range_recent_candles.setSingleStep(1)
+        self.iron_3_range_recent_candles.setValue(2)
+        self.iron_3_range_recent_candles.setToolTip("Number of recent candles for range calculation in Iron Condor 3")
+        layout.addRow("Iron 3 Range Recent Candles:", self.iron_3_range_recent_candles)
+
+        # iron_3_range_reference_candles: int = 10
+        self.iron_3_range_reference_candles = QSpinBox()
+        self.iron_3_range_reference_candles.setRange(1, 100)
+        self.iron_3_range_reference_candles.setSingleStep(1)
+        self.iron_3_range_reference_candles.setValue(10)
+        self.iron_3_range_reference_candles.setToolTip("Number of reference candles for range calculation in Iron Condor 3")
+        layout.addRow("Iron 3 Range Reference Candles:", self.iron_3_range_reference_candles)
+
+        # iron_3_range_threshold: float = 1.25
+        self.iron_3_range_threshold = QDoubleSpinBox()
+        self.iron_3_range_threshold.setRange(0.1, 10.0)
+        self.iron_3_range_threshold.setSingleStep(0.05)
+        self.iron_3_range_threshold.setValue(1.25)
+        self.iron_3_range_threshold.setToolTip("Range threshold for Iron Condor 3")
+        layout.addRow("Iron 3 Range Threshold:", self.iron_3_range_threshold)
+
 
         
         
@@ -347,6 +426,16 @@ class StrategyConfigWidget(QWidget):
             straddle_2_trigger_multiplier = self.straddle_2_trigger_multiplier.value(),
             straddle_2_exit_percentage = self.straddle_2_exit_percentage.value(),
             straddle_2_exit_multiplier = self.straddle_2_exit_multiplier.value(),
+            iron_3_trade_size = self.iron_3_trade_size.value(),
+            iron_3_trigger_multiplier = self.iron_3_trigger_multiplier.value(),
+            iron_3_distance_multiplier = self.iron_3_distance_multiplier.value(),
+            iron_3_min_distance = self.iron_3_min_distance.value(),
+            iron_3_target_win_loss_ratio = self.iron_3_target_win_loss_ratio.value(),
+            iron_3_direction_lookback = self.iron_3_direction_lookback.value(),
+            iron_3_range_recent_candles = self.iron_3_range_recent_candles.value(),
+            iron_3_range_reference_candles = self.iron_3_range_reference_candles.value(),
+            iron_3_range_threshold = self.iron_3_range_threshold.value(),
+
             
         )
     
@@ -379,3 +468,12 @@ class StrategyConfigWidget(QWidget):
         self.straddle_2_trigger_multiplier.setValue(config.straddle_2_trigger_multiplier)
         self.straddle_2_exit_percentage.setValue(config.straddle_2_exit_percentage)
         self.straddle_2_exit_multiplier.setValue(config.straddle_2_exit_multiplier)
+        self.iron_3_trade_size.setValue(config.iron_3_trade_size)
+        self.iron_3_trigger_multiplier.setValue(config.iron_3_trigger_multiplier)
+        self.iron_3_distance_multiplier.setValue(config.iron_3_distance_multiplier)
+        self.iron_3_min_distance.setValue(config.iron_3_min_distance)
+        self.iron_3_target_win_loss_ratio.setValue(config.iron_3_target_win_loss_ratio)
+        self.iron_3_direction_lookback.setValue(config.iron_3_direction_lookback)
+        self.iron_3_range_recent_candles.setValue(config.iron_3_range_recent_candles)
+        self.iron_3_range_reference_candles.setValue(config.iron_3_range_reference_candles)
+        self.iron_3_range_threshold.setValue(config.iron_3_range_threshold)
