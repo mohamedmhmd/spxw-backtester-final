@@ -8,6 +8,7 @@ from data.polygon_data_provider import PolygonDataProvider
 from config.strategy_config import StrategyConfig
 from trades.iron_condor_3 import IronCondor3
 from trades.straddle2 import Straddle2
+from trades.straddle3 import Straddle3
 from trades.trade import Trade
 from engine.statistics import Statistics
 from trades.iron_condor_1 import IronCondor1
@@ -174,6 +175,7 @@ class BacktestEngine:
         ic1_found = False
         ic2_found = False
         ic3_found = False
+        straddle_3_type = ""
         for i in range(iron_1_min_bars_needed, len(spx_ohlc_data)):
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
             current_price = spx_ohlc_data.iloc[i]['open']
@@ -183,6 +185,10 @@ class BacktestEngine:
             
             if not Straddle2.Straddle2_exited and len(open_straddles) > 1:
                await Straddle2._check_straddle_exits(open_straddles[1], current_price, current_bar_time, config, self.data_provider)
+            if straddle_3_type == "Straddle 3(a)" and not Straddle3.Straddle3a_exited and len(open_straddles) > 2:
+               await Straddle3._check_straddle_exits(open_straddles[2], current_price, current_bar_time, config, self.data_provider)
+            if straddle_3_type == "Straddle 3(b)" and not Straddle3.Straddle3b_exited and len(open_straddles) > 2:
+               await Straddle3._check_straddle_exits(open_straddles[2], current_price, current_bar_time, config, self.data_provider)
             
             if(ic1_found):
                 if not ic2_found:
@@ -228,6 +234,47 @@ class BacktestEngine:
                             active_iron_condors.append(iron_3_trade)
                             ic3_found = True 
                             logger.info(f"Entered Iron Condor 3  at {current_bar_time}.")
+                            
+                            if isinstance(date, datetime):
+                               option_date = date
+                            else:
+                               option_date = datetime.combine(date, datetime.min.time())
+                            
+                            if iron_3_trade.trade_type == "Iron Condor 3(a)":
+                                straddle_3_type = "Straddle 3(a)"
+                                straddle_3_trade = await Straddle3._execute_straddle3a(
+                                     option_date,
+                                     current_bar_time,
+                                     current_price,
+                                     strategy,
+                                     iron_2_trade,
+                                     iron_3_trade,
+                                     open_straddles[0],
+                                     self.data_provider, config
+                                )
+                                
+                                if straddle_3_trade:
+                                    trades.append(straddle_3_trade)
+                                    open_straddles.append(straddle_3_trade)
+                                    logger.info(f"Entered Straddle 3(a) at {current_bar_time}.")
+                            elif iron_3_trade.trade_type == "Iron Condor 3(b)":
+                                straddle_3_type = "Straddle 3(b)"
+                                straddle_3_trade = await Straddle3._execute_straddle3b(
+                                     option_date,
+                                     current_bar_time,
+                                     current_price,
+                                     strategy,
+                                     ic_1_trade,
+                                     iron_2_trade,
+                                     iron_3_trade,
+                                     open_straddles[0],
+                                     self.data_provider, config
+                                )
+                                if straddle_3_trade:
+                                    trades.append(straddle_3_trade)
+                                    open_straddles.append(straddle_3_trade)
+                                    logger.info(f"Entered Straddle 3(b) at {current_bar_time}.")
+                            
                     else:
                         continue
             else:
@@ -260,7 +307,7 @@ class BacktestEngine:
             
             
             #break condition - all trades found for the day
-            if ic1_found and ic2_found and Straddle1.Straddle1_exited and Straddle2.Straddle2_exited:
+            if ic1_found and ic2_found and Straddle1.Straddle1_exited and Straddle2.Straddle2_exited and (Straddle3.Straddle3a_exited or Straddle3.Straddle3b_exited):
                 break
                     
                     

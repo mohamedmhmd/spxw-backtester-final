@@ -40,7 +40,7 @@ class StrategyConfig:
     straddle_2_exit_percentage: float = 0.5  # Exit 50% of position
     straddle_2_exit_multiplier: float = 2.0  # Exit when price is 2x entry
     
-    # Iron Condor 3(a) parameters - Iron Butterfly
+    # Iron Condor 3 parameters - Iron Butterfly
     iron_3_trade_size: int = 10
     iron_3_trigger_multiplier: float = 1.0  # 100% of Iron 2 net premium
     iron_3_distance_multiplier: float = 1.0  # 100% of Iron 1 net premium for exclusion zone
@@ -50,6 +50,12 @@ class StrategyConfig:
     iron_3_range_recent_candles: int = 2  # Last 2 candles for range check
     iron_3_range_reference_candles: int = 10  # Last 10 candles for reference
     iron_3_range_threshold: float = 1.25  # 125% threshold
+    
+    #straddle 3 parameters
+    straddle_3_trade_size: int = 2
+    straddle_3_trigger_multiplier: float = 1.0  # 100% of Iron 2 net premium for strike calculation
+    straddle_3_exit_percentage: float = 0.5  # Exit 50% of position
+    straddle_3_exit_multiplier: float = 2.0  # Exit when price is 2x entry
     
     def to_dict(self) -> dict:
         return {
@@ -94,6 +100,11 @@ class StrategyConfig:
             'iron_3_range_recent_candles': self.iron_3_range_recent_candles,
             'iron_3_range_reference_candles': self.iron_3_range_reference_candles,
             'iron_3_range_threshold': self.iron_3_range_threshold,
+            # Straddle 3 parameters
+            'straddle_3_trade_size': self.straddle_3_trade_size,
+            'straddle_3_trigger_multiplier': self.straddle_3_trigger_multiplier,
+            'straddle_3_exit_percentage': self.straddle_3_exit_percentage,
+            'straddle_3_exit_multiplier': self.straddle_3_exit_multiplier,
 
         }
     

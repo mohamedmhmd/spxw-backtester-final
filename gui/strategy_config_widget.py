@@ -319,8 +319,43 @@ class StrategyConfigWidget(QWidget):
         self.iron_3_range_threshold.setToolTip("Range threshold for Iron Condor 3")
         layout.addRow("Iron 3 Range Threshold:", self.iron_3_range_threshold)
 
+        # === STRADDLE 2 settings ===
+        straddle_3_label = QLabel("=== STRADDLE 3 SETTINGS ===")
+        straddle_3_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+        layout.addRow(straddle_3_label)
 
-        
+        # straddle_3_trade_size: int
+        self.straddle_3_trade_size = QSpinBox()
+        self.straddle_3_trade_size.setRange(1, 1000)
+        self.straddle_3_trade_size.setSingleStep(1)
+        self.straddle_3_trade_size.setValue(2)
+        self.straddle_3_trade_size.setToolTip("Number of contracts to trade for Straddle 3")
+        layout.addRow("Straddle 3 Trade Size:", self.straddle_3_trade_size)
+
+        # straddle_3_trigger_multiplier: float
+        self.straddle_3_trigger_multiplier = QDoubleSpinBox()
+        self.straddle_3_trigger_multiplier.setRange(0.1, 5.0)
+        self.straddle_3_trigger_multiplier.setSingleStep(0.1)
+        self.straddle_3_trigger_multiplier.setValue(1.0)
+        self.straddle_3_trigger_multiplier.setToolTip("Trigger multiplier for Straddle 3")
+        layout.addRow("Straddle 3 Trigger Multiplier:", self.straddle_3_trigger_multiplier)
+
+        # straddle_3_exit_percentage: float
+        self.straddle_3_exit_percentage = QDoubleSpinBox()
+        self.straddle_3_exit_percentage.setRange(0.01, 1.0)
+        self.straddle_3_exit_percentage.setSingleStep(0.05)
+        self.straddle_3_exit_percentage.setValue(0.5)
+        self.straddle_3_exit_percentage.setToolTip("Exit percentage for Straddle 3 (0.5 = 50%)")
+        layout.addRow("Straddle 3 Exit Percentage:", self.straddle_3_exit_percentage)
+
+        # straddle_3_exit_multiplier: float
+        self.straddle_3_exit_multiplier = QDoubleSpinBox()
+        self.straddle_3_exit_multiplier.setRange(0.1, 10.0)
+        self.straddle_3_exit_multiplier.setSingleStep(0.1)
+        self.straddle_3_exit_multiplier.setValue(2.0)
+        self.straddle_3_exit_multiplier.setToolTip("Exit multiplier for Straddle 3 (2.0 = 2x entry price)")
+        layout.addRow("Straddle 3 Exit Multiplier:", self.straddle_3_exit_multiplier)
+
         
         # Add some spacing at the end
         spacer_label = QLabel("")
@@ -435,6 +470,11 @@ class StrategyConfigWidget(QWidget):
             iron_3_range_recent_candles = self.iron_3_range_recent_candles.value(),
             iron_3_range_reference_candles = self.iron_3_range_reference_candles.value(),
             iron_3_range_threshold = self.iron_3_range_threshold.value(),
+            straddle_3_trade_size = self.straddle_3_trade_size.value(),
+            straddle_3_trigger_multiplier = self.straddle_3_trigger_multiplier.value(),
+            straddle_3_exit_percentage = self.straddle_3_exit_percentage.value(),
+            straddle_3_exit_multiplier = self.straddle_3_exit_multiplier.value(),
+
 
             
         )
@@ -477,3 +517,8 @@ class StrategyConfigWidget(QWidget):
         self.iron_3_range_recent_candles.setValue(config.iron_3_range_recent_candles)
         self.iron_3_range_reference_candles.setValue(config.iron_3_range_reference_candles)
         self.iron_3_range_threshold.setValue(config.iron_3_range_threshold)
+        self.straddle_3_trade_size.setValue(config.straddle_3_trade_size)
+        self.straddle_3_trigger_multiplier.setValue(config.straddle_3_trigger_multiplier)
+        self.straddle_3_exit_percentage.setValue(config.straddle_3_exit_percentage)
+        self.straddle_3_exit_multiplier.setValue(config.straddle_3_exit_multiplier)
+        
