@@ -457,7 +457,7 @@ class Straddle3:
                 
                 # Update running P&L at trade level
                 straddle.metadata["partial_pnl"] = partial_pnl
-                straddle.metadata["partial_pnl_without_comission"] = partial_pnl_without_comission
+                straddle.metadata["partial_pnl_without_commission"] = partial_pnl_without_comission
                 straddle.contracts[contract] = details
                 
                 # Set appropriate exit flag

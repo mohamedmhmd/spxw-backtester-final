@@ -25,6 +25,7 @@ class Trade:
     exit_signals: Optional[Dict[str, Any]] = None
     pnl: float = 0.0
     unit_pnl: float = 0.0
+    pnl_without_commission: float = 0.0
     unit_pnl_without_commission: float = 0.0
     status: str = "OPEN"  # OPEN, CLOSED
     metadata: Optional[Dict[str, Any]] = None
@@ -71,7 +72,7 @@ class Trade:
         self.unit_pnl_without_commission = 0.0
         for contract, details in self.contracts.items():
             pnl = self.calculate_option_pnl(contract, details, payoffs)
-            details['pnl_without_comission'] = pnl
+            details['pnl_without_commission'] = pnl
             self.contracts[contract] = details
             self.unit_pnl_without_commission += pnl
         return self.unit_pnl_without_commission
@@ -86,9 +87,9 @@ class Trade:
     
     def calculate_pnl_without_commission(self, size : int ) -> float:
         """Calculate P&L for the trade without commission"""
-        self.pnl = self.metadata.get('partial_pnl_without_comission', 0.0)* size  +  size * self.unit_pnl_without_commission
+        self.pnl_without_commission = self.metadata.get('partial_pnl_without_commission', 0.0)* size  +  size * self.unit_pnl_without_commission
         self.size = size
-        return self.pnl
+        return self.pnl_without_commission
     
 
     async def _close_trade_at_expiry(self, ohlc_data : pd.DataFrame, date: datetime, 

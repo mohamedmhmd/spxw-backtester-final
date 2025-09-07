@@ -16,6 +16,7 @@ from data.mock_data_provider import MockDataProvider
 import copy
 import sys
 import platform
+import xlsxwriter
 
 
 # Set up logging
@@ -819,7 +820,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Error", f"Failed to load configuration: {e}")
     
     def export_results(self):
-        """Export backtest results to CSV/Excel file"""
+        """Export backtest results to Excel file with two tabs using XlsxWriter"""
         if not self.last_results:
            QMessageBox.information(self, "No Results", "Please run a backtest first")
            return
@@ -827,55 +828,130 @@ class MainWindow(QMainWindow):
         filename, _ = QFileDialog.getSaveFileName(
         self,
         "Export Results",
-        f"backtest_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-        "CSV Files (*.csv)"
-    )
+        f"backtest_results_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+        "Excel Files (*.xlsx)"
+        )
 
         if not filename:
            return
 
         try:
-            # Collect rows
-            rows = []
+            # Prepare data for Tab 1: Grouped Trades
+            grouped_trades_data = []
             for trade in self.last_results["trades"]:
-                # Format contract details into single string
-                details_parts = []
-                for leg, d in trade.contracts.items():
-                    leg_str = f"{leg}: pos={d.get('position')} remaining_pos={d.get('remaining_position')} strike={d.get('strike', '')} entry={d.get('entry_price', '')} exit={d.get('exit_price', '')}"
-                    details_parts.append(leg_str)
-                strategy_details = " | ".join(details_parts)
+                wings = trade.metadata.get("wing", "")
+                short_strikes = ""
+                if "Iron Condor" in trade.trade_type:
+                   for contract, details in trade.contracts.items():
+                       if "short" in details.get('leg_type', ''):
+                             short_strikes = f"{details.get('strike', '')}"
 
-                rows.append({
-                "Entry Time": trade.entry_time.strftime("%Y-%m-%d %H:%M") if trade.entry_time else "",
-                "Exit Time": trade.exit_time.strftime("%Y-%m-%d %H:%M") if trade.exit_time else "",
-                "Type": trade.trade_type  + " "+ trade.metadata.get("representation"),
+                trade_label = trade.trade_type
+                if trade.metadata.get("representation"):
+                   trade_label = f"{trade.trade_type} {trade.metadata['representation']}"
+
+                grouped_trades_data.append({
+                "Date": trade.entry_time.strftime("%b %d, %Y") if trade.entry_time else "",
+                "Trade Label": trade_label,
+                "Short Strikes": short_strikes,
+                "Wings": wings if wings else "",
                 "Size": trade.size,
-                "Entry SPX Price": trade.metadata.get("entry_spx_price", ""),
-                "Exit SPX Price": trade.metadata.get("exit_spx_price", ""),
-                "Net Premium": trade.metadata.get("net_premium"),
-                "P&L": trade.pnl,
-                "Status": trade.status,
-                "Strategy Details": strategy_details
+                "Entry Time": trade.entry_time.strftime("%I:%M %p"),
+                "Net Premium": f"{-trade.metadata.get('net_premium', 0):.2f}" if "Iron Condor" in trade.trade_type else f"{trade.metadata.get('net_premium', 0):.2f}",
+                "Entry SPX Price": f"{trade.metadata.get('entry_spx_price', ''):.2f}" ,
+                "Exit SPX Price": f"{trade.metadata.get('exit_spx_price', ''):.2f}" ,
+                "PnL without Commission": f"${trade.pnl_without_commission:,.0f}",
+                "PnL": f"${trade.pnl:,.0f}"
             })
 
-            df = pd.DataFrame(rows)
+            # Prepare data for Tab 2: Individual Trades
+            individual_trades_data = []
+            for trade in self.last_results["trades"]:
+                trade_group = trade.trade_type
+                for contract, details in trade.contracts.items():
+                    position_type = "Long" if "long" in details.get('leg_type', '') else "Short" if "short" in details.get('leg_type', '') else ""
+                    option_type = "Call" if "call" in details.get('leg_type', '') else "Put" if "put" in details.get('leg_type', '') else ""
 
-            # Export based on extension
-            df.to_csv(filename, index=False)
+                    trade_detail = f"{details.get('strike', 0)} {position_type} {option_type}".strip()
+                    entry_price = details.get('entry_price', 0)
+                    exit_price = details.get('exit_price', 0)
+                    position = details.get('position', 0)
+                    individual_pnl_no_comm = details.get('pnl_without_commission', 0) * abs(position)
+                    individual_pnl = details.get('pnl', 0) * abs(position)
+
+                    individual_trades_data.append({
+                    "Date": trade.entry_time.strftime("%b %d, %Y") if trade.entry_time else "",
+                    "Trade Detail": trade_detail,
+                    "Trade Group": trade_group,
+                    "Entry Size": abs(position),
+                    "Entry Time": trade.entry_time.strftime("%I:%M %p") if trade.entry_time else "",
+                    "Net Premium": f"{entry_price:.2f}" if 'Long' in position_type   else f"{-entry_price:.2f}",
+                    "Entry SPX Price": f"{trade.metadata.get('entry_spx_price', ''):.2f}" if trade.metadata and trade.metadata.get('entry_spx_price') else "",
+                    "Exit SPX Price": f"{trade.metadata.get('exit_spx_price', ''):.2f}" if trade.metadata and trade.metadata.get('exit_spx_price') else "",
+                    "PnL without Commission": f"${individual_pnl_no_comm:,.0f}",
+                    "PnL": f"${individual_pnl:,.0f}"
+                })
+
+            # Create DataFrames
+            df_grouped = pd.DataFrame(grouped_trades_data)
+            df_individual = pd.DataFrame(individual_trades_data)
+
+            # Export with XlsxWriter
+            with pd.ExcelWriter(filename, engine='xlsxwriter') as writer:
+                 df_grouped.to_excel(writer, sheet_name='Grouped Trades', index=False)
+                 df_individual.to_excel(writer, sheet_name='Individual Trades', index=False)
+
+                 workbook = writer.book
+                 grouped_sheet = writer.sheets['Grouped Trades']
+                 individual_sheet = writer.sheets['Individual Trades']
+
+                 # Formatting
+                 header_format = workbook.add_format({'bold': True, 'align': 'center', 'bg_color': '#366092', 'font_color': 'white'})
+                 light_fill_format = workbook.add_format({'bg_color': '#F2F2F2'})
+                 center_align = workbook.add_format({'align': 'center'})
+                 right_align = workbook.add_format({'align': 'right'})
+
+                 # Function to format a sheet
+                 def format_sheet(sheet, df):
+                     for col_num, col_name in enumerate(df.columns):
+                         sheet.write(0, col_num, col_name, header_format)
+                         column_width = min(max(df[col_name].astype(str).map(len).max(), len(col_name)) + 2, 50)
+                         sheet.set_column(col_num, col_num, column_width)
+
+                     for row_num in range(1, len(df) + 1):
+                        if row_num % 2 == 0:
+                           sheet.set_row(row_num, cell_format=light_fill_format)
+
+                     # Align PnL columns right, others center
+                     for col_num, col_name in enumerate(df.columns):
+                         if 'PnL' in col_name:
+                            sheet.set_column(col_num, col_num, None, right_align)
+                         elif col_name in ['Short Strikes', 'Wings', 'Size']:
+                            sheet.set_column(col_num, col_num, None, center_align)
+
+                 format_sheet(grouped_sheet, df_grouped)
+                 format_sheet(individual_sheet, df_individual)
 
             QMessageBox.information(
             self,
             "Export Successful",
             f"Results exported successfully to:\n{filename}\n\n"
-            f"📊 {len(rows)} trades exported"
+            f"📊 {len(grouped_trades_data)} grouped trades\n"
+            f"📋 {len(individual_trades_data)} individual contract details"
         )
             self.status_bar.showMessage(f"Results exported to {filename}", 5000)
-            logger.info(f"Results exported to {filename} with {len(rows)} trades")
+            logger.info(f"Results exported to Excel: {filename}")
 
+        except ImportError:
+            QMessageBox.warning(
+            self, 
+            "Missing Dependency", 
+            "Please install XlsxWriter to export to Excel:\npip install XlsxWriter"
+        )
         except Exception as e:
-               QMessageBox.warning(self, "Export Error", f"Failed to export results:\n{str(e)}")
-               logger.error(f"Export error: {e}")
-  
+            QMessageBox.warning(self, "Export Error", f"Failed to export results:\n{str(e)}")
+            logger.error(f"Export error: {e}")
+
     
     def show_about(self):
         """Show about dialog"""

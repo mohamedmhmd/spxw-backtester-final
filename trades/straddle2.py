@@ -271,7 +271,7 @@ class Straddle2:
 
                 # Update running P&L at trade level
                 straddle.metadata["partial_pnl"] = partial_pnl
-                straddle.metadata["partial_pnl_without_comission"] = partial_pnl_without_comission
+                straddle.metadata["partial_pnl_without_commission"] = partial_pnl_without_comission
                 straddle.contracts[contract] = details
                 straddle.exit_percentage = exit_percentage
                 Straddle2.Straddle2_exited = True  # Mark that a partial exit has occurred
