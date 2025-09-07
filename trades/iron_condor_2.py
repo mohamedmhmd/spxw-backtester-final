@@ -406,7 +406,8 @@ class IronCondor2:
                 'strategy_name': 'iron_2',
                 'entry_spx_price': current_price,
                 'representation': representation,
-                'butterfly_type': 'iron_butterfly'
+                'butterfly_type': 'iron_butterfly',
+                'wing' : strikes_dict['short_put'] - strikes_dict['long_put']
             }
         )
         

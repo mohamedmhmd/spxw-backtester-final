@@ -572,7 +572,8 @@ class IronCondor3:
                 'entry_spx_price': current_price,
                 'representation': representation,
                 'structure_type': structure_type,
-                'no_exit': True  # Flag to indicate no exit rules
+                'no_exit': True,  # Flag to indicate no exit rules,
+                'wing' : strikes_dict['short_put'] - strikes_dict['long_put']
             }
         )
         

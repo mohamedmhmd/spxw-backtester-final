@@ -196,7 +196,8 @@ class Straddle2:
                 'entry_spx_price': current_price,
                 'representation': representation,
                 'strike_calculation_details': strike_info,
-                'partial_pnl': 0.0  # Initialize to track partial exits
+                'partial_pnl': 0.0,  # Initialize to track partial exits
+                'wing' : strikes_dict["long_straddle_call"] - strikes_dict["long_straddle_put"]
             }
         )
         

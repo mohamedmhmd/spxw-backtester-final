@@ -98,7 +98,8 @@ class Straddle1:
                 'exit_percentage': strategy.straddle_1_exit_percentage,
                 'exit_multiplier': strategy.straddle_1_exit_multiplier,
                 'entry_spx_price': current_price,
-                'representation': representation
+                'representation': representation,
+                'wing' : strikes_dict["long_straddle_call"] - strikes_dict["long_straddle_put"]
             }
         )
         

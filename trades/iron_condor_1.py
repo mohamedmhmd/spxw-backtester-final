@@ -365,7 +365,8 @@ class IronCondor1:
                 'net_premium': net_premium,
                 'strategy_name': 'iron_1',
                 'entry_spx_price': current_price,
-                'representation': representation
+                'representation': representation,
+                'wing' : strikes_dict['short_put'] - strikes_dict['long_put']
             }
         )
         
