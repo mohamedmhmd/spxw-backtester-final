@@ -80,7 +80,7 @@ class Straddle1:
             }
             net_premium += price
         
-        representation = f"{strikes_dict["long_straddle_put"]}/{strikes_dict["long_straddle_call"]}"
+        representation = f"{strikes_dict["long_straddle_put"]}/{strikes_dict["long_straddle_call"]} ({strikes_dict["long_straddle_call"] - strikes_dict["long_straddle_put"]})"
         trade = Trade(
             entry_time=entry_time,
             exit_time=None,

@@ -351,7 +351,7 @@ class IronCondor1:
                 'used_capital': price * 100 + config.commission_per_contract
             }
         
-        representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']}  {strikes_dict['short_call']}/{strikes_dict['long_call']}"
+        representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']}  {strikes_dict['short_call']}/{strikes_dict['long_call']} ({strikes_dict['short_put'] - strikes_dict['long_put']})"
         # Create trade with metadata
         trade = Trade(
             entry_time=entry_time,

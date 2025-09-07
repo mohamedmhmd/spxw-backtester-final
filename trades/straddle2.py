@@ -169,7 +169,7 @@ class Straddle2:
             }
             net_premium += price
         
-        representation = f"{strikes_dict['long_straddle_put']}/{strikes_dict['long_straddle_call']}"
+        representation = f"{strikes_dict['long_straddle_put']}/{strikes_dict['long_straddle_call']} ({strikes_dict["long_straddle_call"] - strikes_dict["long_straddle_put"]})"
         
         # Get exit parameters from strategy config with proper defaults
         exit_percentage = getattr(strategy, 'straddle_2_exit_percentage', 0.5)  # 50%

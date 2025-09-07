@@ -391,7 +391,7 @@ class IronCondor2:
             }
         
         # Create representation string for Iron Butterfly
-        representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']} {strikes_dict['short_call']}/{strikes_dict['long_call']}"
+        representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']} {strikes_dict['short_call']}/{strikes_dict['long_call']} ({strikes_dict['short_put'] - strikes_dict['long_put']})"
         
         trade = Trade(
             entry_time=entry_time,

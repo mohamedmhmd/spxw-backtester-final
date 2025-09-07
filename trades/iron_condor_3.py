@@ -551,11 +551,11 @@ class IronCondor3:
         # Create representation
         if '3(a)' in trade_type:
             # Iron Butterfly format
-            representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']} {strikes_dict['short_call']}/{strikes_dict['long_call']}"
+            representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']} {strikes_dict['short_call']}/{strikes_dict['long_call']} ({strikes_dict['short_put'] - strikes_dict['long_put']})"
             structure_type = 'iron_butterfly'
         else:
             # Iron Condor format
-            representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']}  {strikes_dict['short_call']}/{strikes_dict['long_call']}"
+            representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']}  {strikes_dict['short_call']}/{strikes_dict['long_call']} ({strikes_dict['short_put'] - strikes_dict['long_put']})"
             structure_type = 'iron_condor'
         
         trade = Trade(
