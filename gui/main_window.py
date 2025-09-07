@@ -596,6 +596,7 @@ class MainWindow(QMainWindow):
         
             # Scale the trade P&L and size
             trade.calculate_pnl(scale_factor)
+            trade.calculate_pnl_without_commission(scale_factor)
             trade.calculate_used_capital()
             
             for contract, details in trade.contracts.items():

@@ -442,9 +442,10 @@ class Straddle3:
                     continue
                 
                 # Calculate partial P&L (SPX = 100× multiplier)
-                partial_pnl = (exit_price - entry_price) * exit_size * 100 * details['position']
+                partial_pnl = (exit_price - entry_price) * exit_size * 100
                 # Apply exit commission
                 partial_pnl -= config.commission_per_contract * exit_size
+                partial_pnl_without_comission = (exit_price - entry_price) * exit_size * 100
                 details["used_capital"] += config.commission_per_contract * exit_size
                 
                 # Update position
@@ -453,8 +454,8 @@ class Straddle3:
                 details["exited"] = True
                 
                 # Update running P&L at trade level
-                current_partial_pnl = straddle.metadata.get("partial_pnl", 0.0)
-                straddle.metadata["partial_pnl"] = current_partial_pnl + partial_pnl
+                straddle.metadata["partial_pnl"] = partial_pnl
+                straddle.metadata["partial_pnl_without_comission"] = partial_pnl_without_comission
                 straddle.contracts[contract] = details
                 
                 # Set appropriate exit flag

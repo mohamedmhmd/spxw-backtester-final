@@ -25,11 +25,13 @@ class Trade:
     exit_signals: Optional[Dict[str, Any]] = None
     pnl: float = 0.0
     unit_pnl: float = 0.0
+    unit_pnl_without_commission: float = 0.0
     status: str = "OPEN"  # OPEN, CLOSED
     metadata: Optional[Dict[str, Any]] = None
     used_capital: float = 0.0  # ADD THIS LINE
     unit_used_capital: float = 0.0  # Capital used per unit size
     exit_percentage: float = 0.0 # For partial exits
+    
     
     
     def calculate_unit_used_capital(self) -> float:
@@ -61,13 +63,30 @@ class Trade:
         self.unit_pnl = 0.0
         for contract, details in self.contracts.items():
             pnl = self.calculate_option_pnl(contract, details, payoffs) - self.calculate_option_commission(contract, details, payoffs, commission_per_contract)
+            details['pnl'] = pnl
+            self.contracts[contract] = details
             self.unit_pnl += pnl
+            
+    def calculate_unit_pnl_without_commission(self, payoffs: Dict[str, float]) -> float:
+        self.unit_pnl_without_commission = 0.0
+        for contract, details in self.contracts.items():
+            pnl = self.calculate_option_pnl(contract, details, payoffs)
+            details['pnl_without_comission'] = pnl
+            self.contracts[contract] = details
+            self.unit_pnl_without_commission += pnl
+        return self.unit_pnl_without_commission
             
             
     
     def calculate_pnl(self, size : int ) -> float:
         """Calculate P&L for the trade"""
         self.pnl = self.metadata.get('partial_pnl', 0.0)* size  +  size * self.unit_pnl
+        self.size = size
+        return self.pnl
+    
+    def calculate_pnl_without_commission(self, size : int ) -> float:
+        """Calculate P&L for the trade without commission"""
+        self.pnl = self.metadata.get('partial_pnl_without_comission', 0.0)* size  +  size * self.unit_pnl_without_commission
         self.size = size
         return self.pnl
     
@@ -123,6 +142,8 @@ class Trade:
         
         self.calculate_unit_pnl(payoffs, config.commission_per_contract)
         self.calculate_pnl(self.size)
+        self.calculate_unit_pnl_without_commission(payoffs)
+        self.calculate_pnl_without_commission(self.size)
         self.calculate_unit_used_capital()
         self.calculate_used_capital()
         

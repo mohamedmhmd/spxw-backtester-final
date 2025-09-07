@@ -261,6 +261,7 @@ class Straddle2:
                 partial_pnl = (exit_price - entry_price) * exit_size * 100
                 # Apply only exit commission (entry commission assumed at open)
                 partial_pnl -= config.commission_per_contract * exit_size
+                partial_pnl_without_comission = (exit_price - entry_price) * exit_size * 100
                 details["used_capital"] += config.commission_per_contract * exit_size
 
                 # Update position
@@ -269,6 +270,7 @@ class Straddle2:
 
                 # Update running P&L at trade level
                 straddle.metadata["partial_pnl"] = partial_pnl
+                straddle.metadata["partial_pnl_without_comission"] = partial_pnl_without_comission
                 straddle.contracts[contract] = details
                 straddle.exit_percentage = exit_percentage
                 Straddle2.Straddle2_exited = True  # Mark that a partial exit has occurred
