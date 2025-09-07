@@ -46,6 +46,7 @@ class IronCondor1:
                 volume_checks.append(current_volume)
                 if current_volume > volume_threshold:
                     volume_ok = False
+                    break
                     
         signals['volume_condition'] = volume_ok
         signals['details']['volume_checks'] = volume_checks

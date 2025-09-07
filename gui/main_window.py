@@ -597,6 +597,11 @@ class MainWindow(QMainWindow):
             # Scale the trade P&L and size
             trade.calculate_pnl(scale_factor)
             trade.calculate_used_capital()
+            
+            for contract, details in trade.contracts.items():
+                   details['position'] = scale_factor
+                   trade.contracts[contract] = details
+               
     
     
         total_capital_used = sum(t.used_capital for t in scaled_results['trades'])

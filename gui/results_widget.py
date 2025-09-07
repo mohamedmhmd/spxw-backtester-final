@@ -550,6 +550,7 @@ class ResultsWidget(QWidget):
             legs_layout.setContentsMargins(6, 6, 6, 6)
             legs_layout.setSpacing(4)
             
+            fields = ['position', 'entry_price', 'exit_price', 'strike', 'leg_type', 'remaining_position']
             for leg_name, details in trade.contracts.items():
                 # Create a frame for each leg
                 leg_frame = QFrame()
@@ -582,6 +583,8 @@ class ResultsWidget(QWidget):
                 # Leg details in organized rows
                 details_text = []
                 for key, value in details.items():
+                    if not key in fields:
+                            continue
                     if isinstance(value, float):
                         formatted_value = f"{value:.2f}"
                     else:
