@@ -211,7 +211,7 @@ class StrategyConfigWidget(QWidget):
         
         # straddle_2_trade_size: int = 2
         self.straddle_2_trade_size = QSpinBox()
-        self.straddle_2_trade_size.setRange(1, 1000)
+        self.straddle_2_trade_size.setRange(0, 10000000)
         self.straddle_2_trade_size.setSingleStep(1)
         self.straddle_2_trade_size.setValue(2)
         self.straddle_2_trade_size.setToolTip("Number of contracts to trade for Straddle 2")
@@ -249,7 +249,7 @@ class StrategyConfigWidget(QWidget):
         
         # iron_3_trade_size: int = 10
         self.iron_3_trade_size = QSpinBox()
-        self.iron_3_trade_size.setRange(1, 1000)
+        self.iron_3_trade_size.setRange(0, 1000000)
         self.iron_3_trade_size.setSingleStep(1)
         self.iron_3_trade_size.setValue(10)
         self.iron_3_trade_size.setToolTip("Number of contracts to trade for Iron Condor 3")
@@ -319,14 +319,14 @@ class StrategyConfigWidget(QWidget):
         self.iron_3_range_threshold.setToolTip("Range threshold for Iron Condor 3")
         layout.addRow("Iron 3 Range Threshold:", self.iron_3_range_threshold)
 
-        # === STRADDLE 2 settings ===
+        # === STRADDLE 3 settings ===
         straddle_3_label = QLabel("=== STRADDLE 3 SETTINGS ===")
         straddle_3_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
         layout.addRow(straddle_3_label)
 
         # straddle_3_trade_size: int
         self.straddle_3_trade_size = QSpinBox()
-        self.straddle_3_trade_size.setRange(1, 1000)
+        self.straddle_3_trade_size.setRange(0, 1000000)
         self.straddle_3_trade_size.setSingleStep(1)
         self.straddle_3_trade_size.setValue(2)
         self.straddle_3_trade_size.setToolTip("Number of contracts to trade for Straddle 3")

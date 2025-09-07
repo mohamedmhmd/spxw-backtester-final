@@ -41,7 +41,10 @@ class Statistics:
         ic2 = {t.entry_time: t.pnl for t in trades if t.trade_type == "Iron Condor 2"}
         st2 = {t.entry_time: t.pnl for t in trades if t.trade_type == "Straddle 2"}
         couples2 = [(ic2[t] + st2[t]) > 0 for t in ic2 if t in st2]
-        win_rate = (sum(couples1) + sum(couples2))/ (len(couples1) + len(couples2)) if couples1 and couples2 else 0
+        ic3 = {t.entry_time: t.pnl for t in trades if "Iron Condor 3" in t.trade_type}
+        st3 = {t.entry_time: t.pnl for t in trades if "Straddle 3" in t.trade_type}
+        couples3 = [(ic3[t] + st3[t]) > 0 for t in ic3 if t in st3]
+        win_rate = (sum(couples1) + sum(couples2) + sum(couples3))/ (len(couples1) + len(couples2) + len(couples3)) if couples1 and couples2 and couples3 else 0
         
         # Overall statistics
         winning_trades = [t for t in trades if t.pnl > 0]
