@@ -255,14 +255,46 @@ class ResultsWidget(QWidget):
         self.tabs.addTab(self.annual_pnl_widget, "📅 Annual P&L")
     
     def _create_stats_widget(self):
-        """Create statistics display widget with cards"""
-        widget = QWidget()
-        widget.setStyleSheet("background-color: white;")
+        """Create statistics display widget with cards in a scrollable area"""
+        # Create the main widget that will contain the scroll area
+        main_widget = QWidget()
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+    
+        # Create scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("""
+        QScrollArea {
+            border: none;
+            background-color: white;
+        }
+        QScrollBar:vertical {
+            background: #f0f0f0;
+            width: 12px;
+            border-radius: 6px;
+        }
+        QScrollBar::handle:vertical {
+            background: #c0c0c0;
+            border-radius: 6px;
+            min-height: 20px;
+        }
+        QScrollBar::handle:vertical:hover {
+            background: #a0a0a0;
+        }
+    """)
+    
+        # Create the scrollable content widget
+        content_widget = QWidget()
+        content_widget.setStyleSheet("background-color: white;")
         layout = QVBoxLayout()
         layout.setSpacing(20)
         layout.setContentsMargins(24, 24, 24, 24)
     
-    # Performance Summary Header
+        # Performance Summary Header
         summary_label = QLabel("Performance Summary")
         summary_label.setStyleSheet("""
         QLabel {
@@ -274,12 +306,12 @@ class ResultsWidget(QWidget):
     """)
         layout.addWidget(summary_label)
     
-    # Create cards grid with better spacing
+        # Create cards grid with better spacing
         cards_layout = QGridLayout()
         cards_layout.setSpacing(12)  # Reduced from 16 for more compact layout
         cards_layout.setContentsMargins(0, 0, 0, 0)
     
-    # Initialize stat cards (now with 9 stats including capital used)
+        # Initialize stat cards (now with 27 stats including capital used)
         self.stat_cards = {}
         stats_config = [
         ('total_trades', 'Total Trades', '#2196F3'),
@@ -290,10 +322,28 @@ class ResultsWidget(QWidget):
         ('profit_factor', 'Profit Factor', '#00BCD4'),
         ('sharpe_ratio', 'Sharpe Ratio', '#795548'),
         ('max_drawdown', 'Max Drawdown', '#F44336'),
-        ('return_pct', 'Return on Capital', '#607D8B')
+        ('return_pct', 'Return on Capital', '#607D8B'),
+        ('iron_1_trades', 'Iron 1 Trades', '#3F51B5'),
+        ('iron_1_pnl', 'Iron 1 P&L', '#E91E63'),
+        ('iron_1_win_rate', 'Iron 1 Win Rate', '#8BC34A'),
+        ('iron_2_trades', 'Iron 2 Trades', '#FF5722'),
+        ('iron_2_pnl', 'Iron 2 P&L', '#009688'),
+        ('iron_2_win_rate', 'Iron 2 Win Rate', '#CDDC39'),
+        ('iron_3_trades', 'Iron 3 Trades', '#673AB7'),
+        ('iron_3_pnl', 'Iron 3 P&L', '#FFC107'),
+        ('iron_3_win_rate', 'Iron 3 Win Rate', '#03A9F4'),
+        ('straddle_1_trades', 'Straddle 1 Trades', '#FF5722'),
+        ('straddle_1_pnl', 'Straddle 1 P&L', '#009688'),
+        ('straddle_1_win_rate', 'Straddle 1 Win Rate', '#CDDC39'),
+        ('straddle_2_trades', 'Straddle 2 Trades', '#673AB7'),
+        ('straddle_2_pnl', 'Straddle 2 P&L', '#FFC107'),
+        ('straddle_2_win_rate', 'Straddle 2 Win Rate', '#03A9F4'),
+        ('straddle_3_trades', 'Straddle 3 Trades', '#E91E63'),
+        ('straddle_3_pnl', 'Straddle 3 P&L', '#8BC34A'),
+        ('straddle_3_win_rate', 'Straddle 3 Win Rate', '#FF9800'),
     ]
     
-    # Arrange in 3 rows x 3 columns for better layout
+        # Arrange in 3 rows x 3 columns for better layout
         for i, (key, name, color) in enumerate(stats_config):
             card = StatsCard(name, "--", color)
             self.stat_cards[key] = card
@@ -301,15 +351,23 @@ class ResultsWidget(QWidget):
             col = i % 3
             cards_layout.addWidget(card, row, col)
     
-    # Make columns stretch equally
+        # Make columns stretch equally
         for i in range(3):
             cards_layout.setColumnStretch(i, 1)
     
         layout.addLayout(cards_layout)
-        layout.addStretch()
     
-        widget.setLayout(layout)
-        return widget 
+        # Set the layout to the content widget
+        content_widget.setLayout(layout)
+    
+        # Set the content widget as the scroll area's widget
+        scroll_area.setWidget(content_widget)
+    
+        # Add scroll area to main layout
+        main_layout.addWidget(scroll_area)
+        main_widget.setLayout(main_layout)
+    
+        return main_widget
     
     def _create_equity_widget(self):
         """Create equity curve chart with enhanced styling"""
@@ -528,7 +586,8 @@ class ResultsWidget(QWidget):
         for key, card in self.stat_cards.items():
             if key in stats:
                value = stats[key]
-            if key in ['total_pnl', 'avg_trade_pnl', 'total_capital_used']:
+            if key in ['total_pnl', 'avg_trade_pnl', 'total_capital_used', 'iron_1_pnl', 'iron_2_pnl', 'iron_3_pnl',
+                       'straddle_1_pnl', 'straddle_2_pnl', 'straddle_3_pnl']:
                 # Use shorter format for large numbers
                 if abs(value) >= 1000000:
                     formatted_value = f"${value/1000000:.2f}M"
@@ -541,11 +600,13 @@ class ResultsWidget(QWidget):
                     color = "#9E9E9E"
                 else:
                     color = "#4CAF50" if value >= 0 else "#F44336"
-            elif key in ['win_rate', 'max_drawdown', 'return_pct']:
+            elif key in ['win_rate', 'max_drawdown', 'return_pct', 'iron_1_win_rate', 'iron_2_win_rate', 'iron_3_win_rate',
+                         'straddle_1_win_rate', 'straddle_2_win_rate', 'straddle_3_win_rate']:
                 formatted_value = f"{value:.1%}"
                 if key == 'max_drawdown':
                     color = "#F44336"
-                elif key == 'win_rate':
+                elif key in ['win_rate', 'iron_1_win_rate', 'iron_2_win_rate', 'iron_3_win_rate',
+                             'straddle_1_win_rate', 'straddle_2_win_rate', 'straddle_3_win_rate']:
                     color = "#4CAF50" if value >= 0.5 else "#FF9800"
                 else:
                     color = "#4CAF50" if value >= 0 else "#F44336"

@@ -85,47 +85,7 @@ class Statistics:
         else:
             return_pct = 0
         
-        # Iron Condor specific stats
-        ic_stats = {}
-        if iron_1_condor_trades:
-            ic_wins = [t for t in iron_1_condor_trades if t.pnl > 0]
-            ic_losses = [t for t in iron_1_condor_trades if t.pnl < 0]
-            ic_stats = {
-                'total_trades': len(iron_1_condor_trades),
-                'winning_trades': len(ic_wins),
-                'losing_trades': len(ic_losses),
-                'win_rate': len(ic_wins) / len(iron_1_condor_trades),
-                'total_pnl': sum(t.pnl for t in iron_1_condor_trades),
-                'avg_pnl': np.mean([t.pnl for t in iron_1_condor_trades]),
-                'avg_credit': np.mean([t.metadata.get('net_credit', 0) for t in iron_1_condor_trades])
-            }
-        
-        # Straddle specific stats
-        straddle_stats = {}
-        if straddle_2_trades:
-            straddle_wins = [t for t in straddle_2_trades if t.pnl > 0]
-            straddle_losses = [t for t in straddle_2_trades if t.pnl < 0]
-            
-            # Count partial exits
-            partial_exit_count = 0
-            total_partial_pnl = 0
-            for trade in straddle_2_trades:
-                for contract, details in trade.contracts.items():
-                    if 'partial_exits' in details:
-                        partial_exit_count += len(details['partial_exits'])
-                        for exit in details['partial_exits']:
-                            total_partial_pnl += exit['pnl']
-            
-            straddle_stats = {
-                'total_trades': len(straddle_2_trades),
-                'winning_trades': len(straddle_wins),
-                'losing_trades': len(straddle_losses),
-                'win_rate': len(straddle_wins) / len(straddle_2_trades),
-                'total_pnl': sum(t.pnl for t in straddle_2_trades),
-                'avg_pnl': np.mean([t.pnl for t in straddle_2_trades]),
-                'partial_exits': partial_exit_count,
-                'partial_exit_pnl': total_partial_pnl
-            }
+       
         
         return {
             'total_trades': len(trades)/2,
@@ -143,6 +103,23 @@ class Statistics:
             'avg_trade_pnl': total_pnl / len(trades) if trades else 0,
             'best_trade': max(trades, key=lambda t: t.pnl).pnl if trades else 0,
             'worst_trade': min(trades, key=lambda t: t.pnl).pnl if trades else 0,
-            'iron_condor_stats': ic_stats,
-            'straddle_stats': straddle_stats
+            'iron_1_trades': len(ic1),
+            'iron_1_pnl': sum(ic1.values()),
+            'iron_1_win_rate': sum(1 for pnl in ic1.values() if pnl > 0) / len(ic1) if ic1 else 0,
+            'straddle_1_trades': len(st1),
+            'straddle_1_pnl': sum(st1.values()),
+            'straddle_1_win_rate': sum(1 for pnl in st1.values() if pnl > 0) / len(st1) if st1 else 0,
+            'iron_2_trades': len(ic2), 
+            'iron_2_pnl': sum(ic2.values()),
+            'iron_2_win_rate': sum(1 for pnl in ic2.values() if pnl > 0) / len(ic2) if ic2 else 0,
+            'straddle_2_trades': len(st2),
+            'straddle_2_pnl': sum(st2.values()),
+            'straddle_2_win_rate': sum(1 for pnl in st2.values() if pnl > 0) / len(st2) if st2 else 0,
+            'iron_3_trades': len(ic3),
+            'iron_3_pnl': sum(ic3.values()),
+            'iron_3_win_rate': sum(1 for pnl in ic3.values() if pnl > 0) / len(ic3) if ic3 else 0,
+            'straddle_3_trades': len(st3),
+            'straddle_3_pnl': sum(st3.values()),
+            'straddle_3_win_rate': sum(1 for pnl in st3.values() if pnl > 0) / len(st3) if st3 else 0,
+            
         }
