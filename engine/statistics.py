@@ -32,9 +32,6 @@ class Statistics:
         # Calculate total capital used if not provided
         total_capital_used = sum(t.used_capital for t in trades)
         
-        # Separate trades by type
-        iron_1_condor_trades = [t for t in trades if t.trade_type == "Iron Condor 1"]
-        straddle_2_trades = [t for t in trades if t.trade_type == "Straddle 1"]
         ic1 = {t.entry_time: t.pnl for t in trades if t.trade_type == "Iron Condor 1"}
         st1 = {t.entry_time: t.pnl for t in trades if t.trade_type == "Straddle 1"}
         couples1 = [(ic1[t] + st1[t]) > 0 for t in ic1 if t in st1] 

@@ -49,32 +49,32 @@ class StrategyConfigWidget(QWidget):
         layout.addRow("Iron 1 Size:", self.iron_1_trade_size)
 
         self.iron_1_consecutive_candles = QSpinBox()
-        self.iron_1_consecutive_candles.setRange(1, 10)
+        self.iron_1_consecutive_candles.setRange(1, 100)
         self.iron_1_consecutive_candles.setValue(3)
         self.iron_1_consecutive_candles.setToolTip("Number of consecutive 5-min candles to check for volume condition")
         layout.addRow("Iron 1 Consecutive Candles (Volume Check):", self.iron_1_consecutive_candles)
 
         self.iron_1_volume_threshold = QDoubleSpinBox()
-        self.iron_1_volume_threshold.setRange(0.1, 1.0)
+        self.iron_1_volume_threshold.setRange(0.0, 10000.0)
         self.iron_1_volume_threshold.setSingleStep(0.05)
         self.iron_1_volume_threshold.setValue(0.5)
         self.iron_1_volume_threshold.setToolTip("Volume threshold as fraction of first 5-min candle (0.5 = 50%)")
         layout.addRow("Iron 1 Volume Threshold (% of 1st candle):", self.iron_1_volume_threshold)
 
         self.iron_1_lookback_candles = QSpinBox()
-        self.iron_1_lookback_candles.setRange(1, 10)
+        self.iron_1_lookback_candles.setRange(1, 100)
         self.iron_1_lookback_candles.setValue(4)
         self.iron_1_lookback_candles.setToolTip("Number of recent candles to check direction (not all same color)")
         layout.addRow("Iron 1 Direction Check Candles:", self.iron_1_lookback_candles)
 
         self.iron_1_avg_range_candles = QSpinBox()
-        self.iron_1_avg_range_candles.setRange(1, 10)
+        self.iron_1_avg_range_candles.setRange(1, 100)
         self.iron_1_avg_range_candles.setValue(2)
         self.iron_1_avg_range_candles.setToolTip("Number of recent candles to average for range comparison")
         layout.addRow("Iron 1 Range Avg Candles:", self.iron_1_avg_range_candles)
 
         self.iron_1_range_threshold = QDoubleSpinBox()
-        self.iron_1_range_threshold.setRange(0.1, 2.0)
+        self.iron_1_range_threshold.setRange(0.0, 100000.0)
         self.iron_1_range_threshold.setSingleStep(0.05)
         self.iron_1_range_threshold.setValue(0.8)
         self.iron_1_range_threshold.setToolTip("Range threshold as fraction of day's average range (0.8 = 80%)")
@@ -82,21 +82,21 @@ class StrategyConfigWidget(QWidget):
 
 
         self.iron_1_target_win_loss_ratio = QDoubleSpinBox()
-        self.iron_1_target_win_loss_ratio.setRange(1.0, 5.0)
+        self.iron_1_target_win_loss_ratio.setRange(0.0, 100000.0)
         self.iron_1_target_win_loss_ratio.setSingleStep(0.1)
         self.iron_1_target_win_loss_ratio.setValue(1.5)
         self.iron_1_target_win_loss_ratio.setToolTip("Target win/loss ratio for strike selection (1.5 = 1.5:1)")
         layout.addRow("Iron 1 Target Win/Loss Ratio:", self.iron_1_target_win_loss_ratio)
 
         self.min_wing_width = QSpinBox()
-        self.min_wing_width.setRange(5, 100)
+        self.min_wing_width.setRange(0, 100000)
         self.min_wing_width.setSingleStep(5)
         self.min_wing_width.setValue(15)
         self.min_wing_width.setToolTip("Minimum distance from ATM strike for long options")
         layout.addRow("Min Wing Width ($):", self.min_wing_width)
 
         self.max_wing_width = QSpinBox()
-        self.max_wing_width.setRange(10, 200)
+        self.max_wing_width.setRange(0, 200000)
         self.max_wing_width.setSingleStep(5)
         self.max_wing_width.setValue(70)
         self.max_wing_width.setToolTip("Maximum distance from ATM strike for long options")
@@ -114,21 +114,21 @@ class StrategyConfigWidget(QWidget):
         layout.addRow("Straddle 1  Size:", self.straddle_1_trade_size)
 
         self.straddle_1_distance_multiplier = QDoubleSpinBox()
-        self.straddle_1_distance_multiplier.setRange(1.0, 10.0)
+        self.straddle_1_distance_multiplier.setRange(0.0, 100000.0)
         self.straddle_1_distance_multiplier.setSingleStep(0.1)
         self.straddle_1_distance_multiplier.setValue(2.5)
         self.straddle_1_distance_multiplier.setToolTip("Multiply IC net credit by this to get straddle strike distance")
         layout.addRow("Straddle 1 Strike Distance Multiplier:", self.straddle_1_distance_multiplier)
 
         self.straddle_1_exit_percentage = QDoubleSpinBox()
-        self.straddle_1_exit_percentage.setRange(0.01, 1.0)
+        self.straddle_1_exit_percentage.setRange(0.0, 100000.0)
         self.straddle_1_exit_percentage.setSingleStep(0.05)
         self.straddle_1_exit_percentage.setValue(0.5)
         self.straddle_1_exit_percentage.setToolTip("Fraction of position to exit when conditions met (0.5 = 50%)")
         layout.addRow("Straddle 1 Exit Percentage:", self.straddle_1_exit_percentage)
 
         self.straddle_1_exit_multiplier = QDoubleSpinBox()
-        self.straddle_1_exit_multiplier.setRange(1.0, 10.0)
+        self.straddle_1_exit_multiplier.setRange(0.0, 100000.0)
         self.straddle_1_exit_multiplier.setSingleStep(0.1)
         self.straddle_1_exit_multiplier.setValue(2.0)
         self.straddle_1_exit_multiplier.setToolTip("Exit when current price >= entry price × this multiplier")
@@ -150,7 +150,7 @@ class StrategyConfigWidget(QWidget):
 
         # iron_2_trigger_multiplier: float = 1.0
         self.iron_2_trigger_multiplier = QDoubleSpinBox()
-        self.iron_2_trigger_multiplier.setRange(0.0, 10000)
+        self.iron_2_trigger_multiplier.setRange(0.0, 100000.0)
         self.iron_2_trigger_multiplier.setSingleStep(0.1)
         self.iron_2_trigger_multiplier.setValue(1.0)
         self.iron_2_trigger_multiplier.setToolTip("Multiplier to trigger Iron Condor 2 entry")
@@ -182,7 +182,7 @@ class StrategyConfigWidget(QWidget):
 
         # iron_2_range_threshold: float = 1.25
         self.iron_2_range_threshold = QDoubleSpinBox()
-        self.iron_2_range_threshold.setRange(0.0, 100)
+        self.iron_2_range_threshold.setRange(0.0, 100000.0)
         self.iron_2_range_threshold.setSingleStep(0.25)
         self.iron_2_range_threshold.setValue(1.25)
         self.iron_2_range_threshold.setToolTip("Range threshold for Iron Condor 2")
@@ -190,14 +190,14 @@ class StrategyConfigWidget(QWidget):
 
         # iron_2_min_distance: int = 5
         self.iron_2_min_distance = QSpinBox()
-        self.iron_2_min_distance.setRange(0, 1000)
+        self.iron_2_min_distance.setRange(0, 1000000)
         self.iron_2_min_distance.setSingleStep(1)
         self.iron_2_min_distance.setValue(5)
         self.iron_2_min_distance.setToolTip("Minimum distance between strikes for Iron Condor 2")
         layout.addRow("Iron 2 Min Distance:", self.iron_2_min_distance)
         
         self.iron_2_target_win_loss_ratio = QDoubleSpinBox()
-        self.iron_2_target_win_loss_ratio.setRange(0.1, 10.0)
+        self.iron_2_target_win_loss_ratio.setRange(0.0, 100000.0)
         self.iron_2_target_win_loss_ratio.setSingleStep(0.1)
         self.iron_2_target_win_loss_ratio.setValue(1.5)
         self.iron_2_target_win_loss_ratio.setToolTip("Target win/loss ratio for Iron Condor 2")
@@ -219,7 +219,7 @@ class StrategyConfigWidget(QWidget):
 
         # straddle_2_trigger_multiplier: float = 1.0
         self.straddle_2_trigger_multiplier = QDoubleSpinBox()
-        self.straddle_2_trigger_multiplier.setRange(0.1, 5.0)
+        self.straddle_2_trigger_multiplier.setRange(0.0, 100000.0)
         self.straddle_2_trigger_multiplier.setSingleStep(0.1)
         self.straddle_2_trigger_multiplier.setValue(1.0)
         self.straddle_2_trigger_multiplier.setToolTip("Trigger multiplier for Straddle 2 (1.0 = 100%)")
@@ -227,7 +227,7 @@ class StrategyConfigWidget(QWidget):
 
         # straddle_2_exit_percentage: float = 0.5
         self.straddle_2_exit_percentage = QDoubleSpinBox()
-        self.straddle_2_exit_percentage.setRange(0.01, 1.0)
+        self.straddle_2_exit_percentage.setRange(0.0, 100000.0)
         self.straddle_2_exit_percentage.setSingleStep(0.05)
         self.straddle_2_exit_percentage.setValue(0.5)
         self.straddle_2_exit_percentage.setToolTip("Fraction of position to exit for Straddle 2 (0.5 = 50%)")
@@ -235,7 +235,7 @@ class StrategyConfigWidget(QWidget):
 
         # straddle_2_exit_multiplier: float = 2.0
         self.straddle_2_exit_multiplier = QDoubleSpinBox()
-        self.straddle_2_exit_multiplier.setRange(0.1, 10.0)
+        self.straddle_2_exit_multiplier.setRange(0.0, 100000.0)
         self.straddle_2_exit_multiplier.setSingleStep(0.1)
         self.straddle_2_exit_multiplier.setValue(2.0)
         self.straddle_2_exit_multiplier.setToolTip("Exit multiplier for Straddle 2 (2.0 = 2x entry price)")
@@ -257,7 +257,7 @@ class StrategyConfigWidget(QWidget):
 
         # iron_3_trigger_multiplier: float = 1.0
         self.iron_3_trigger_multiplier = QDoubleSpinBox()
-        self.iron_3_trigger_multiplier.setRange(0.1, 5.0)
+        self.iron_3_trigger_multiplier.setRange(0.0, 100000.0)
         self.iron_3_trigger_multiplier.setSingleStep(0.1)
         self.iron_3_trigger_multiplier.setValue(1.0)
         self.iron_3_trigger_multiplier.setToolTip("Trigger multiplier for Iron Condor 3 (1.0 = 100%)")
@@ -265,7 +265,7 @@ class StrategyConfigWidget(QWidget):
 
         # iron_3_distance_multiplier: float = 1.0
         self.iron_3_distance_multiplier = QDoubleSpinBox()
-        self.iron_3_distance_multiplier.setRange(0.1, 5.0)
+        self.iron_3_distance_multiplier.setRange(0.0, 100000.0)
         self.iron_3_distance_multiplier.setSingleStep(0.1)
         self.iron_3_distance_multiplier.setValue(1.0)
         self.iron_3_distance_multiplier.setToolTip("Distance multiplier for Iron Condor 3 (1.0 = 100%)")
@@ -273,7 +273,7 @@ class StrategyConfigWidget(QWidget):
 
         # iron_3_min_distance: int = 2
         self.iron_3_min_distance = QSpinBox()
-        self.iron_3_min_distance.setRange(1, 1000)
+        self.iron_3_min_distance.setRange(0, 100000)
         self.iron_3_min_distance.setSingleStep(1)
         self.iron_3_min_distance.setValue(2)
         self.iron_3_min_distance.setToolTip("Minimum distance from exclusion boundaries for Iron Condor 3")
@@ -281,7 +281,7 @@ class StrategyConfigWidget(QWidget):
 
         # iron_3_target_win_loss_ratio: float = 1.5
         self.iron_3_target_win_loss_ratio = QDoubleSpinBox()
-        self.iron_3_target_win_loss_ratio.setRange(0.1, 10.0)
+        self.iron_3_target_win_loss_ratio.setRange(0.0, 100000.0)
         self.iron_3_target_win_loss_ratio.setSingleStep(0.1)
         self.iron_3_target_win_loss_ratio.setValue(1.5)
         self.iron_3_target_win_loss_ratio.setToolTip("Target win/loss ratio for Iron Condor 3")
@@ -313,7 +313,7 @@ class StrategyConfigWidget(QWidget):
 
         # iron_3_range_threshold: float = 1.25
         self.iron_3_range_threshold = QDoubleSpinBox()
-        self.iron_3_range_threshold.setRange(0.1, 10.0)
+        self.iron_3_range_threshold.setRange(0.0, 100000.0)
         self.iron_3_range_threshold.setSingleStep(0.05)
         self.iron_3_range_threshold.setValue(1.25)
         self.iron_3_range_threshold.setToolTip("Range threshold for Iron Condor 3")
@@ -334,7 +334,7 @@ class StrategyConfigWidget(QWidget):
 
         # straddle_3_trigger_multiplier: float
         self.straddle_3_trigger_multiplier = QDoubleSpinBox()
-        self.straddle_3_trigger_multiplier.setRange(0.1, 5.0)
+        self.straddle_3_trigger_multiplier.setRange(0.0, 100000.0)
         self.straddle_3_trigger_multiplier.setSingleStep(0.1)
         self.straddle_3_trigger_multiplier.setValue(1.0)
         self.straddle_3_trigger_multiplier.setToolTip("Trigger multiplier for Straddle 3")
@@ -342,7 +342,7 @@ class StrategyConfigWidget(QWidget):
 
         # straddle_3_exit_percentage: float
         self.straddle_3_exit_percentage = QDoubleSpinBox()
-        self.straddle_3_exit_percentage.setRange(0.01, 1.0)
+        self.straddle_3_exit_percentage.setRange(0.0, 100000.0)
         self.straddle_3_exit_percentage.setSingleStep(0.05)
         self.straddle_3_exit_percentage.setValue(0.5)
         self.straddle_3_exit_percentage.setToolTip("Exit percentage for Straddle 3 (0.5 = 50%)")
@@ -350,11 +350,19 @@ class StrategyConfigWidget(QWidget):
 
         # straddle_3_exit_multiplier: float
         self.straddle_3_exit_multiplier = QDoubleSpinBox()
-        self.straddle_3_exit_multiplier.setRange(0.1, 10.0)
+        self.straddle_3_exit_multiplier.setRange(0.0, 100000000.0)
         self.straddle_3_exit_multiplier.setSingleStep(0.1)
         self.straddle_3_exit_multiplier.setValue(2.0)
         self.straddle_3_exit_multiplier.setToolTip("Exit multiplier for Straddle 3 (2.0 = 2x entry price)")
         layout.addRow("Straddle 3 Exit Multiplier:", self.straddle_3_exit_multiplier)
+        
+        self.straddle_itm_override_multiplier = QDoubleSpinBox()
+        self.straddle_itm_override_multiplier.setRange(0.0, 1000000.0)
+        self.straddle_itm_override_multiplier.setSingleStep(0.1)
+        self.straddle_itm_override_multiplier.setValue(2.5)
+        self.straddle_itm_override_multiplier.setToolTip("Multiplier override for ITM straddles")
+        layout.addRow("Straddle ITM Override Multiplier:", self.straddle_itm_override_multiplier)
+
 
         
         # Add some spacing at the end
@@ -474,9 +482,7 @@ class StrategyConfigWidget(QWidget):
             straddle_3_trigger_multiplier = self.straddle_3_trigger_multiplier.value(),
             straddle_3_exit_percentage = self.straddle_3_exit_percentage.value(),
             straddle_3_exit_multiplier = self.straddle_3_exit_multiplier.value(),
-
-
-            
+            straddle_itm_override_multiplier = self.straddle_itm_override_multiplier.value(),
         )
     
     def set_config(self, config: StrategyConfig):
@@ -521,4 +527,6 @@ class StrategyConfigWidget(QWidget):
         self.straddle_3_trigger_multiplier.setValue(config.straddle_3_trigger_multiplier)
         self.straddle_3_exit_percentage.setValue(config.straddle_3_exit_percentage)
         self.straddle_3_exit_multiplier.setValue(config.straddle_3_exit_multiplier)
+        self.straddle_itm_override_multiplier.setValue(config.straddle_itm_override_multiplier)
+
         

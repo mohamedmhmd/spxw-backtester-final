@@ -57,6 +57,8 @@ class StrategyConfig:
     straddle_3_exit_percentage: float = 0.5  # Exit 50% of position
     straddle_3_exit_multiplier: float = 2.0  # Exit when price is 2x entry
     
+    straddle_itm_override_multiplier: float = 2.5
+    
     def to_dict(self) -> dict:
         return {
             'name': self.name,
@@ -105,6 +107,7 @@ class StrategyConfig:
             'straddle_3_trigger_multiplier': self.straddle_3_trigger_multiplier,
             'straddle_3_exit_percentage': self.straddle_3_exit_percentage,
             'straddle_3_exit_multiplier': self.straddle_3_exit_multiplier,
+            'straddle_itm_override_multiplier': self.straddle_itm_override_multiplier
 
         }
     

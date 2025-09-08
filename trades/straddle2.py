@@ -126,6 +126,14 @@ class Straddle2:
         call_strike = strike_info['call_strike']
         put_strike = strike_info['put_strike']
         
+        # Override ITM strikes if necessary
+        iron_net_premium = strike_info['iron1_net_premium']
+        override_result = Straddle2._check_and_override_itm_strikes(
+        call_strike, put_strike, current_price, iron_net_premium, strategy
+)
+        call_strike = override_result['call_strike']
+        put_strike = override_result['put_strike']
+        
         # Create straddle contracts
         exp_str = date.strftime('%y%m%d')
         contracts = {
@@ -205,6 +213,31 @@ class Straddle2:
                    f"Net Premium=${net_premium:.2f}")
         
         return trade
+    
+    @staticmethod
+    def _check_and_override_itm_strikes(call_strike: int, put_strike: int, 
+                                   current_price: float, iron_net_premium: float,
+                                   strategy: StrategyConfig) -> Dict[str, int]:
+        """
+        Override in-the-money strikes with OTM strikes at 2.5x net premium distance.
+        Never buy ITM options for straddles.
+        """
+        override_multiplier = getattr(strategy, 'straddle_itm_override_multiplier', 2.5)
+        override_distance = iron_net_premium * override_multiplier
+    
+        # Check and override call if ITM
+        if call_strike <= current_price:
+           new_call_strike = round((current_price + override_distance) / 5) * 5
+           logger.info(f"Override ITM call strike {call_strike} -> {new_call_strike} (OTM at {override_multiplier}x premium)")
+           call_strike = int(new_call_strike)
+    
+        # Check and override put if ITM
+        if put_strike >= current_price:
+           new_put_strike = round((current_price - override_distance) / 5) * 5
+           logger.info(f"Override ITM put strike {put_strike} -> {new_put_strike} (OTM at {override_multiplier}x premium)")
+           put_strike = int(new_put_strike)
+    
+        return {'call_strike': call_strike, 'put_strike': put_strike}
 
     @staticmethod
     async def _check_straddle_exits(

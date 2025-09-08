@@ -811,6 +811,8 @@ class MainWindow(QMainWindow):
                     self.strategy_config_widget.straddle_3_trigger_multiplier.setValue(sc['straddle_3_trigger_multiplier'])
                     self.strategy_config_widget.straddle_3_exit_percentage.setValue(sc['straddle_3_exit_percentage'])
                     self.strategy_config_widget.straddle_3_exit_multiplier.setValue(sc['straddle_3_exit_multiplier'])
+                    self.strategy_config_widget.straddle_itm_override_multiplier.setValue(sc['straddle_itm_override_multiplier'])
+
 
 
                         
