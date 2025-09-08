@@ -7,8 +7,8 @@ from PyQt6.QtGui import *
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
-import matplotlib.style as mplstyle
 from trades.trade import Trade
+from collections import defaultdict
 
 # Set up logging
 logging.basicConfig(
@@ -241,6 +241,18 @@ class ResultsWidget(QWidget):
         
         layout.addWidget(self.tabs)
         self.setLayout(layout)
+        
+        # Weekly P&L tab
+        self.weekly_pnl_widget = self._create_weekly_pnl_widget()
+        self.tabs.addTab(self.weekly_pnl_widget, "📊 Weekly P&L")
+
+        # Quarterly P&L tab
+        self.quarterly_pnl_widget = self._create_quarterly_pnl_widget()
+        self.tabs.addTab(self.quarterly_pnl_widget, "📈 Quarterly P&L")
+
+        # Annual P&L tab
+        self.annual_pnl_widget = self._create_annual_pnl_widget()
+        self.tabs.addTab(self.annual_pnl_widget, "📅 Annual P&L")
     
     def _create_stats_widget(self):
         """Create statistics display widget with cards"""
@@ -377,6 +389,138 @@ class ResultsWidget(QWidget):
         widget.setLayout(layout)
         return widget
     
+    
+    def _create_weekly_pnl_widget(self):
+        """Create weekly P&L chart widget"""
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+    
+        # Create matplotlib figure
+        self.weekly_pnl_figure = Figure(figsize=(12, 8), facecolor='white')
+        self.weekly_pnl_canvas = FigureCanvas(self.weekly_pnl_figure)
+        layout.addWidget(self.weekly_pnl_canvas)
+    
+        widget.setLayout(layout)
+        return widget
+
+    def _create_quarterly_pnl_widget(self):
+        """Create quarterly P&L chart widget"""
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+    
+        # Create matplotlib figure
+        self.quarterly_pnl_figure = Figure(figsize=(12, 8), facecolor='white')
+        self.quarterly_pnl_canvas = FigureCanvas(self.quarterly_pnl_figure)
+        layout.addWidget(self.quarterly_pnl_canvas)
+    
+        widget.setLayout(layout)
+        return widget
+
+    def _create_annual_pnl_widget(self):
+        """Create annual P&L chart widget"""
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+    
+        # Create matplotlib figure
+        self.annual_pnl_figure = Figure(figsize=(12, 8), facecolor='white')
+        self.annual_pnl_canvas = FigureCanvas(self.annual_pnl_figure)
+        layout.addWidget(self.annual_pnl_canvas)
+    
+        widget.setLayout(layout)
+        return widget
+
+    def _aggregate_pnl_by_period(self, daily_pnl: Dict[datetime, float], period: str) -> Dict:
+        """Aggregate daily P&L by specified period"""
+        if not daily_pnl:
+           return {}
+    
+        aggregated = defaultdict(float)
+    
+        for date, pnl in daily_pnl.items():
+            if period == 'weekly':
+               # Get week number and year
+               week_key = f"{date.year}-W{date.isocalendar()[1]:02d}"
+               aggregated[week_key] += pnl
+            elif period == 'quarterly':
+               # Get quarter and year
+               quarter = (date.month - 1) // 3 + 1
+               quarter_key = f"{date.year}-Q{quarter}"
+               aggregated[quarter_key] += pnl
+            elif period == 'annual':
+               # Get year
+               aggregated[date.year] += pnl
+    
+        return dict(aggregated)
+
+    def _plot_period_pnl(self, figure, period_pnl: Dict, title: str):
+        """Plot P&L for a specific period"""
+        figure.clear()
+        ax = figure.add_subplot(111)
+    
+        if not period_pnl:
+           ax.text(0.5, 0.5, f'No {title.lower()} data available', 
+               transform=ax.transAxes, ha='center', va='center',
+               fontsize=14, color='gray')
+           figure.canvas.draw()
+           return
+    
+        # Sort by period
+        sorted_periods = sorted(period_pnl.items())
+        periods = [p[0] for p in sorted_periods]
+        pnls = [p[1] for p in sorted_periods]
+    
+        # Create bar chart
+        colors = ['#4CAF50' if pnl >= 0 else '#F44336' for pnl in pnls]
+        bars = ax.bar(range(len(periods)), pnls, color=colors, alpha=0.7, edgecolor='white', linewidth=0.5)
+    
+        # Add value labels on bars
+        for i, (bar, pnl) in enumerate(zip(bars, pnls)):
+            height = bar.get_height()
+            if abs(height) > max(abs(min(pnls)), max(pnls)) * 0.05:  # Only label significant bars
+               ax.text(bar.get_x() + bar.get_width()/2., height + (max(pnls)*0.02 if height >= 0 else min(pnls)*0.02),
+                   f'${height:,.0f}', ha='center', va='bottom' if height >= 0 else 'top',
+                   fontsize=9, fontweight='bold')
+    
+        # Set x-axis labels
+        ax.set_xticks(range(len(periods)))
+        ax.set_xticklabels(periods, rotation=45, ha='right')
+    
+        # Styling
+        ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel('Period', fontsize=12)
+        ax.set_ylabel('P&L ($)', fontsize=12)
+        ax.grid(True, alpha=0.3, linestyle='--', axis='y')
+        ax.set_facecolor('#FAFAFA')
+    
+        # Format y-axis
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
+        ax.tick_params(labelsize=10)
+    
+        # Add zero line
+        ax.axhline(y=0, color='#424242', linestyle='-', alpha=0.6, linewidth=1)
+    
+        # Add summary statistics
+        if pnls:
+           total_pnl = sum(pnls)
+           avg_pnl = total_pnl / len(pnls)
+           positive_periods = sum(1 for pnl in pnls if pnl > 0)
+           total_periods = len(pnls)
+           win_rate = (positive_periods / total_periods) * 100 if total_periods > 0 else 0
+        
+           stats_text = (f'Total P&L: ${total_pnl:,.0f}\n'
+                     f'Avg {title.split()[0]} P&L: ${avg_pnl:,.0f}\n'
+                     f'Win Rate: {win_rate:.1f}% ({positive_periods}/{total_periods})')
+        
+           ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10,
+               verticalalignment='top',
+               bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.9, edgecolor='#E0E0E0'))
+    
+        figure.tight_layout()
+        figure.canvas.draw()
+    
     def update_results(self, results: Dict[str, Any]):
         """Update all results displays"""
         # Update statistics cards
@@ -418,6 +562,14 @@ class ResultsWidget(QWidget):
         self._plot_equity_curve(results['equity_curve'])
         self._update_trades_table(results['trades'])
         self._plot_daily_pnl(results['daily_pnl'])
+        # Aggregate and plot period P&L
+        weekly_pnl = self._aggregate_pnl_by_period(results['daily_pnl'], 'weekly')
+        quarterly_pnl = self._aggregate_pnl_by_period(results['daily_pnl'], 'quarterly')
+        annual_pnl = self._aggregate_pnl_by_period(results['daily_pnl'], 'annual')
+
+        self._plot_period_pnl(self.weekly_pnl_figure, weekly_pnl, 'Weekly P&L')
+        self._plot_period_pnl(self.quarterly_pnl_figure, quarterly_pnl, 'Quarterly P&L')
+        self._plot_period_pnl(self.annual_pnl_figure, annual_pnl, 'Annual P&L')
     
     def _plot_equity_curve(self, equity_curve: List[Tuple[datetime, float]]):
         """Plot enhanced equity curve with proper cumulative P&L"""
