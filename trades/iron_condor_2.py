@@ -120,36 +120,7 @@ class IronCondor2:
         
         return signals
 
-    @staticmethod
-    def _check_minimum_distance_from_iron1(current_price: float, 
-                                         iron1_trade: Trade, strategy_config : StrategyConfig) -> bool:
-        """
-        Ensure Iron 2 is not set too close to Iron 1 short strikes +/- 100% net premium
-        """              
-        iron_1_net_premium = iron1_trade.metadata.get('net_premium', 0)
-        # Find short strikes
-        iron_1_short_strike = None
-            
-        for contract_symbol, contract_data in iron1_trade.contracts.items():
-            if contract_data['leg_type'] == 'short_call':
-                iron_1_short_strike = contract_data['strike']
-                break
-                
-        # Calculate exclusion zone boundaries
-        upper_boundary = iron_1_short_strike +  strategy_config.iron_2_trigger_multiplier*iron_1_net_premium
-        lower_boundary = iron_1_short_strike - strategy_config.iron_2_trigger_multiplier*iron_1_net_premium
-            
-        # Check if current price is too close to boundaries
-        min_distance = strategy_config.iron_2_min_distance  # Minimum distance in points (configurable)
-            
-        if (abs(current_price - upper_boundary) < min_distance or 
-            abs(current_price - lower_boundary) < min_distance):
-            logger.info(f"Iron 2 too close to Iron 1 boundaries: {current_price:.2f} "
-                           f"(boundaries: {lower_boundary:.2f} - {upper_boundary:.2f})")
-            return False
-            
-                
-        return True
+   
 
     @staticmethod
     async def _find_iron_butterfly_strikes(current_price: float,
