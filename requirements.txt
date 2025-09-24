@@ -5,3 +5,4 @@ scipy>=1.14.1
 PyQt6>=6.7
 aiohttp>=3.10
 XlsxWriter>=3.1.0
+mplcursors>=0.5.3
