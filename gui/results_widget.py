@@ -9,6 +9,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 from trades.trade import Trade
 from collections import defaultdict
+import mplcursors
 
 # Set up logging
 logging.basicConfig(
@@ -871,6 +872,18 @@ class ResultsWidget(QWidget):
         # Create enhanced bar chart
         colors = ['#4CAF50' if pnl >= 0 else '#F44336' for pnl in pnls]
         bars = ax.bar(dates, pnls, color=colors, alpha=0.7, edgecolor='white', linewidth=0.5)
+        
+        # Add hover functionality
+        cursor = mplcursors.cursor(bars, hover=True)
+
+        @cursor.connect("add")
+        def on_hover(sel):
+            index = sel.index  # safer than sel.target.index
+            sel.annotation.set_text(
+            f"Date: {dates[index].strftime('%Y-%m-%d')}\n"
+            f"P&L: ${pnls[index]:,.2f}"
+    )
+            sel.annotation.get_bbox_patch().set(fc="white", alpha=0.9)
         
         # Add value labels on bars
         for bar, pnl in zip(bars, pnls):
