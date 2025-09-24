@@ -188,13 +188,6 @@ class StrategyConfigWidget(QWidget):
         self.iron_2_range_threshold.setToolTip("Range threshold for Iron Condor 2")
         layout.addRow("Iron 2 Range Threshold:", self.iron_2_range_threshold)
 
-        # iron_2_min_distance: int = 5
-        self.iron_2_min_distance = QSpinBox()
-        self.iron_2_min_distance.setRange(0, 1000000)
-        self.iron_2_min_distance.setSingleStep(1)
-        self.iron_2_min_distance.setValue(5)
-        self.iron_2_min_distance.setToolTip("Minimum distance between strikes for Iron Condor 2")
-        layout.addRow("Iron 2 Min Distance:", self.iron_2_min_distance)
         
         self.iron_2_target_win_loss_ratio = QDoubleSpinBox()
         self.iron_2_target_win_loss_ratio.setRange(0.0, 100000.0)
@@ -271,14 +264,7 @@ class StrategyConfigWidget(QWidget):
         self.iron_3_distance_multiplier.setToolTip("Distance multiplier for Iron Condor 3 (1.0 = 100%)")
         layout.addRow("Iron 3 Distance Multiplier:", self.iron_3_distance_multiplier)
 
-        # iron_3_min_distance: int = 2
-        self.iron_3_min_distance = QSpinBox()
-        self.iron_3_min_distance.setRange(0, 100000)
-        self.iron_3_min_distance.setSingleStep(1)
-        self.iron_3_min_distance.setValue(2)
-        self.iron_3_min_distance.setToolTip("Minimum distance from exclusion boundaries for Iron Condor 3")
-        layout.addRow("Iron 3 Min Distance:", self.iron_3_min_distance)
-
+        
         # iron_3_target_win_loss_ratio: float = 1.5
         self.iron_3_target_win_loss_ratio = QDoubleSpinBox()
         self.iron_3_target_win_loss_ratio.setRange(0.0, 100000.0)
@@ -463,7 +449,6 @@ class StrategyConfigWidget(QWidget):
             iron_2_range_recent_candles = self.iron_2_range_recent_candles.value(),
             iron_2_range_reference_candles = self.iron_2_range_reference_candles.value(),
             iron_2_range_threshold = self.iron_2_range_threshold.value(),
-            iron_2_min_distance = self.iron_2_min_distance.value(),
             iron_2_target_win_loss_ratio = self.iron_2_target_win_loss_ratio.value(),
             straddle_2_trade_size = self.straddle_2_trade_size.value(),
             straddle_2_trigger_multiplier = self.straddle_2_trigger_multiplier.value(),
@@ -472,7 +457,6 @@ class StrategyConfigWidget(QWidget):
             iron_3_trade_size = self.iron_3_trade_size.value(),
             iron_3_trigger_multiplier = self.iron_3_trigger_multiplier.value(),
             iron_3_distance_multiplier = self.iron_3_distance_multiplier.value(),
-            iron_3_min_distance = self.iron_3_min_distance.value(),
             iron_3_target_win_loss_ratio = self.iron_3_target_win_loss_ratio.value(),
             iron_3_direction_lookback = self.iron_3_direction_lookback.value(),
             iron_3_range_recent_candles = self.iron_3_range_recent_candles.value(),
@@ -508,7 +492,6 @@ class StrategyConfigWidget(QWidget):
         self.iron_2_range_recent_candles.setValue(config.iron_2_range_recent_candles)
         self.iron_2_range_reference_candles.setValue(config.iron_2_range_reference_candles)
         self.iron_2_range_threshold.setValue(config.iron_2_range_threshold)
-        self.iron_2_min_distance.setValue(config.iron_2_min_distance)
         self.iron_2_target_win_loss_ratio.setValue(config.iron_2_target_win_loss_ratio)
         self.straddle_2_trade_size.setValue(config.straddle_2_trade_size)
         self.straddle_2_trigger_multiplier.setValue(config.straddle_2_trigger_multiplier)
@@ -517,7 +500,6 @@ class StrategyConfigWidget(QWidget):
         self.iron_3_trade_size.setValue(config.iron_3_trade_size)
         self.iron_3_trigger_multiplier.setValue(config.iron_3_trigger_multiplier)
         self.iron_3_distance_multiplier.setValue(config.iron_3_distance_multiplier)
-        self.iron_3_min_distance.setValue(config.iron_3_min_distance)
         self.iron_3_target_win_loss_ratio.setValue(config.iron_3_target_win_loss_ratio)
         self.iron_3_direction_lookback.setValue(config.iron_3_direction_lookback)
         self.iron_3_range_recent_candles.setValue(config.iron_3_range_recent_candles)

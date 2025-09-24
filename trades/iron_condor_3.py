@@ -608,7 +608,6 @@ class IronCondor3:
             # Check trigger price
             if IronCondor3._check_iron3a_trigger_price(current_price, iron1_trade, iron2_trade, strategy):
                 # Check minimum distance
-                if IronCondor3._check_minimum_distance_iron3a(current_price, iron2_trade, iron1_trade, strategy):
                     # Check entry conditions
                     signals = IronCondor3._check_iron3_entry_conditions(spx_ohlc_data, i, strategy)
                     
@@ -659,7 +658,6 @@ class IronCondor3:
             # Check trigger price
             if IronCondor3._check_iron3b_trigger_price(current_price, iron1_trade, iron2_trade, strategy):
                 # Check minimum distance
-                if IronCondor3._check_minimum_distance_iron3b(current_price, iron1_trade, strategy):
                     # Check entry conditions
                     signals = IronCondor3._check_iron3_entry_conditions(spx_ohlc_data, i, strategy)
                     

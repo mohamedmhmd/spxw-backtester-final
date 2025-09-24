@@ -431,10 +431,6 @@ class IronCondor2:
         if not IronCondor2._check_iron2_trigger_price(current_price, iron1_trade, strategy):
             return None
         
-        # Check minimum distance from Iron 1
-        if not IronCondor2._check_minimum_distance_from_iron1(current_price, iron1_trade, strategy):
-            return None
-        
         # Check Iron 2 specific entry conditions
         signals = IronCondor2._check_iron2_entry_conditions(spx_ohlc_data, i, strategy)
         
