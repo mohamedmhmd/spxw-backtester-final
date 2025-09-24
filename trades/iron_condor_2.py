@@ -29,30 +29,24 @@ class IronCondor2:
         Trigger: SPX moves to Iron 1 short strikes +/- 100% net premium collected
         """
         # Get Iron 1 trade details
-        net_premium = iron1_trade.metadata.get('net_premium', 0)
+        iron_1_net_premium = iron1_trade.metadata.get('net_premium', 0)
             
         # Find short strikes from trade contracts
-        short_call_strike = None
-        short_put_strike = None
-            
+        iron_1_short_strike = None    
         for contract_symbol, contract_data in iron1_trade.contracts.items():
             if contract_data['leg_type'] == 'short_call':
-                short_call_strike = contract_data['strike']
-            elif contract_data['leg_type'] == 'short_put':
-                short_put_strike = contract_data['strike']
-            
-            if short_call_strike is None or short_put_strike is None:
-                continue
+                iron_1_short_strike = contract_data['strike']
+                break
                 
-            # Calculate trigger prices: short strikes +/- 100% of net premium
-            upper_trigger = short_call_strike + strategy_config.iron_2_trigger_multiplier* net_premium
-            lower_trigger = short_put_strike - strategy_config.iron_2_trigger_multiplier* net_premium
+        # Calculate trigger prices: short strikes +/- 100% of net premium
+        upper_trigger = iron_1_short_strike + strategy_config.iron_2_trigger_multiplier* iron_1_net_premium
+        lower_trigger = iron_1_short_strike - strategy_config.iron_2_trigger_multiplier* iron_1_net_premium
             
-            # Check if current price is at or beyond trigger levels
-            if current_price >= upper_trigger or current_price <= lower_trigger:
-                logger.info(f"Iron 2 trigger price reached: {current_price:.2f} "
+        # Check if current price is at or beyond trigger levels
+        if current_price >= upper_trigger or current_price <= lower_trigger:
+            logger.info(f"Iron 2 trigger price reached: {current_price:.2f} "
                            f"(triggers: {lower_trigger:.2f} - {upper_trigger:.2f})")
-                return True
+            return True
                 
         return False
 
@@ -132,32 +126,27 @@ class IronCondor2:
         """
         Ensure Iron 2 is not set too close to Iron 1 short strikes +/- 100% net premium
         """              
-        net_premium = iron1_trade.metadata.get('net_premium', 0)
+        iron_1_net_premium = iron1_trade.metadata.get('net_premium', 0)
         # Find short strikes
-        short_call_strike = None
-        short_put_strike = None
+        iron_1_short_strike = None
             
         for contract_symbol, contract_data in iron1_trade.contracts.items():
             if contract_data['leg_type'] == 'short_call':
-                short_call_strike = contract_data['strike']
-            elif contract_data['leg_type'] == 'short_put':
-                short_put_strike = contract_data['strike']
-            
-            if short_call_strike is None or short_put_strike is None:
-                continue
+                iron_1_short_strike = contract_data['strike']
+                break
                 
-            # Calculate exclusion zone boundaries
-            upper_boundary = short_call_strike +  strategy_config.iron_2_trigger_multiplier*net_premium
-            lower_boundary = short_put_strike - strategy_config.iron_2_trigger_multiplier*net_premium
+        # Calculate exclusion zone boundaries
+        upper_boundary = iron_1_short_strike +  strategy_config.iron_2_trigger_multiplier*iron_1_net_premium
+        lower_boundary = iron_1_short_strike - strategy_config.iron_2_trigger_multiplier*iron_1_net_premium
             
-            # Check if current price is too close to boundaries
-            min_distance = strategy_config.iron_2_min_distance  # Minimum distance in points (configurable)
+        # Check if current price is too close to boundaries
+        min_distance = strategy_config.iron_2_min_distance  # Minimum distance in points (configurable)
             
-            if (abs(current_price - upper_boundary) < min_distance or 
-                abs(current_price - lower_boundary) < min_distance):
-                logger.info(f"Iron 2 too close to Iron 1 boundaries: {current_price:.2f} "
+        if (abs(current_price - upper_boundary) < min_distance or 
+            abs(current_price - lower_boundary) < min_distance):
+            logger.info(f"Iron 2 too close to Iron 1 boundaries: {current_price:.2f} "
                            f"(boundaries: {lower_boundary:.2f} - {upper_boundary:.2f})")
-                return False
+            return False
             
                 
         return True
@@ -460,6 +449,7 @@ class IronCondor2:
         else:
             option_date = datetime.combine(date, datetime.min.time())
         
+
         ib_result = await IronCondor2._find_iron_butterfly_strikes(
             current_price, current_bar_time, strategy, data_provider, 
         )

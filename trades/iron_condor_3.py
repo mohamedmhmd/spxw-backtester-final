@@ -26,12 +26,29 @@ class IronCondor3:
     """
     
     @staticmethod
-    def _check_iron3a_trigger_price(current_price: float, iron2_trade: Trade, 
+    def _check_iron3a_trigger_price(current_price: float, iron1_trade: Trade, iron2_trade: Trade, 
                                    strategy_config: StrategyConfig) -> bool:
         """
         Check if current price triggers Iron 3(a) entry.
         Trigger: SPX moves to Iron 2 short strike +/- 100% of Iron 2 net premium
         """
+                # Get Iron 1 trade details
+        iron_1_net_premium = iron1_trade.metadata.get('net_premium', 0)
+            
+        # Find short strikes from trade contracts
+        iron_1_short_strike = None
+        
+        for contract_symbol, contract_data in iron1_trade.contracts.items():
+            if contract_data['leg_type'] == 'short_call':
+                iron_1_short_strike = contract_data['strike']
+                break
+                
+        d = iron_1_short_strike - iron_1_net_premium
+        u = iron_1_short_strike + iron_1_net_premium
+        
+        if current_price >= d and current_price <= u:
+            return False
+        
         iron2_net_premium = iron2_trade.metadata.get('net_premium', 0)
         
         # Iron 2 is an Iron Butterfly, so both shorts are at same ATM strike
@@ -67,13 +84,10 @@ class IronCondor3:
         iron1_net_premium = iron1_trade.metadata.get('net_premium', 0)
         
         # Get Iron 1 strikes
-        iron1_short_call = None
-        iron1_short_put = None
+        iron1_short_strike = None
         for contract_data in iron1_trade.contracts.values():
             if contract_data['leg_type'] == 'short_call':
-                iron1_short_call = contract_data['strike']
-            elif contract_data['leg_type'] == 'short_put':
-                iron1_short_put = contract_data['strike']
+                iron1_short_strike = contract_data['strike']
         
         # Get Iron 2 ATM strike to determine direction
         iron2_atm_strike = None
@@ -82,23 +96,19 @@ class IronCondor3:
                 iron2_atm_strike = contract_data['strike']
                 break
         
-        if None in [iron1_short_call, iron1_short_put, iron2_atm_strike]:
-            return False
-        
-        iron1_center = (iron1_short_call + iron1_short_put) / 2
         trigger_multiplier = getattr(strategy_config, 'iron_3_trigger_multiplier', 1.0)
         
         # Determine which trigger to check (opposite direction from Iron 2)
-        if iron2_atm_strike > iron1_center:
+        if iron2_atm_strike > iron1_short_strike:
             # Iron 2 was set above, so Iron 3(b) triggers below
-            trigger_price = iron1_short_put - trigger_multiplier * iron1_net_premium
+            trigger_price = iron1_short_strike - trigger_multiplier * iron1_net_premium
             if current_price <= trigger_price:
                 logger.info(f"Iron 3(b) trigger price reached: {current_price:.2f} "
                            f"(trigger: {trigger_price:.2f})")
                 return True
         else:
             # Iron 2 was set below, so Iron 3(b) triggers above
-            trigger_price = iron1_short_call + trigger_multiplier * iron1_net_premium
+            trigger_price = iron1_short_strike + trigger_multiplier * iron1_net_premium
             if current_price >= trigger_price:
                 logger.info(f"Iron 3(b) trigger price reached: {current_price:.2f} "
                            f"(trigger: {trigger_price:.2f})")
@@ -596,7 +606,7 @@ class IronCondor3:
         # Check for Iron 3(a) first (if not already executed)
         if not iron3a_executed and iron2_trade:
             # Check trigger price
-            if IronCondor3._check_iron3a_trigger_price(current_price, iron2_trade, strategy):
+            if IronCondor3._check_iron3a_trigger_price(current_price, iron1_trade, iron2_trade, strategy):
                 # Check minimum distance
                 if IronCondor3._check_minimum_distance_iron3a(current_price, iron2_trade, iron1_trade, strategy):
                     # Check entry conditions

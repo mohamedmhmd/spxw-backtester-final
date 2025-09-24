@@ -111,7 +111,7 @@ class IronCondor1:
     timestamp: datetime,
     strategy, # StrategyConfig 
     data_provider : Union[MockDataProvider, PolygonDataProvider],
-    tolerance: float = 0.05  # Stop early if ratio within 5% of target
+    tolerance: float = 0.01  # Stop early if ratio within 5% of target
 ) -> Optional[Dict[str, float]]:
          atm_strike = int(round(current_price / 5) * 5)
     
