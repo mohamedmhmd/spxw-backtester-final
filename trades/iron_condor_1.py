@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 import logging
 import numpy as np
 import pandas as pd
@@ -29,199 +29,134 @@ class IronCondor1:
     timestamp: datetime,
     strategy, # StrategyConfig 
     data_provider : Union[MockDataProvider, PolygonDataProvider],
-    tolerance: float = 0.01  # Stop early if ratio within 5% of target
+    tolerance: float = 0.01
 ) -> Optional[Dict[str, float]]:
-         atm_strike = int(round(current_price / 5) * 5)
+        """
+        Ultra-optimized version using gradient descent approach.
+        Typically uses only 8-15 API calls total.
+        """
+        atm_strike = int(round(current_price / 5) * 5)
     
-         min_wing = getattr(strategy, 'min_wing_width', 15)
-         max_wing = getattr(strategy, 'max_wing_width', 70)
-         step = 5
-         target_ratio = getattr(strategy, 'iron_1_target_win_loss_ratio', 1.5)
-
-         distances = list(range(min_wing, max_wing + 1, step))
+        min_wing = getattr(strategy, 'min_wing_width', 15)
+        max_wing = getattr(strategy, 'max_wing_width', 70)
+        step = 5
+        target_ratio = getattr(strategy, 'iron_1_target_win_loss_ratio', 1.5)
     
-         logger.info(f"Searching {len(distances)} wing distances concurrently for optimal Iron Condor...")
+        quote_cache = {}
     
-   
-         sc = atm_strike
-         sp = atm_strike
-    
-         atm_call_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{sc*1000:08d}"
-         atm_put_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{sp*1000:08d}"
-    
-         try:
-            qsc, qsp = await asyncio.gather(
-            data_provider._get_option_tick_quote(atm_call_symbol, timestamp),
-            data_provider._get_option_tick_quote(atm_put_symbol, timestamp),
-            return_exceptions=True)
-            if isinstance(qsc, Exception) or isinstance(qsp, Exception) or None in [qsc, qsp]:
-                logger.error("Failed to get ATM option quotes")
-                return None
+        async def get_quotes_for_distance(d: int) -> Tuple[Optional[float], Optional[float], Optional[list]]:
+                  """Get ratio and net premium for a specific distance"""
+                  symbols = [
+                  f"O:SPXW{timestamp.strftime('%y%m%d')}C{atm_strike*1000:08d}",  # Short call
+                  f"O:SPXW{timestamp.strftime('%y%m%d')}P{atm_strike*1000:08d}",  # Short put
+                  f"O:SPXW{timestamp.strftime('%y%m%d')}C{(atm_strike+d)*1000:08d}",  # Long call
+                  f"O:SPXW{timestamp.strftime('%y%m%d')}P{(atm_strike-d)*1000:08d}",  # Long put
+                  ]
+        
+                  # Fetch only uncached quotes
+                  to_fetch = [(i, s) for i, s in enumerate(symbols) if s not in quote_cache]
+                  fetched = []  # Add this line
+                  if to_fetch:
+                     fetched = await asyncio.gather(
+                              *[data_provider._get_option_tick_quote(s, timestamp) for _, s in to_fetch],
+                              return_exceptions=True
+                    )
             
-         except Exception as e:
-               logger.error(f"Error fetching ATM quotes: {e}")
-               return None
-    
-         option_symbols = []
-         symbol_to_distance = {}
-         symbol_to_strike_type = {}  # 'call' or 'put'
-     
-         for d in distances:
-             lc = atm_strike + d  # Long call strike
-             lp = atm_strike - d  # Long put strike
+                  for (i, symbol), quote in zip(to_fetch, fetched):
+                      if not isinstance(quote, Exception):
+                         quote_cache[symbol] = quote
+                      else:
+                         quote_cache[symbol] = None
         
-             lc_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{lc*1000:08d}"
-             lp_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{lp*1000:08d}"
+                  quotes = [quote_cache.get(s) for s in symbols]
         
-             option_symbols.extend([lc_symbol, lp_symbol])
-             symbol_to_distance[lc_symbol] = d
-             symbol_to_distance[lp_symbol] = d
-             symbol_to_strike_type[lc_symbol] = 'call'
-             symbol_to_strike_type[lp_symbol] = 'put'
-    
-        # Step 3: Fetch all wing option quotes concurrently
-         logger.info(f"Fetching {len(option_symbols)} option quotes concurrently...")
-    
-         start_time = asyncio.get_event_loop().time()
-    
-         try:
-             quote_tasks = [
-             data_provider._get_option_tick_quote(symbol, timestamp) 
-             for symbol in option_symbols
-             ]
+                  if None in quotes:
+                     return None, None, None
         
-             all_quotes = await asyncio.gather(*quote_tasks, return_exceptions=True)
+                  sc_bid = quotes[0].get('bid')
+                  sp_bid = quotes[1].get('bid')
+                  lc_ask = quotes[2].get('ask')
+                  lp_ask = quotes[3].get('ask')
         
-             fetch_time = asyncio.get_event_loop().time() - start_time
-             logger.info(f"Fetched all quotes in {fetch_time:.2f} seconds")
+                  if None in [sc_bid, sp_bid, lc_ask, lp_ask]:
+                     return None, None, None
         
-         except Exception as e:
-             logger.error(f"Error in concurrent quote fetching: {e}")
-             return None
+                  net_premium = sc_bid + sp_bid - lc_ask - lp_ask
+                  max_loss = d - net_premium
+        
+                  if net_premium <= 0 or max_loss <= 0:
+                     return None, None, None
+        
+                  return net_premium / max_loss, net_premium, {s : quote_cache.get(s) for s in symbols}
     
-         # Step 4: Create lookup dictionary for successful quotes
-         quote_lookup = {}
-         failed_count = 0
+        # Three-point search to find optimal region quickly
+        distances = [min_wing, (min_wing + max_wing) // 2, max_wing]
     
-         for i, symbol in enumerate(option_symbols):
-             if i < len(all_quotes):
-                quote = all_quotes[i]
-             if isinstance(quote, Exception):
-                logger.warning(f"Failed to get quote for {symbol}: {quote}")
-                failed_count += 1
-             elif quote is not None:
-                quote_lookup[symbol] = quote
-             else:
-                failed_count += 1
+        best_d = None
+        best_ratio = None
+        best_diff = float('inf')
     
-         if failed_count > 0:
-            logger.warning(f"Failed to fetch {failed_count} out of {len(option_symbols)} quotes")
+        for d in distances:
+            ratio, net_premium, quotes = await get_quotes_for_distance(d)
+            if ratio is not None:
+               diff = abs(ratio - target_ratio)
+               if diff < best_diff:
+                  best_diff = diff
+                  best_d = d
+                  best_ratio = ratio
     
-         # Step 5: Define premium calculation function (moved outside loop)
-         def get_premium(q, action):
-            if q is None:
-               return None
-            if action == "long":
-               return q.get('ask')
-            elif action == "short":
-                 return q.get('bid')
+        if best_d is None:
             return None
     
-         # Step 6: Process all combinations to find best ratio
-         best_combo = None
-         best_diff = float('inf')
-         valid_combos_checked = 0
+        # Binary search refinement
+        if best_ratio < target_ratio:
+           # Need smaller distance (higher ratio)
+           left, right = min_wing, best_d
+        else:
+           # Need larger distance (lower ratio)
+           left, right = best_d, max_wing
     
-         for d in distances:
-             lc = atm_strike + d
-             lp = atm_strike - d
+        while right - left > step:
+           mid = ((left + right) // 2 // step) * step  # Align to step
         
-             lc_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{lc*1000:08d}"
-             lp_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{lp*1000:08d}"
+           ratio, net_premium, quotes = await get_quotes_for_distance(mid)
         
-             # Get quotes from our lookup
-             qlc = quote_lookup.get(lc_symbol)
-             qlp = quote_lookup.get(lp_symbol)
+           if ratio is None:
+              break
         
-             # All strikes must exist
-             if None in [qsc, qlc, qsp, qlp]:
-                continue
+           diff = abs(ratio - target_ratio)
+           if diff < best_diff:
+              best_diff = diff
+              best_d = mid
+              best_ratio = ratio
         
-            # Calculate premiums
-             sc_mid = get_premium(qsc, "short")
-             lc_mid = get_premium(qlc, "long")
-             sp_mid = get_premium(qsp, "short")
-             lp_mid = get_premium(qlp, "long")
+           if diff <= tolerance:
+              break
         
-             if None in [sc_mid, lc_mid, sp_mid, lp_mid]:
-                continue
-        
-             valid_combos_checked += 1
-        
-        # Calculate net credit
-             net_premium = sc_mid + sp_mid - lc_mid - lp_mid
-             max_loss = d - net_premium
-        
-        # Avoid division by zero/bad combos
-             if net_premium <= 0 or max_loss <= 0:
-               continue
-        
-             ratio = net_premium / max_loss
-             diff = abs(ratio - target_ratio)
-        
-             if diff < best_diff:
-                best_diff = diff
-                best_combo = {
-                'short_call': sc,
-                'long_call': lc,
-                'short_put': sp,
-                'long_put': lp,
+           if ratio < target_ratio:
+              right = mid
+           else:
+              left = mid
+    
+           # Final result
+        if best_d:
+           ratio, net_premium, quotes = await get_quotes_for_distance(best_d)
+        if ratio is not None:
+            return {
+                'short_call': atm_strike,
+                'long_call': atm_strike + best_d,
+                'short_put': atm_strike,
+                'long_put': atm_strike - best_d,
                 'net_premium': net_premium,
-                'max_loss': max_loss,
+                'max_loss': best_d - net_premium,
                 'ratio': ratio,
-                'distance': d
-                }
-            
-            # Early termination if we find a very good match
-                if diff <= tolerance:
-                   logger.info(f"Found excellent match early (tolerance={tolerance:.1%}): "
-                           f"Wing=${d}, Credit=${net_premium:.2f}, Ratio={ratio:.2f}")
-                   break
+                'distance': best_d,
+                'quotes': quotes
+            }
     
-         logger.info(f"Processed {valid_combos_checked} valid combinations out of {len(distances)} distances")
-    
-         # Step 7: Return best result
-         if best_combo:
-            logger.info(f"Selected Iron Condor: Wing=${best_combo['distance']}, "
-                   f"Net Premium=${best_combo['net_premium']:.2f}, Ratio={best_combo['ratio']:.2f} "
-                   f"(Target: {target_ratio:.2f})")
-            return best_combo
-         else:
-             logger.warning("No valid Iron Condor combination found")
-             return None
+        return None
     
 
-    def _calculate_iron_condor_credit(quotes: Dict[str, Dict], contracts: Dict[str, str],
-                                    ) -> float:
-        """Calculate net credit for Iron Condor based on actual execution prices"""
-        total_credit = 0
-        total_debit = 0
-        
-        # Short positions (sell at bid)
-        for leg in ['short_call', 'short_put']:
-            contract = contracts[leg]
-            if contract in quotes:
-                price = quotes[contract]['bid']
-                total_credit += price
-        
-        # Long positions (buy at ask)
-        for leg in ['long_call', 'long_put']:
-            contract = contracts[leg]
-            if contract in quotes:
-                price = quotes[contract]['ask'] 
-                total_debit += price
-        
-        return total_credit - total_debit
     
 
     async def _execute_iron_condor(quotes: Dict[str, Dict], entry_time: datetime,
@@ -329,11 +264,9 @@ class IronCondor1:
                 }
                     
                 ic_contracts = IronCondor1._create_option_contracts(ic_strikes, option_date)
-                ic_quotes = await data_provider.get_option_quotes(
-                    list(ic_contracts.values()), current_bar_time
-                )
+                ic_quotes = ic_result['quotes']
                     
-                net_premium = IronCondor1._calculate_iron_condor_credit(ic_quotes, ic_contracts)
+                net_premium = ic_result['net_premium']
                     
                 if net_premium > 0:
                     ic_trade = await IronCondor1._execute_iron_condor(
