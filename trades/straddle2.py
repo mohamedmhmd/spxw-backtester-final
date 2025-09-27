@@ -189,7 +189,6 @@ class Straddle2:
             trade_type="Straddle 2",
             contracts=trade_contracts,
             size=trade_size,
-            entry_signals={'triggered_by': 'iron_condor_2', 'entered_with': 'iron_2'},
             used_capital=0.0,
             metadata={
                 'strategy_name': 'straddle_2',

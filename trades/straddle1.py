@@ -87,7 +87,6 @@ class Straddle1:
             trade_type="Straddle 1",
             contracts=trade_contracts,
             size=strategy.straddle_1_trade_size,
-            entry_signals={'triggered_by': 'iron_condor'},
             used_capital=0.0,
             metadata={
                 'strategy_name': 'straddle_1',

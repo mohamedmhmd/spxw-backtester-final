@@ -11,6 +11,7 @@ from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
 import asyncio
 import time as time_module
+from trades.signal_checker import OptimizedSignalChecker
 
 #Set up logging
 logging.basicConfig(
@@ -22,90 +23,7 @@ logger = logging.getLogger(__name__)
 
 class IronCondor1:
 
-    def _check_entry_signals_5min(spx_ohlc_data, spy_ohlc_data: pd.DataFrame, current_idx: int, 
-                                  strategy: StrategyConfig) -> Dict[str, Any]:
-        """Check entry signals using 5-minute bars only"""
-        signals = {
-            'entry_signal': False,
-            'volume_condition': False,
-            'direction_condition': False,
-            'range_condition': False,
-            'details': {}
-        }
-        
-        # Condition 1: Volume check (consecutive candles below threshold)
-        first_candle_volume = spy_ohlc_data.iloc[0]['volume']
-        volume_threshold = first_candle_volume * strategy.iron_1_volume_threshold
-        
-        volume_ok = True
-        volume_checks = []
-        for j in range(strategy.iron_1_consecutive_candles):
-            idx = current_idx - strategy.iron_1_consecutive_candles + j
-            if idx >= 0 and idx < len(spy_ohlc_data):
-                current_volume = spy_ohlc_data.iloc[idx]['volume']
-                volume_checks.append(current_volume)
-                if current_volume > volume_threshold:
-                    volume_ok = False
-                    break
-                    
-        signals['volume_condition'] = volume_ok
-        signals['details']['volume_checks'] = volume_checks
-        signals['details']['volume_threshold'] = volume_threshold
-
-        if not volume_ok:
-            return signals
-        
-        # Condition 2: Direction check (not all candles in same direction)
-        directions = []
-        for j in range(strategy.iron_1_lookback_candles):
-            idx = current_idx - strategy.iron_1_lookback_candles + j
-            if idx >= 0 and idx < len(spx_ohlc_data):
-                open_price = spx_ohlc_data.iloc[idx]['open']
-                close_price = spx_ohlc_data.iloc[idx]['close']
-                directions.append(1 if close_price > open_price else -1)
-        
-        if directions:
-            all_same = all(d == directions[0] for d in directions)
-            signals['direction_condition'] = not all_same
-            signals['details']['directions'] = directions
-            if all_same:
-                return signals  # Exit early if all same direction
-        
-        # Condition 3: Range check (recent range below threshold)
-        recent_ranges = []
-        for j in range(strategy.iron_1_avg_range_candles):
-            idx = current_idx - strategy.iron_1_avg_range_candles + j
-            if idx >= 0 and idx < len(spx_ohlc_data):
-                high = spx_ohlc_data.iloc[idx]['high']
-                low = spx_ohlc_data.iloc[idx]['low']
-                recent_ranges.append(high - low)
-        
-        if recent_ranges:
-            avg_recent_range = np.mean(recent_ranges)
-            
-            # Calculate average range for all candles up to current
-            all_ranges = []
-            for j in range(current_idx):
-                high = spx_ohlc_data.iloc[j]['high']
-                low = spx_ohlc_data.iloc[j]['low']
-                all_ranges.append(high - low)
-            
-            if all_ranges:
-                avg_day_range = np.mean(all_ranges)
-                range_threshold = avg_day_range * strategy.iron_1_range_threshold
-                signals['range_condition'] = avg_recent_range < range_threshold
-                signals['details']['avg_recent_range'] = avg_recent_range
-                signals['details']['avg_day_range'] = avg_day_range
-                signals['details']['range_threshold'] = range_threshold
-        
-        # All conditions must be met
-        signals['entry_signal'] = (
-            signals['volume_condition'] and 
-            signals['direction_condition'] and 
-            signals['range_condition']
-        )
-        
-        return signals
+    
     
     async def _find_iron_condor_strikes(current_price: float, 
     timestamp: datetime,
@@ -308,7 +226,6 @@ class IronCondor1:
 
     async def _execute_iron_condor(quotes: Dict[str, Dict], entry_time: datetime,
                                   contracts: Dict[str, str], strategy: StrategyConfig,
-                                  signals: Dict,
                                   net_premium: float, current_price, config : BacktestConfig) -> Optional[Trade]:
         """Execute Iron Condor trade""" 
         # Check if we have all quotes
@@ -359,7 +276,6 @@ class IronCondor1:
             trade_type="Iron Condor 1",
             contracts=trade_contracts,
             size=strategy.iron_1_trade_size,
-            entry_signals=signals,
             used_capital = 0.0,
             metadata={
                 'net_premium': net_premium,
@@ -393,12 +309,10 @@ class IronCondor1:
                                  current_price,
                                  current_bar_time,
                                  data_provider : Union[MockDataProvider, PolygonDataProvider],
-                                 config : BacktestConfig) -> Trade:
+                                 config : BacktestConfig, checker : OptimizedSignalChecker) -> Trade:
         """Find Iron Condor 1 trade based on strategy config"""
-        # Check entry conditions for new Iron Condor trades
-        signals = IronCondor1._check_entry_signals_5min(spx_ohlc_data, spy_ohlc_data, i, strategy)
-            
-        if signals['entry_signal']:
+        # Check entry conditions for new Iron Condor trades    
+        if checker.check_entry_signals_5min(i, strategy):
             if isinstance(date, datetime):
                 option_date = date
             else:
@@ -427,7 +341,6 @@ class IronCondor1:
                             current_bar_time,
                             ic_contracts,
                             strategy,
-                            signals,
                             net_premium,
                             current_price, config
                     )

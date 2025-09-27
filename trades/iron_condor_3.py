@@ -512,7 +512,6 @@ class IronCondor3:
             trade_type=trade_type,
             contracts=trade_contracts,
             size=trade_size,
-            entry_signals=signals,
             used_capital=0.0,
             metadata={
                 'net_premium': net_premium,

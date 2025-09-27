@@ -21,7 +21,6 @@ class Trade:
     trade_type: str
     contracts: Dict[str, Dict]  # contract -> {position, entry_price, exit_price}
     size: int
-    entry_signals: Dict[str, Any]
     exit_signals: Optional[Dict[str, Any]] = None
     pnl: float = 0.0
     unit_pnl: float = 0.0

@@ -7,6 +7,7 @@ from config.back_test_config import BacktestConfig
 from data.polygon_data_provider import PolygonDataProvider
 from config.strategy_config import StrategyConfig
 from trades.iron_condor_3 import IronCondor3
+from trades.signal_checker import OptimizedSignalChecker
 from trades.straddle2 import Straddle2
 from trades.straddle3 import Straddle3
 from trades.trade import Trade
@@ -176,6 +177,8 @@ class BacktestEngine:
         ic2_found = False
         ic3_found = False
         straddle_3_type = ""
+        checker = OptimizedSignalChecker(spx_ohlc_data, spy_ohlc_data)
+        
         for i in range(iron_1_min_bars_needed, len(spx_ohlc_data)):
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
             current_price = spx_ohlc_data.iloc[i]['open']
@@ -281,7 +284,7 @@ class BacktestEngine:
             
                 ic_1_trade = await IronCondor1._find_iron_trade(spx_ohlc_data, spy_ohlc_data, i, strategy, 
                                                      date, current_price, current_bar_time,
-                                                     self.data_provider, config)
+                                                     self.data_provider, config, checker)
                 if ic_1_trade:
                    trades.append(ic_1_trade)
                    active_iron_condors.append(ic_1_trade)
