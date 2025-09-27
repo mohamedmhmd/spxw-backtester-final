@@ -238,7 +238,7 @@ class IronCondor1:
         return contracts
     
 
-    async def _find_iron_trade(spx_ohlc_data, spy_ohlc_data : pd.DataFrame, i : int, 
+    async def _find_iron_trade(i : int, 
                                  strategy : StrategyConfig, 
                                  date: datetime,
                                  current_price,

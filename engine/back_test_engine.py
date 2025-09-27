@@ -282,7 +282,7 @@ class BacktestEngine:
                         continue
             else:
             
-                ic_1_trade = await IronCondor1._find_iron_trade(spx_ohlc_data, spy_ohlc_data, i, strategy, 
+                ic_1_trade = await IronCondor1._find_iron_trade(i, strategy, 
                                                      date, current_price, current_bar_time,
                                                      self.data_provider, config, checker)
                 if ic_1_trade:
