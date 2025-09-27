@@ -30,9 +30,9 @@ class PolygonDataProvider:
         self.session: Optional[aiohttp.ClientSession] = None
         
         # Rate limiting
-        self.rate_limiter = asyncio.Semaphore(5)  # 5 concurrent requests
+        self.rate_limiter = asyncio.Semaphore(200)  # 5 concurrent requests
         self.last_request_time = 0
-        self.min_request_interval = 0.2  # 200ms between requests
+        self.min_request_interval = 0.0  # 200ms between requests
         self.ssl_context = self._create_ssl_context()
 
     async def __aenter__(self):
