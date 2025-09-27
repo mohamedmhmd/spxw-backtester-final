@@ -6,6 +6,7 @@ import pandas as pd
 from config.back_test_config import BacktestConfig
 from config.strategy_config import StrategyConfig
 from trades.signal_checker import OptimizedSignalChecker
+from trades.strikes_finder import StrikesFinder
 from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
@@ -483,9 +484,7 @@ class IronCondor3:
                         else:
                             option_date = datetime.combine(date, datetime.min.time())
                         
-                        iron_result = await IronCondor3._find_iron_butterfly_strikes(
-                            current_price, current_bar_time, strategy, data_provider
-                        )
+                        iron_result = await StrikesFinder._find_iron_condor_strikes(current_price, current_bar_time, strategy, data_provider)
                         
                         if iron_result:
                             strikes = {

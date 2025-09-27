@@ -7,6 +7,7 @@ from pyparsing import Union
 from config.back_test_config import BacktestConfig
 from config.strategy_config import StrategyConfig
 from trades.signal_checker import OptimizedSignalChecker
+from trades.strikes_finder import StrikesFinder
 from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
@@ -343,9 +344,7 @@ class IronCondor2:
             option_date = datetime.combine(date, datetime.min.time())
         
 
-        ib_result = await IronCondor2._find_iron_butterfly_strikes(
-            current_price, current_bar_time, strategy, data_provider, 
-        )
+        ib_result = await StrikesFinder._find_iron_condor_strikes(current_price, current_bar_time, strategy, data_provider)
         
         if not ib_result:
             return None
