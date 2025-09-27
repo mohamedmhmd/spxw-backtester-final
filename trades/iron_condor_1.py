@@ -312,7 +312,7 @@ class IronCondor1:
                                  config : BacktestConfig, checker : OptimizedSignalChecker) -> Trade:
         """Find Iron Condor 1 trade based on strategy config"""
         # Check entry conditions for new Iron Condor trades    
-        if checker.check_entry_signals_5min(i, strategy):
+        if checker.iron_1_check_entry_signals_5min(i, strategy):
             if isinstance(date, datetime):
                 option_date = date
             else:

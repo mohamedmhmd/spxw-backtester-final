@@ -6,6 +6,7 @@ import pandas as pd
 from pyparsing import Union
 from config.back_test_config import BacktestConfig
 from config.strategy_config import StrategyConfig
+from trades.signal_checker import OptimizedSignalChecker
 from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
@@ -50,78 +51,8 @@ class IronCondor2:
                 
         return False
 
-    @staticmethod
-    def _check_iron2_entry_conditions(spx_ohlc_data: pd.DataFrame, current_idx: int, strategy_config : StrategyConfig) -> Dict[str, Any]:
-        """
-        Check Iron 2 entry conditions:
-        1) Last four 5-minute candles not all in same direction
-        2) Average range of last two candles <= 125% of average of last ten candles
-        """
-        signals = {
-            'entry_signal': False,
-            'direction_condition': False,
-            'range_condition': False,
-            'details': {}
-        }
-        
-        # Ensure we have enough data
-        if current_idx < strategy_config.iron_2_range_reference_candles:
-            return signals
-            
-        # Condition 1: Last four candles not all in same direction
-        directions = []
-        for j in range(strategy_config.iron_2_direction_lookback):  # Last 4 candles
-            idx = current_idx - strategy_config.iron_2_direction_lookback  + j  # +1 because current_idx is 0-based
-            if idx >= 0 and idx < len(spx_ohlc_data):
-                open_price = spx_ohlc_data.iloc[idx]['open']
-                close_price = spx_ohlc_data.iloc[idx]['close']
-                directions.append(1 if close_price > open_price else -1)
-        
-        if len(directions) == strategy_config.iron_2_direction_lookback:
-            all_same_direction = all(d == directions[0] for d in directions)
-            signals['direction_condition'] = not all_same_direction
-            signals['details']['last_4_directions'] = directions
-            signals['details']['all_same_direction'] = all_same_direction
-            if all_same_direction:
-                return signals
-        
-        # Condition 2: Range comparison
-        # Get ranges for last 2 candles
-        last_2_ranges = []
-        for j in range(strategy_config.iron_2_range_recent_candles):  # Last 2 candles
-            idx = current_idx - strategy_config.iron_2_range_recent_candles + j
-            if idx >= 0 and idx < len(spx_ohlc_data):
-                high = spx_ohlc_data.iloc[idx]['high']
-                low = spx_ohlc_data.iloc[idx]['low']
-                last_2_ranges.append(high - low)
-        
-        # Get ranges for last 10 candles
-        last_10_ranges = []
-        for j in range(strategy_config.iron_2_range_reference_candles):  # Last 10 candles
-            idx = current_idx - strategy_config.iron_2_range_reference_candles + j
-            if idx >= 0 and idx < len(spx_ohlc_data):
-                high = spx_ohlc_data.iloc[idx]['high']
-                low = spx_ohlc_data.iloc[idx]['low']
-                last_10_ranges.append(high - low)
-        
-        if len(last_2_ranges) == strategy_config.iron_2_range_recent_candles and len(last_10_ranges) == strategy_config.iron_2_range_reference_candles:
-            avg_last_2 = np.mean(last_2_ranges)
-            avg_last_10 = np.mean(last_10_ranges)
-            threshold = avg_last_10 * strategy_config.iron_2_range_threshold  # 125%
-            
-            signals['range_condition'] = avg_last_2 <= threshold
-            signals['details']['avg_last_2_range'] = avg_last_2
-            signals['details']['avg_last_10_range'] = avg_last_10
-            signals['details']['range_threshold'] = threshold
-            signals['details']['range_ratio'] = avg_last_2 / avg_last_10 if avg_last_10 > 0 else 0
-        
-        # Both conditions must be met
-        signals['entry_signal'] = signals['direction_condition'] and signals['range_condition']
-        
-        return signals
 
    
-
     @staticmethod
     async def _find_iron_butterfly_strikes(current_price: float,
                                          timestamp: datetime,
@@ -308,7 +239,7 @@ class IronCondor2:
     @staticmethod
     async def _execute_iron_butterfly(quotes: Dict[str, Dict], entry_time: datetime,
                                     contracts: Dict[str, str], strategy: StrategyConfig,
-                                    signals: Dict, net_premium: float, current_price: float,
+                                    net_premium: float, current_price: float,
                                     config: BacktestConfig) -> Optional[Trade]:
         """Execute Iron Butterfly trade"""
         if not all(contract in quotes for contract in contracts.values()):
@@ -387,12 +318,11 @@ class IronCondor2:
         return contracts
 
     @staticmethod
-    async def _find_iron_trade(spx_ohlc_data: pd.DataFrame, 
-                              i: int, strategy: StrategyConfig, date: datetime,
+    async def _find_iron_trade(i: int, strategy: StrategyConfig, date: datetime,
                               current_price: float, current_bar_time: datetime,
                               data_provider: Union[MockDataProvider, PolygonDataProvider],
                               config: BacktestConfig, 
-                              iron1_trade: Trade = None) -> Optional[Trade]:
+                              iron1_trade: Trade, checker : OptimizedSignalChecker) -> Optional[Trade]:
         """
         Find Iron Butterfly (Iron 2) trade based on strategy config and existing Iron 1 trades
         """
@@ -400,11 +330,8 @@ class IronCondor2:
         # Check if price triggers Iron 2 entry based on Iron 1 positions
         if not IronCondor2._check_iron2_trigger_price(current_price, iron1_trade, strategy):
             return None
-        
-        # Check Iron 2 specific entry conditions
-        signals = IronCondor2._check_iron2_entry_conditions(spx_ohlc_data, i, strategy)
-        
-        if not signals['entry_signal']:
+         
+        if not checker.iron_2_check_entry_conditions(i, strategy):
             return None
         
         logger.info(f"Iron 2 entry conditions met at {current_bar_time}")
@@ -447,7 +374,7 @@ class IronCondor2:
         # Execute Iron Butterfly trade
         ib_trade = await IronCondor2._execute_iron_butterfly(
             ib_quotes, current_bar_time, ib_contracts, strategy,
-            signals, net_premium, current_price, config
+            net_premium, current_price, config
         )
         
         if ib_trade:

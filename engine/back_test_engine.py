@@ -195,10 +195,10 @@ class BacktestEngine:
             
             if(ic1_found):
                 if not ic2_found:
-                    iron_2_trade = await IronCondor2._find_iron_trade(spx_ohlc_data, i, strategy, 
+                    iron_2_trade = await IronCondor2._find_iron_trade(i, strategy, 
                                                          date, current_price, current_bar_time,
                                                          self.data_provider, config,
-                                                         active_iron_condors[0])
+                                                         active_iron_condors[0], checker)
                     if iron_2_trade:
                         trades.append(iron_2_trade)
                         active_iron_condors.append(iron_2_trade)
@@ -224,13 +224,13 @@ class BacktestEngine:
                             logger.info(f"Entered Straddle 2 at {current_bar_time}.")
                 else:
                     if not ic3_found:
-                        iron_3_trade = await IronCondor3._find_iron_trade(spx_ohlc_data, i,
+                        iron_3_trade = await IronCondor3._find_iron_trade(i,
                               strategy, date,
                               current_price, current_bar_time,
                               self.data_provider,
                               config,
                               ic_1_trade,
-                              iron_2_trade,
+                              iron_2_trade, checker
                               )
                         if iron_3_trade:
                             trades.append(iron_3_trade)

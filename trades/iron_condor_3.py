@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from config.back_test_config import BacktestConfig
 from config.strategy_config import StrategyConfig
+from trades.signal_checker import OptimizedSignalChecker
 from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
@@ -115,79 +116,6 @@ class IronCondor3:
                 return True
         
         return False
-    
-    @staticmethod
-    def _check_iron3_entry_conditions(spx_ohlc_data: pd.DataFrame, current_idx: int,
-                                     strategy_config: StrategyConfig) -> Dict[str, Any]:
-        """
-        Check Iron 3 entry conditions (same for both 3a and 3b):
-        1) Last four 5-minute candles not all in same direction
-        2) Average range of last two candles <= 125% of average of last ten candles
-        """
-        signals = {
-            'entry_signal': False,
-            'direction_condition': False,
-            'range_condition': False,
-            'details': {}
-        }
-        
-        # Get parameters with defaults
-        direction_lookback = getattr(strategy_config, 'iron_3_direction_lookback', 4)
-        range_recent = getattr(strategy_config, 'iron_3_range_recent_candles', 2)
-        range_reference = getattr(strategy_config, 'iron_3_range_reference_candles', 10)
-        range_threshold_mult = getattr(strategy_config, 'iron_3_range_threshold', 1.25)
-        
-        # Ensure sufficient data
-        if current_idx < range_reference:
-            return signals
-        
-        # Condition 1: Direction check
-        directions = []
-        for j in range(direction_lookback):
-            idx = current_idx - direction_lookback + j
-            if idx >= 0 and idx < len(spx_ohlc_data):
-                open_price = spx_ohlc_data.iloc[idx]['open']
-                close_price = spx_ohlc_data.iloc[idx]['close']
-                directions.append(1 if close_price > open_price else -1)
-        
-        if len(directions) == direction_lookback:
-            all_same = all(d == directions[0] for d in directions)
-            signals['direction_condition'] = not all_same
-            signals['details']['directions'] = directions
-            if all_same:
-                return signals
-        
-        # Condition 2: Range check
-        recent_ranges = []
-        for j in range(range_recent):
-            idx = current_idx - range_recent + j
-            if idx >= 0 and idx < len(spx_ohlc_data):
-                high = spx_ohlc_data.iloc[idx]['high']
-                low = spx_ohlc_data.iloc[idx]['low']
-                recent_ranges.append(high - low)
-        
-        reference_ranges = []
-        for j in range(range_reference):
-            idx = current_idx - range_reference + j
-            if idx >= 0 and idx < len(spx_ohlc_data):
-                high = spx_ohlc_data.iloc[idx]['high']
-                low = spx_ohlc_data.iloc[idx]['low']
-                reference_ranges.append(high - low)
-        
-        if len(recent_ranges) == range_recent and len(reference_ranges) == range_reference:
-            avg_recent = np.mean(recent_ranges)
-            avg_reference = np.mean(reference_ranges)
-            threshold = avg_reference * range_threshold_mult
-            
-            signals['range_condition'] = avg_recent <= threshold
-            signals['details']['avg_recent_range'] = avg_recent
-            signals['details']['avg_reference_range'] = avg_reference
-            signals['details']['range_threshold'] = threshold
-        
-        signals['entry_signal'] = signals['direction_condition'] and signals['range_condition']
-        
-        return signals
-    
     
     
     
@@ -447,7 +375,7 @@ class IronCondor3:
     @staticmethod
     async def _execute_iron_trade(quotes: Dict[str, Dict], entry_time: datetime,
                                  contracts: Dict[str, str], strategy: StrategyConfig,
-                                 signals: Dict, net_premium: float, current_price: float,
+                                 net_premium: float, current_price: float,
                                  config: BacktestConfig, trade_type: str,
                                  strikes: Dict) -> Optional[Trade]:
         """Execute Iron 3(a) or 3(b) trade"""
@@ -527,28 +455,26 @@ class IronCondor3:
         return trade
     
     @staticmethod
-    async def _find_iron_trade(spx_ohlc_data: pd.DataFrame, i: int,
+    async def _find_iron_trade(i: int,
                               strategy: StrategyConfig, date: datetime,
                               current_price: float, current_bar_time: datetime,
                               data_provider: Union[MockDataProvider, PolygonDataProvider],
                               config: BacktestConfig,
-                              iron1_trade: Optional[Trade] = None,
-                              iron2_trade: Optional[Trade] = None,
-                              iron3a_executed: bool = False) -> Optional[Trade]:
+                              iron1_trade: Optional[Trade],
+                              iron2_trade: Optional[Trade],
+                              checker : OptimizedSignalChecker) -> Optional[Trade]:
         """
         Find Iron 3(a) or 3(b) trade based on market conditions.
         Iron 3(a) takes precedence; Iron 3(b) only if no 3(a) executed.
         """
         
         # Check for Iron 3(a) first (if not already executed)
-        if not iron3a_executed and iron2_trade:
+        if iron2_trade:
             # Check trigger price
             if IronCondor3._check_iron3a_trigger_price(current_price, iron1_trade, iron2_trade, strategy):
                 # Check minimum distance
                     # Check entry conditions
-                    signals = IronCondor3._check_iron3_entry_conditions(spx_ohlc_data, i, strategy)
-                    
-                    if signals['entry_signal']:
+                    if checker.iron_3_check_entry_conditions(i, strategy):
                         logger.info(f"Iron 3(a) entry conditions met at {current_bar_time}")
                         
                         # Find Iron Butterfly strikes
@@ -579,7 +505,7 @@ class IronCondor3:
                             if net_premium > 0:
                                 trade = await IronCondor3._execute_iron_trade(
                                     quotes, current_bar_time, contracts, strategy,
-                                    signals, net_premium, current_price, config,
+                                     net_premium, current_price, config,
                                     "Iron Condor 3(a)", strikes
                                 )
                                 
@@ -587,18 +513,13 @@ class IronCondor3:
                                     logger.info(f"Entered Iron 3(a) at {current_bar_time}: {strikes}")
                                     return trade
         
-        # Check for Iron 3(b) only if no 3(a) has been executed
-        if iron3a_executed:
-            return None
         
         if iron1_trade and iron2_trade:
             # Check trigger price
             if IronCondor3._check_iron3b_trigger_price(current_price, iron1_trade, iron2_trade, strategy):
                 # Check minimum distance
                     # Check entry conditions
-                    signals = IronCondor3._check_iron3_entry_conditions(spx_ohlc_data, i, strategy)
-                    
-                    if signals['entry_signal']:
+                    if checker.iron_3_check_entry_conditions(i, strategy):
                         logger.info(f"Iron 3(b) entry conditions met at {current_bar_time}")
                         
                         # Find Iron Condor strikes
@@ -629,7 +550,7 @@ class IronCondor3:
                             if net_premium > 0:
                                 trade = await IronCondor3._execute_iron_trade(
                                     quotes, current_bar_time, contracts, strategy,
-                                    signals, net_premium, current_price, config,
+                                   net_premium, current_price, config,
                                     "Iron Condor 3(b)", strikes
                                 )
                                 
