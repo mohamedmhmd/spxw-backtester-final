@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from config.back_test_config import BacktestConfig
 from config.strategy_config import StrategyConfig
+from trades.iron_condor_base import IronCondorBase
 from trades.signal_checker import OptimizedSignalChecker
-from trades.strikes_finder import StrikesFinder
 from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class IronCondor3:
+class IronCondor3(IronCondorBase):
     """
     Iron Condor 3 implementation with two variants:
     - Iron 3(a): Iron Butterfly when price moves further from Iron 1
@@ -120,341 +120,6 @@ class IronCondor3:
     
     
     
-    
-    @staticmethod
-    async def _find_iron_butterfly_strikes(current_price: float, timestamp: datetime,
-                                          strategy: StrategyConfig,
-                                          data_provider: Union[MockDataProvider, PolygonDataProvider],
-                                          tolerance: float = 0.05) -> Optional[Dict[str, float]]:
-        """Find Iron Butterfly strikes for Iron 3(a)"""
-        atm_strike = int(round(current_price / 5) * 5)
-        
-        min_wing = getattr(strategy, 'min_wing_width')
-        max_wing = getattr(strategy, 'max_wing_width')
-        step = 5
-        target_ratio = getattr(strategy, 'iron_3_target_win_loss_ratio', 1.5)
-        
-        distances = list(range(min_wing, max_wing + 1, step))
-        
-        logger.info(f"Searching Iron 3(a) Butterfly strikes for ATM {atm_strike}")
-        
-        # Get ATM quotes
-        atm_call_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{atm_strike*1000:08d}"
-        atm_put_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{atm_strike*1000:08d}"
-        
-        try:
-            qsc, qsp = await asyncio.gather(
-                data_provider._get_option_tick_quote(atm_call_symbol, timestamp),
-                data_provider._get_option_tick_quote(atm_put_symbol, timestamp),
-                return_exceptions=True
-            )
-            
-            if isinstance(qsc, Exception) or isinstance(qsp, Exception) or None in [qsc, qsp]:
-                logger.error("Failed to get ATM quotes for Iron 3(a)")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error fetching ATM quotes: {e}")
-            return None
-        
-        # Prepare and fetch wing options
-        option_symbols = []
-        for d in distances:
-            lc_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{(atm_strike + d)*1000:08d}"
-            lp_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{(atm_strike - d)*1000:08d}"
-            option_symbols.extend([lc_symbol, lp_symbol])
-        
-        try:
-            all_quotes = await asyncio.gather(
-                *[data_provider._get_option_tick_quote(s, timestamp) for s in option_symbols],
-                return_exceptions=True
-            )
-        except Exception as e:
-            logger.error(f"Error fetching wing quotes: {e}")
-            return None
-        
-        # Create quote lookup
-        quote_lookup = {}
-        for i, symbol in enumerate(option_symbols):
-            if i < len(all_quotes) and not isinstance(all_quotes[i], Exception) and all_quotes[i]:
-                quote_lookup[symbol] = all_quotes[i]
-        
-        # Find best combination
-        best_combo = None
-        best_diff = float('inf')
-        
-        for d in distances:
-            lc_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{(atm_strike + d)*1000:08d}"
-            lp_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{(atm_strike - d)*1000:08d}"
-            
-            qlc = quote_lookup.get(lc_symbol)
-            qlp = quote_lookup.get(lp_symbol)
-            
-            if None in [qsc, qsp, qlc, qlp]:
-                continue
-            
-            # Calculate premiums
-            sc_bid = qsc.get('bid')
-            sp_bid = qsp.get('bid')
-            lc_ask = qlc.get('ask')
-            lp_ask = qlp.get('ask')
-            
-            if None in [sc_bid, sp_bid, lc_ask, lp_ask]:
-                continue
-            
-            net_premium = sc_bid + sp_bid - lc_ask - lp_ask
-            max_loss = d - net_premium
-            
-            if net_premium <= 0 or max_loss <= 0:
-                continue
-            
-            ratio = net_premium / max_loss
-            diff = abs(ratio - target_ratio)
-            
-            if diff < best_diff:
-                best_diff = diff
-                best_combo = {
-                    'short_call': atm_strike,
-                    'short_put': atm_strike,
-                    'long_call': atm_strike + d,
-                    'long_put': atm_strike - d,
-                    'net_premium': net_premium,
-                    'max_loss': max_loss,
-                    'ratio': ratio,
-                    'distance': d
-                }
-                
-                if diff <= tolerance:
-                    break
-        
-        if best_combo:
-            logger.info(f"Selected Iron 3(a) Butterfly: ATM={atm_strike}, Wing={best_combo['distance']}, "
-                       f"Ratio={best_combo['ratio']:.2f}")
-        
-        return best_combo
-    
-    @staticmethod
-    async def _find_iron_condor_strikes(current_price: float, timestamp: datetime,
-                                       strategy: StrategyConfig,
-                                       data_provider: Union[MockDataProvider, PolygonDataProvider],
-                                       tolerance: float = 0.05) -> Optional[Dict[str, float]]:
-        """Find Iron Condor strikes for Iron 3(b) - sells ATM, buys closest for 1.5:1 ratio"""
-        atm_strike = int(round(current_price / 5) * 5)
-        
-        min_wing = getattr(strategy, 'iron_3b_min_wing_width', 5)
-        max_wing = getattr(strategy, 'iron_3b_max_wing_width', 30)
-        step = 5
-        target_ratio = getattr(strategy, 'iron_3b_target_win_loss_ratio', 1.5)
-        
-        distances = list(range(min_wing, max_wing + 1, step))
-        
-        logger.info(f"Searching Iron 3(b) Condor strikes for ATM {atm_strike}")
-        
-        # Get ATM quotes
-        atm_call_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{atm_strike*1000:08d}"
-        atm_put_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{atm_strike*1000:08d}"
-        
-        try:
-            qsc, qsp = await asyncio.gather(
-                data_provider._get_option_tick_quote(atm_call_symbol, timestamp),
-                data_provider._get_option_tick_quote(atm_put_symbol, timestamp),
-                return_exceptions=True
-            )
-            
-            if isinstance(qsc, Exception) or isinstance(qsp, Exception) or None in [qsc, qsp]:
-                logger.error("Failed to get ATM quotes for Iron 3(b)")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error fetching ATM quotes: {e}")
-            return None
-        
-        # Prepare and fetch wing options
-        option_symbols = []
-        for d in distances:
-            lc_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{(atm_strike + d)*1000:08d}"
-            lp_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{(atm_strike - d)*1000:08d}"
-            option_symbols.extend([lc_symbol, lp_symbol])
-        
-        try:
-            all_quotes = await asyncio.gather(
-                *[data_provider._get_option_tick_quote(s, timestamp) for s in option_symbols],
-                return_exceptions=True
-            )
-        except Exception as e:
-            logger.error(f"Error fetching wing quotes: {e}")
-            return None
-        
-        # Create quote lookup
-        quote_lookup = {}
-        for i, symbol in enumerate(option_symbols):
-            if i < len(all_quotes) and not isinstance(all_quotes[i], Exception) and all_quotes[i]:
-                quote_lookup[symbol] = all_quotes[i]
-        
-        # Find best combination (preferring closest strikes that meet ratio)
-        best_combo = None
-        
-        for d in distances:
-            lc_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}C{(atm_strike + d)*1000:08d}"
-            lp_symbol = f"O:SPXW{timestamp.strftime('%y%m%d')}P{(atm_strike - d)*1000:08d}"
-            
-            qlc = quote_lookup.get(lc_symbol)
-            qlp = quote_lookup.get(lp_symbol)
-            
-            if None in [qsc, qsp, qlc, qlp]:
-                continue
-            
-            # Calculate premiums
-            sc_bid = qsc.get('bid')
-            sp_bid = qsp.get('bid')
-            lc_ask = qlc.get('ask')
-            lp_ask = qlp.get('ask')
-            
-            if None in [sc_bid, sp_bid, lc_ask, lp_ask]:
-                continue
-            
-            net_premium = sc_bid + sp_bid - lc_ask - lp_ask
-            max_loss = d - net_premium
-            
-            if net_premium <= 0 or max_loss <= 0:
-                continue
-            
-            ratio = net_premium / max_loss
-            
-            # For Iron 3(b), we want ratio >= target (1.5:1 or better)
-            if ratio >= target_ratio:
-                best_combo = {
-                    'short_call': atm_strike,
-                    'short_put': atm_strike,
-                    'long_call': atm_strike + d,
-                    'long_put': atm_strike - d,
-                    'net_premium': net_premium,
-                    'max_loss': max_loss,
-                    'ratio': ratio,
-                    'distance': d
-                }
-                break  # Take first (closest) that meets criteria
-        
-        if best_combo:
-            logger.info(f"Selected Iron 3(b) Condor: ATM={atm_strike}, Wing={best_combo['distance']}, "
-                       f"Ratio={best_combo['ratio']:.2f}")
-        
-        return best_combo
-    
-    @staticmethod
-    def _create_option_contracts(strikes: Dict[str, float], expiration: datetime) -> Dict[str, str]:
-        """Create option contract symbols"""
-        exp_str = expiration.strftime('%y%m%d')
-        
-        contracts = {
-            'short_call': f"O:SPXW{exp_str}C{int(strikes['short_call']*1000):08d}",
-            'short_put': f"O:SPXW{exp_str}P{int(strikes['short_put']*1000):08d}",
-            'long_call': f"O:SPXW{exp_str}C{int(strikes['long_call']*1000):08d}",
-            'long_put': f"O:SPXW{exp_str}P{int(strikes['long_put']*1000):08d}"
-        }
-        
-        return contracts
-    
-    @staticmethod
-    def _calculate_net_credit(quotes: Dict[str, Dict], contracts: Dict[str, str]) -> float:
-        """Calculate net credit for Iron structure"""
-        total_credit = 0
-        total_debit = 0
-        
-        for leg in ['short_call', 'short_put']:
-            contract = contracts[leg]
-            if contract in quotes:
-                total_credit += quotes[contract]['bid']
-        
-        for leg in ['long_call', 'long_put']:
-            contract = contracts[leg]
-            if contract in quotes:
-                total_debit += quotes[contract]['ask']
-        
-        return total_credit - total_debit
-    
-    @staticmethod
-    async def _execute_iron_trade(quotes: Dict[str, Dict], entry_time: datetime,
-                                 contracts: Dict[str, str], strategy: StrategyConfig,
-                                 net_premium: float, current_price: float,
-                                 config: BacktestConfig, trade_type: str,
-                                 strikes: Dict) -> Optional[Trade]:
-        """Execute Iron 3(a) or 3(b) trade"""
-        if not all(contract in quotes for contract in contracts.values()):
-            logger.warning(f"Missing option quotes for {trade_type}, skipping trade")
-            return None
-        
-        trade_contracts = {}
-        strikes_dict = {}
-        
-        # Determine trade size
-        if '3(a)' in trade_type:
-            trade_size = getattr(strategy, 'iron_3_trade_size', 10)
-        else:
-            trade_size = getattr(strategy, 'iron_3_trade_size', 10)
-        
-        # Short positions
-        for leg, contract in [('short_call', contracts['short_call']), 
-                             ('short_put', contracts['short_put'])]:
-            quote = quotes[contract]
-            price = quote['bid']
-            strike = strikes[leg]
-            strikes_dict[leg] = strike
-            
-            trade_contracts[contract] = {
-                'position': -trade_size,
-                'entry_price': price,
-                'leg_type': leg,
-                'strike': strike,
-                'used_capital': config.commission_per_contract
-            }
-        
-        # Long positions
-        for leg, contract in [('long_call', contracts['long_call']), 
-                             ('long_put', contracts['long_put'])]:
-            quote = quotes[contract]
-            price = quote['ask']
-            strike = strikes[leg]
-            strikes_dict[leg] = strike
-            
-            trade_contracts[contract] = {
-                'position': trade_size,
-                'entry_price': price,
-                'leg_type': leg,
-                'strike': strike,
-                'used_capital': price * 100 + config.commission_per_contract
-            }
-        
-        # Create representation
-        if '3(a)' in trade_type:
-            # Iron Butterfly format
-            representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']} {strikes_dict['short_call']}/{strikes_dict['long_call']} ({strikes_dict['short_put'] - strikes_dict['long_put']})"
-            structure_type = 'iron_butterfly'
-        else:
-            # Iron Condor format
-            representation = f"{strikes_dict['long_put']}/{strikes_dict['short_put']}  {strikes_dict['short_call']}/{strikes_dict['long_call']} ({strikes_dict['short_put'] - strikes_dict['long_put']})"
-            structure_type = 'iron_condor'
-        
-        trade = Trade(
-            entry_time=entry_time,
-            exit_time=None,
-            trade_type=trade_type,
-            contracts=trade_contracts,
-            size=trade_size,
-            used_capital=0.0,
-            metadata={
-                'net_premium': net_premium,
-                'strategy_name': 'iron_3a' if '3(a)' in trade_type else 'iron_3b',
-                'entry_spx_price': current_price,
-                'representation': representation,
-                'structure_type': structure_type,
-                'no_exit': True,  # Flag to indicate no exit rules,
-                'wing' : strikes_dict['short_put'] - strikes_dict['long_put']
-            }
-        )
-        
-        return trade
-    
     @staticmethod
     async def _find_iron_trade(i: int,
                               strategy: StrategyConfig, date: datetime,
@@ -484,7 +149,7 @@ class IronCondor3:
                         else:
                             option_date = datetime.combine(date, datetime.min.time())
                         
-                        iron_result = await StrikesFinder._find_iron_condor_strikes(current_price, current_bar_time, strategy, data_provider)
+                        iron_result = await IronCondor3.find_iron_condor_strikes(current_price, current_bar_time, strategy, data_provider, strategy.iron_3_target_win_loss_ratio)
                         
                         if iron_result:
                             strikes = {
@@ -494,18 +159,18 @@ class IronCondor3:
                                 'long_put': iron_result['long_put']
                             }
                             
-                            contracts = IronCondor3._create_option_contracts(strikes, option_date)
+                            contracts = IronCondor3.create_option_contracts(strikes, option_date)
                             quotes = await data_provider.get_option_quotes(
                                 list(contracts.values()), current_bar_time
                             )
                             
-                            net_premium = IronCondor3._calculate_net_credit(quotes, contracts)
+                            net_premium = iron_result['net_premium']
                             
                             if net_premium > 0:
-                                trade = await IronCondor3._execute_iron_trade(
+                                trade = await IronCondorBase.execute(
                                     quotes, current_bar_time, contracts, strategy,
                                      net_premium, current_price, config,
-                                    "Iron Condor 3(a)", strikes
+                                    "Iron Condor 3(a)"
                                 )
                                 
                                 if trade:
@@ -527,8 +192,8 @@ class IronCondor3:
                         else:
                             option_date = datetime.combine(date, datetime.min.time())
                         
-                        iron_result = await IronCondor3._find_iron_condor_strikes(
-                            current_price, current_bar_time, strategy, data_provider
+                        iron_result = await IronCondor3.find_iron_condor_strikes(
+                            current_price, current_bar_time, strategy, data_provider, strategy.iron_3_target_win_loss_ratio
                         )
                         
                         if iron_result:
@@ -539,18 +204,18 @@ class IronCondor3:
                                 'long_put': iron_result['long_put']
                             }
                             
-                            contracts = IronCondor3._create_option_contracts(strikes, option_date)
+                            contracts = IronCondor3.create_option_contracts(strikes, option_date)
                             quotes = await data_provider.get_option_quotes(
                                 list(contracts.values()), current_bar_time
                             )
                             
-                            net_premium = IronCondor3._calculate_net_credit(quotes, contracts)
+                            net_premium = iron_result['net_premium']
                             
                             if net_premium > 0:
-                                trade = await IronCondor3._execute_iron_trade(
+                                trade = await IronCondorBase.execute(
                                     quotes, current_bar_time, contracts, strategy,
                                    net_premium, current_price, config,
-                                    "Iron Condor 3(b)", strikes
+                                    "Iron Condor 3(b)"
                                 )
                                 
                                 if trade:
