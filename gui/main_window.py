@@ -120,7 +120,6 @@ class MainWindow(QMainWindow):
         self._create_menu_bar()
         
     def update_artificial_progress(self):
-        """Update artificial progress by 5% every 8 seconds"""
         if self.artificial_progress < 98:
            self.artificial_progress += 2
     
@@ -456,7 +455,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         
         # Start artificial progress timer (fires every 8 seconds)
-        self.progress_timer.start(20000)  # 8000 milliseconds = 8 seconds
+        self.progress_timer.start(2400)  # 8000 milliseconds = 8 seconds
         
         # Create and start worker
         self.backtest_worker = BacktestWorker(
@@ -496,15 +495,8 @@ class MainWindow(QMainWindow):
     
     def on_backtest_finished_with_progress(self, results):
         """Handle backtest completion with artificial progress"""
-        # Stop the timer if still running
-        self.progress_timer.stop()
-    
-        # Ensure progress shows 100%
-        self.progress_bar.setValue(100)
         self.status_bar.showMessage("Processing results...")
-    
-        # Small delay for visual effect
-        QTimer.singleShot(500, lambda: self.finish_with_results(results))
+        self.finish_with_results(results)
 
     def finish_with_results(self, results):
         """Complete the backtest with actual results"""
@@ -512,13 +504,14 @@ class MainWindow(QMainWindow):
         self.run_backtest_btn.setEnabled(True)
         self.update_results_btn.setEnabled(True)
         self.stop_backtest_btn.setEnabled(False)
-        self.progress_bar.setVisible(False)
-        self.artificial_progress = 0
-    
+        
         if results:
            # Store and display results
            self.last_results = results
+           if(self.progress_bar.value() < 80):
+               self.progress_bar.setValue(80)
            self.results_widget.update_results(results)
+           self.progress_bar.setValue(95)
         
            # Show summary
            stats = results.get('statistics', {})
@@ -534,6 +527,11 @@ class MainWindow(QMainWindow):
            logger.info(f"Backtest completed successfully with {total_trades} trades")
         else:
            self.status_bar.showMessage("Backtest completed (no results)", 5000)
+        self.progress_bar.setValue(100)
+        self.progress_bar.setVisible(False)
+        self.artificial_progress = 0
+        self.progress_timer.stop()
+        
 
 
     def update_results_with_new_sizes(self):
@@ -653,56 +651,6 @@ class MainWindow(QMainWindow):
     
         return equity_curve
 
-    def _recalculate_statistics(self, trades, equity_curve, daily_pnl):
-        if not trades:
-           return {}
-    
-        total_trades = len(trades)
-        winning_trades = [t for t in trades if t.pnl > 0]
-        losing_trades = [t for t in trades if t.pnl < 0]
-    
-        win_rate = len(winning_trades) / total_trades if total_trades > 0 else 0
-        total_pnl = sum(t.pnl for t in trades)
-        avg_trade_pnl = total_pnl / total_trades if total_trades > 0 else 0
-    
-    # Profit factor
-        gross_profit = sum(t.pnl for t in winning_trades)
-        gross_loss = abs(sum(t.pnl for t in losing_trades))
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
-    
-        initial_capital = equity_curve[0][1] if equity_curve else 100000
-        final_capital = equity_curve[-1][1] if equity_curve else initial_capital
-        return_pct = (final_capital - initial_capital) / initial_capital if initial_capital > 0 else 0
-    
-        # Max drawdown
-        max_drawdown = 0
-        peak = initial_capital
-        for _, value in equity_curve:
-            if value > peak:
-               peak = value
-            drawdown = (peak - value) / peak if peak > 0 else 0
-            max_drawdown = max(max_drawdown, drawdown)
-    
-    # Sharpe ratio (simplified)
-        if daily_pnl:
-           daily_returns = [pnl/initial_capital for pnl in daily_pnl.values()]
-           avg_return = sum(daily_returns) / len(daily_returns)
-           return_std = (sum((r - avg_return)**2 for r in daily_returns) / len(daily_returns))**0.5
-           sharpe_ratio = (avg_return / return_std * (252**0.5)) if return_std > 0 else 0
-        else:
-           sharpe_ratio = 0
-    
-        return {
-        'total_trades': total_trades,
-        'win_rate': win_rate,
-        'total_pnl': total_pnl,
-        'avg_trade_pnl': avg_trade_pnl,
-        'profit_factor': profit_factor,
-        'return_pct': return_pct,
-        'max_drawdown': max_drawdown,
-        'sharpe_ratio': sharpe_ratio
-    }
-    
     
     def on_backtest_error(self, error_msg):
         """Handle backtest error"""
