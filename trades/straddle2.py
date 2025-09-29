@@ -23,54 +23,31 @@ class Straddle2:
     @staticmethod
     def _determine_straddle_strikes(iron1_trade: Trade, iron2_trade: Trade, straddle1_trade: Trade,
                                    strategy: StrategyConfig) -> Dict[str, Any]:
-        """
-        Determine Straddle 2 strikes based on Iron 1 and Iron 2 positions.
-        
-        Entry rules:
-        - If Iron 2 short strikes > Iron 1 short strikes: buy same call as Straddle 1
-        - If Iron 2 short strikes < Iron 1 short strikes: buy same put as Straddle 1
-        - For other option: buy at Iron 1 short strikes +/- 100% Iron 1 net premium
-          (furthest away from the OTHER Straddle 2 leg and from Iron 2 short strikes)
-        """
-        # Get Iron 1 details
         iron1_net_premium = iron1_trade.metadata.get('net_premium', 0)
-        iron1_short_call_strike = None
-        iron1_short_put_strike = None
+        iron1_short_strike = None
         
         for contract_data in iron1_trade.contracts.values():
             if contract_data['leg_type'] == 'short_call':
-                iron1_short_call_strike = contract_data['strike']
-            elif contract_data['leg_type'] == 'short_put':
-                iron1_short_put_strike = contract_data['strike']
-        
-        # Get Iron 2 details (Iron Butterfly - both shorts at same ATM strike)
+                iron1_short_strike = contract_data['strike']
+                break
+            
         iron2_atm_strike = None
         for contract_data in iron2_trade.contracts.values():
             if contract_data['leg_type'] in ['short_call', 'short_put']:
                 iron2_atm_strike = contract_data['strike']
-                break  # Both are at same strike for butterfly
-        
-        # Get Straddle 1 strikes
+                break 
+            
+       
         straddle1_call_strike = straddle1_trade.metadata.get('call_straddle_strike')
         straddle1_put_strike = straddle1_trade.metadata.get('put_straddle_strike')
         
-        # Calculate Iron 1 center for comparison
-        iron1_center = (iron1_short_call_strike + iron1_short_put_strike) / 2
-        
-        # Get strike offset percentage parameter (default 100% = 1.0)
-        # Note: Using straddle_2_trigger_multiplier as it represents the 100% parameter
         offset_percentage = getattr(strategy, 'straddle_2_trigger_multiplier', 1.0)
         offset_distance = iron1_net_premium * offset_percentage
         
-        # Determine which leg to copy from Straddle 1 and calculate the other
-        if iron2_atm_strike > iron1_center:
-            # Iron 2 is higher - use same call as Straddle 1
+        if iron2_atm_strike > iron1_short_strike:
             straddle2_call_strike = straddle1_call_strike
-            
-            # For put: calculate both possible strikes
-            put_option_above = iron1_short_put_strike + offset_distance
-            put_option_below = iron1_short_put_strike - offset_distance
-            
+            put_option_above = iron1_short_strike + offset_distance
+            put_option_below = iron1_short_strike - offset_distance
             if straddle2_call_strike >= iron2_atm_strike:
                 chosen_put_strike = put_option_below
             else:
@@ -79,16 +56,9 @@ class Straddle2:
             straddle2_put_strike = round(chosen_put_strike / 5) * 5
             
         else:
-            # Iron 2 is lower or equal - use same put as Straddle 1
             straddle2_put_strike = straddle1_put_strike
-            
-            # For call: calculate both possible strikes
-            call_option_above = iron1_short_call_strike + offset_distance
-            call_option_below = iron1_short_call_strike - offset_distance
-            
-            # Choose the call strike that's furthest from BOTH:
-            # 1. The put strike we just set (straddle2_put_strike)
-            # 2. Iron 2 ATM strike
+            call_option_above = iron1_short_strike + offset_distance
+            call_option_below = iron1_short_strike - offset_distance
             if straddle2_put_strike >= iron2_atm_strike:
                 chosen_call_strike = call_option_below
             else:
@@ -100,9 +70,9 @@ class Straddle2:
             'call_strike': int(straddle2_call_strike),
             'put_strike': int(straddle2_put_strike),
             'iron1_net_premium': iron1_net_premium,
-            'iron1_short_call': iron1_short_call_strike,
-            'iron1_short_put': iron1_short_put_strike,
-            'iron1_center': iron1_center,
+            'iron1_short_call': iron1_short_strike,
+            'iron1_short_put': iron1_short_strike,
+            'iron1_center': iron1_short_strike,
             'iron2_atm_strike': iron2_atm_strike,
             'straddle1_call_strike': straddle1_call_strike,
             'straddle1_put_strike': straddle1_put_strike,

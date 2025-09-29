@@ -118,14 +118,11 @@ class Straddle3:
           (direction further away from Iron 2 short strikes)
         """
         # Get Iron 1 center strike
-        iron1_short_call = None
-        iron1_short_put = None
+        iron_1_short_strike = None
         for contract_data in iron1_trade.contracts.values():
             if contract_data['leg_type'] == 'short_call':
-                iron1_short_call = contract_data['strike']
-            elif contract_data['leg_type'] == 'short_put':
-                iron1_short_put = contract_data['strike']
-        iron1_center = (iron1_short_call + iron1_short_put) / 2 if iron1_short_call and iron1_short_put else None
+                iron_1_short_strike = contract_data['strike']
+                break
         
         # Get Iron 2 details (Iron Butterfly - ATM strike)
         iron2_net_premium = iron2_trade.metadata.get('net_premium', 0)
@@ -151,7 +148,7 @@ class Straddle3:
         offset_distance = iron2_net_premium * offset_multiplier
         
         # Determine which leg to copy from Straddle 1
-        if iron3_atm_strike < iron1_center:
+        if iron3_atm_strike < iron_1_short_strike:
             # Iron 3(b) is lower than Iron 1 - use same put as Straddle 1
             straddle3_put_strike = straddle1_put_strike
             
@@ -186,7 +183,7 @@ class Straddle3:
         return {
             'call_strike': int(straddle3_call_strike),
             'put_strike': int(straddle3_put_strike),
-            'iron1_center': iron1_center,
+            'iron1_center': iron_1_short_strike,
             'iron2_net_premium': iron2_net_premium,
             'iron2_atm_strike': iron2_atm_strike,
             'iron3_atm_strike': iron3_atm_strike,
