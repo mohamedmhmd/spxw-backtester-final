@@ -382,7 +382,6 @@ class Straddle3:
             trade_type="Straddle 3(b)",
             contracts=trade_contracts,
             size=trade_size,
-            entry_signals={'triggered_by': 'iron_3b', 'entered_with': 'iron_3b'},
             used_capital=0.0,
             metadata={
                 'strategy_name': 'straddle_3b',

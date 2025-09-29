@@ -34,44 +34,39 @@ class IronCondor3(IronCondorBase):
         Check if current price triggers Iron 3(a) entry.
         Trigger: SPX moves to Iron 2 short strike +/- 100% of Iron 2 net premium
         """
-                # Get Iron 1 trade details
         iron_1_net_premium = iron1_trade.metadata.get('net_premium', 0)
-            
-        # Find short strikes from trade contracts
         iron_1_short_strike = None
-        
         for contract_symbol, contract_data in iron1_trade.contracts.items():
             if contract_data['leg_type'] == 'short_call':
                 iron_1_short_strike = contract_data['strike']
-                break
-                
+                break      
         d = iron_1_short_strike - iron_1_net_premium
         u = iron_1_short_strike + iron_1_net_premium
         
-        if current_price >= d and current_price <= u:
-            return False
+        if current_price > d and current_price < u:
+            return False 
+        
         
         iron2_net_premium = iron2_trade.metadata.get('net_premium', 0)
-        
-        # Iron 2 is an Iron Butterfly, so both shorts are at same ATM strike
         iron2_atm_strike = None
         for contract_data in iron2_trade.contracts.values():
             if contract_data['leg_type'] in ['short_call', 'short_put']:
                 iron2_atm_strike = contract_data['strike']
                 break
         
-        if iron2_atm_strike is None:
-            return False
-        
-        # Calculate trigger prices
         trigger_multiplier = getattr(strategy_config, 'iron_3_trigger_multiplier', 1.0)
-        upper_trigger = iron2_atm_strike + trigger_multiplier * iron2_net_premium
-        lower_trigger = iron2_atm_strike - trigger_multiplier * iron2_net_premium
-        
-        if current_price >= upper_trigger or current_price <= lower_trigger:
-            logger.info(f"Iron 3(a) trigger price reached: {current_price:.2f} "
-                       f"(triggers: {lower_trigger:.2f} - {upper_trigger:.2f})")
-            return True
+        if abs(iron2_atm_strike - d) < abs(iron2_atm_strike - u):
+            lower_trigger = iron2_atm_strike - trigger_multiplier * iron2_net_premium
+            if(current_price <= lower_trigger):
+                logger.info(f"Iron 3(a) trigger price reached: {current_price:.2f} "
+                           f"(trigger: {lower_trigger:.2f})")
+                return True
+        else:
+            upper_trigger = iron2_atm_strike + trigger_multiplier * iron2_net_premium
+            if(current_price >= upper_trigger):
+                logger.info(f"Iron 3(a) trigger price reached: {current_price:.2f} "
+                           f"(trigger: {upper_trigger:.2f})")
+                return True
         
         return False
     
