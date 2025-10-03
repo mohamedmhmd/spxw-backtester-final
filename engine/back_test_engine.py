@@ -188,7 +188,7 @@ class BacktestEngine:
             
             if not cs1a_found:
                 cs1a_trade = await CreditSpread1._find_credit_spread_trade(i,strategy,date,current_price,current_bar_time,
-                                                                            self.data_provider, config, checker, spx_ohlc_data,spy_ohlc_data,'a')
+                                                                            self.data_provider, config, checker, spx_ohlc_data,'a')
                 if cs1a_trade:
                    trades.append(cs1a_trade)
                    cs1a_found = True 
@@ -196,7 +196,7 @@ class BacktestEngine:
                    
             if not cs1b_found:
                 cs1b_trade = await CreditSpread1._find_credit_spread_trade(i,strategy,date,current_price,current_bar_time,
-                                                                            self.data_provider, config, checker, spx_ohlc_data,spy_ohlc_data,'b')
+                                                                            self.data_provider, config, checker, spx_ohlc_data,'b')
                 if cs1b_trade:
                    trades.append(cs1b_trade)
                    cs1b_found = True 

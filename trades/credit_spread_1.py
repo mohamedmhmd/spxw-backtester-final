@@ -25,16 +25,16 @@ class CreditSpread1:
     """
     
     @staticmethod
-    def _determine_market_direction(spy_ohlc_data, current_idx: int) -> str:
+    def _determine_market_direction(spx_ohlc_data, current_idx: int) -> str:
         """
         Determine if SPY (the market) is up or down for the day
         Returns: 'up' if current price > open, 'down' otherwise
         """
-        if current_idx < 0 or current_idx >= len(spy_ohlc_data):
+        if current_idx < 0 or current_idx >= len(spx_ohlc_data):
             return 'neutral'
         
-        current_row = spy_ohlc_data.iloc[current_idx]
-        daily_open = spy_ohlc_data.iloc[0]['open']  # First bar's open
+        current_row = spx_ohlc_data.iloc[current_idx]
+        daily_open = spx_ohlc_data.iloc[0]['open']  # First bar's open
         current_price = current_row['close']
         
         return 'up' if current_price > daily_open else 'down'
@@ -59,7 +59,6 @@ class CreditSpread1:
     async def _find_credit_spread_strikes(
         is_call_spread: bool,
         target_strike: float,
-        current_price: float,  # Add current_price parameter
         timestamp: datetime,
         strategy: StrategyConfig,
         data_provider: Union[MockDataProvider, PolygonDataProvider],
@@ -304,7 +303,6 @@ class CreditSpread1:
         config: BacktestConfig,
         checker: OptimizedSignalChecker,
         spx_ohlc_data,
-        spy_ohlc_data,
         variant: str = 'a'  # 'a' or 'b'
     ) -> Optional[Trade]:
         """Find and execute Credit Spread 1(a) or 1(b) trade"""
@@ -314,7 +312,7 @@ class CreditSpread1:
             return None
         
         # Determine market direction using SPY data
-        market_direction = CreditSpread1._determine_market_direction(spy_ohlc_data, i)
+        market_direction = CreditSpread1._determine_market_direction(spx_ohlc_data, i)
         
         # Get day's extremes from SPX data
         high_of_day, low_of_day = CreditSpread1._get_day_extremes(spx_ohlc_data, i)
@@ -355,7 +353,6 @@ class CreditSpread1:
         spread_result = await CreditSpread1._find_credit_spread_strikes(
             is_call_spread,
             target_strike,
-            current_price,  # Pass SPX current_price
             current_bar_time,
             strategy,
             data_provider,
