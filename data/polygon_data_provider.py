@@ -272,3 +272,38 @@ class PolygonDataProvider:
                 quotes[contract] = result
                 
         return quotes
+    
+    
+    async def get_spx_closing_price(self, date: datetime) -> Optional[float]:
+    
+          # Format date for API call
+          date_str = date.strftime('%Y-%m-%d')
+    
+           # Use daily aggregates endpoint for closing price
+          url = f"{self.base_url}/v2/aggs/ticker/I:SPX/range/1/day/{date_str}/{date_str}"
+          params = {
+        "apiKey": self.api_key,
+        "adjusted": "true"
+    }
+    
+          try:
+            data = await self._rate_limited_request(url, params)
+        
+            if 'results' in data and data['results']:
+               # Should only have one result for single day
+               result = data['results'][0]
+               closing_price = result.get('c')  # 'c' is close price
+            
+               if closing_price:
+                  logger.info(f"SPX closing price for {date_str}: ${closing_price:.2f}")
+                  return float(closing_price)
+               else:
+                  logger.warning(f"No closing price in data for {date_str}")
+                  return None
+            else:
+                logger.warning(f"No SPX data available for {date_str}")
+                return None
+            
+          except Exception as e:
+            logger.error(f"Error fetching SPX closing price for {date_str}: {e}")
+            return None

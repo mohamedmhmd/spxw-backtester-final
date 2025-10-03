@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from typing import Dict, Optional, Union
 from config.back_test_config import BacktestConfig
@@ -25,19 +25,15 @@ class CreditSpread1:
     """
     
     @staticmethod
-    def _determine_market_direction(spx_ohlc_data, current_idx: int) -> str:
+    async def _determine_market_direction(current_price : float, date : datetime, data_provider : Union[MockDataProvider, PolygonDataProvider]) -> str:
         """
         Determine if SPY (the market) is up or down for the day
         Returns: 'up' if current price > open, 'down' otherwise
         """
-        if current_idx < 0 or current_idx >= len(spx_ohlc_data):
-            return 'neutral'
         
-        current_row = spx_ohlc_data.iloc[current_idx]
-        daily_open = spx_ohlc_data.iloc[0]['open']  # First bar's open
-        current_price = current_row['close']
+        yesterday_close = await data_provider.get_spx_closing_price(date - timedelta(days=1))
         
-        return 'up' if current_price > daily_open else 'down'
+        return 'up' if current_price > yesterday_close else 'down'
     
     @staticmethod
     def _get_day_extremes(spx_ohlc_data, current_idx: int) -> tuple:
@@ -312,7 +308,7 @@ class CreditSpread1:
             return None
         
         # Determine market direction using SPY data
-        market_direction = CreditSpread1._determine_market_direction(spx_ohlc_data, i)
+        market_direction = await CreditSpread1._determine_market_direction(current_price, date, data_provider)
         
         # Get day's extremes from SPX data
         high_of_day, low_of_day = CreditSpread1._get_day_extremes(spx_ohlc_data, i)
