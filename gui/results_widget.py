@@ -233,8 +233,11 @@ class ResultsWidget(QWidget):
         self.tabs.addTab(self.equity_widget, "📈 Equity Curve")
         
         # Trades tab
-        self.trades_widget = self._create_trades_widget()
-        self.tabs.addTab(self.trades_widget, "📋 Trades")
+        self.trades_16_widget = self._create_trades_16_widget()
+        self.tabs.addTab(self.trades_16_widget, "📋 Trades 16")
+        
+        self.trades_17_widget = self._create_trades_17_widget()
+        self.tabs.addTab(self.trades_17_widget, "📋 Trades 17")
         
         # Daily P&L tab
         self.daily_pnl_widget = self._create_daily_pnl_widget()
@@ -316,7 +319,8 @@ class ResultsWidget(QWidget):
         self.stat_cards = {}
         stats_config = [
         ('total_trades', 'Total Trades', '#2196F3'),
-        ('win_rate', 'Win Rate', '#4CAF50'),
+        ('trade_16_win_rate', 'Trades 16 Win Rate', '#4CAF50'),
+        ('trade_17_win_rate', 'Trades 17 Win Rate', '#4CAF50'),
         ('total_pnl', 'Total P&L', '#FF9800'),
         ('total_capital_used', 'Capital Used', '#9E9E9E'),
         ('avg_trade_pnl', 'Avg Trade P&L', '#9C27B0'),
@@ -342,6 +346,12 @@ class ResultsWidget(QWidget):
         ('straddle_3_trades', 'Straddle 3 Trades', '#E91E63'),
         ('straddle_3_pnl', 'Straddle 3 P&L', '#8BC34A'),
         ('straddle_3_win_rate', 'Straddle 3 Win Rate', '#FF9800'),
+        ('cs_1a_trades', 'CS 1(a) Trades', '#3F51B5'),
+        ('cs_1a_pnl', 'CS 1(a) P&L', '#E91E63'),
+        ('cs_1a_win_rate', 'CS 1(a) Win Rate', '#8BC34A'),
+        ('cs_1b_trades', 'CS 1(b) Trades', '#3F51B5'),
+        ('cs_1b_pnl', 'CS 1(b) P&L', '#E91E63'),
+        ('cs_1b_win_rate', 'CS 1(b) Win Rate', '#8BC34A'),
     ]
     
         # Arrange in 3 rows x 3 columns for better layout
@@ -384,55 +394,104 @@ class ResultsWidget(QWidget):
         widget.setLayout(layout)
         return widget
     
-    def _create_trades_widget(self):
+    def _create_trades_16_widget(self):
         """Create enhanced trades table"""
-        widget = QWidget()
-        layout = QVBoxLayout()
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(16)
+        widget_16 = QWidget()
+        layout_16 = QVBoxLayout()
+        layout_16.setContentsMargins(16, 16, 16, 16)
+        layout_16.setSpacing(16)
         
         # Header
-        header_label = QLabel("Trade History")
-        header_label.setStyleSheet("""
+        header_label_16 = QLabel("Trade History")
+        header_label_16.setStyleSheet("""
             QLabel {
                 font-size: 18px;
                 font-weight: bold;
                 color: #212121;
             }
         """)
-        layout.addWidget(header_label)
+        layout_16.addWidget(header_label_16)
         
         # Create enhanced table
-        self.trades_table = EnhancedTableWidget()
-        self.trades_table.setColumnCount(9)
-        self.trades_table.setHorizontalHeaderLabels([
+        self.trades_16_table = EnhancedTableWidget()
+        self.trades_16_table.setColumnCount(9)
+        self.trades_16_table.setHorizontalHeaderLabels([
             "Entry Time", "Exit Time", "Type", "Entry SPX Price", "Exit SPX Price", "Strategy Details", 
             "Size", "Net Premium", "P&L"
         ])
         
         # Set column widths for optimal horizontal scrolling
-        header = self.trades_table.horizontalHeader()
+        header_16 = self.trades_16_table.horizontalHeader()
         
         # Set specific widths that work well for scrolling
-        self.trades_table.setColumnWidth(0, 120)  # Entry Time
-        self.trades_table.setColumnWidth(1, 120)  # Exit Time  
-        self.trades_table.setColumnWidth(2, 150)  # Type
-        self.trades_table.setColumnWidth(3, 100)  # Entry SPX Price
-        self.trades_table.setColumnWidth(4, 100)  # Exit SPX Price
-        self.trades_table.setColumnWidth(5, 200)  # Strategy Details - Made much wider
-        self.trades_table.setColumnWidth(6, 80)   # Size
-        self.trades_table.setColumnWidth(7, 120)  # Net Premium
-        self.trades_table.setColumnWidth(8, 100)  # P&L
+        self.trades_16_table.setColumnWidth(0, 120)  # Entry Time
+        self.trades_16_table.setColumnWidth(1, 120)  # Exit Time  
+        self.trades_16_table.setColumnWidth(2, 150)  # Type
+        self.trades_16_table.setColumnWidth(3, 100)  # Entry SPX Price
+        self.trades_16_table.setColumnWidth(4, 100)  # Exit SPX Price
+        self.trades_16_table.setColumnWidth(5, 200)  # Strategy Details - Made much wider
+        self.trades_16_table.setColumnWidth(6, 80)   # Size
+        self.trades_16_table.setColumnWidth(7, 120)  # Net Premium
+        self.trades_16_table.setColumnWidth(8, 100)  # P&L
         
         # Allow manual column resizing
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header_16.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         
         # Enable horizontal scrolling when content exceeds widget width
-        self.trades_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.trades_16_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
-        layout.addWidget(self.trades_table)
-        widget.setLayout(layout)
-        return widget
+        layout_16.addWidget(self.trades_16_table)
+        widget_16.setLayout(layout_16)
+        return widget_16
+    
+    def _create_trades_17_widget(self):
+        """Create enhanced trades table"""
+        widget_17 = QWidget()
+        layout_17 = QVBoxLayout()
+        layout_17.setContentsMargins(16, 16, 16, 16)
+        layout_17.setSpacing(16)
+        
+        # Header
+        header_label_17 = QLabel("Trade History")
+        header_label_17.setStyleSheet("""
+            QLabel {
+                font-size: 18px;
+                font-weight: bold;
+                color: #212121;
+            }
+        """)
+        layout_17.addWidget(header_label_17)
+        
+        # Create enhanced table
+        self.trades_table_17 = EnhancedTableWidget()
+        self.trades_table_17.setColumnCount(9)
+        self.trades_table_17.setHorizontalHeaderLabels([
+            "Entry Time", "Exit Time", "Type", "Entry SPX Price", "Exit SPX Price", "Strategy Details", 
+            "Size", "Net Premium", "P&L"
+        ])
+        
+        # Set column widths for optimal horizontal scrolling
+        header_17 = self.trades_table_17.horizontalHeader()
+        
+        # Set specific widths that work well for scrolling
+        self.trades_table_17.setColumnWidth(0, 120)  # Entry Time
+        self.trades_table_17.setColumnWidth(1, 120)  # Exit Time  
+        self.trades_table_17.setColumnWidth(2, 150)  # Type
+        self.trades_table_17.setColumnWidth(3, 100)  # Entry SPX Price
+        self.trades_table_17.setColumnWidth(4, 100)  # Exit SPX Price
+        self.trades_table_17.setColumnWidth(5, 200)  # Strategy Details - Made much wider
+        self.trades_table_17.setColumnWidth(6, 80)   # Size
+        self.trades_table_17.setColumnWidth(7, 120)  # Net Premium
+        self.trades_table_17.setColumnWidth(8, 100)  # P&L
+        
+        
+        header_17.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        
+        self.trades_table_17.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        layout_17.addWidget(self.trades_table_17)
+        widget_17.setLayout(layout_17)
+        return widget_17
     
     def _create_daily_pnl_widget(self):
         """Create daily P&L chart with enhanced styling"""
@@ -588,7 +647,7 @@ class ResultsWidget(QWidget):
             if key in stats:
                value = stats[key]
             if key in ['total_pnl', 'avg_trade_pnl', 'total_capital_used', 'iron_1_pnl', 'iron_2_pnl', 'iron_3_pnl',
-                       'straddle_1_pnl', 'straddle_2_pnl', 'straddle_3_pnl']:
+                       'straddle_1_pnl', 'straddle_2_pnl', 'straddle_3_pnl', 'cs_1a_pnl', 'cs_1b_pnl']:
                 # Use shorter format for large numbers
                 if abs(value) >= 1000000:
                     formatted_value = f"${value/1000000:.2f}M"
@@ -601,13 +660,13 @@ class ResultsWidget(QWidget):
                     color = "#9E9E9E"
                 else:
                     color = "#4CAF50" if value >= 0 else "#F44336"
-            elif key in ['win_rate', 'max_drawdown', 'return_pct', 'iron_1_win_rate', 'iron_2_win_rate', 'iron_3_win_rate',
-                         'straddle_1_win_rate', 'straddle_2_win_rate', 'straddle_3_win_rate']:
+            elif key in ['trade_16_win_rate', 'trade_17_win_rate', 'max_drawdown', 'return_pct', 'iron_1_win_rate', 'iron_2_win_rate', 'iron_3_win_rate',
+                         'straddle_1_win_rate', 'straddle_2_win_rate', 'straddle_3_win_rate', 'cs_1a_win_rate', 'cs_1b_win_rate']:
                 formatted_value = f"{value:.1%}"
                 if key == 'max_drawdown':
                     color = "#F44336"
-                elif key in ['win_rate', 'iron_1_win_rate', 'iron_2_win_rate', 'iron_3_win_rate',
-                             'straddle_1_win_rate', 'straddle_2_win_rate', 'straddle_3_win_rate']:
+                elif key in ['trade_16_win_rate', 'trade_17_win_rate', 'iron_1_win_rate', 'iron_2_win_rate', 'iron_3_win_rate',
+                             'straddle_1_win_rate', 'straddle_2_win_rate', 'straddle_3_win_rate', 'cs_1a_win_rate', 'cs_1b_win_rate']:
                     color = "#4CAF50" if value >= 0.5 else "#FF9800"
                 else:
                     color = "#4CAF50" if value >= 0 else "#F44336"
@@ -723,13 +782,21 @@ class ResultsWidget(QWidget):
     
     def _update_trades_table(self, trades: List[Trade]):
         """Update trades table with enhanced formatting"""
-        self.trades_table.setRowCount(len(trades))
+        trades_16_types = {"Iron Condor 1", "Iron Condor 2", "Iron Condor 3(a)", "Iron Condor 3(b)",
+                           "Straddle 1", "Straddle 2", "Straddle 3(a)", "Straddle 3(b)"}
+        trades_17_types = {"Credit Spread 1(a)", "Credit Spread 1(b)"}
+        self.trades_16_table.setRowCount(len([t for t in trades if t.trade_type in trades_16_types]))
+        self.trades_table_17.setRowCount(len([t for t in trades if t.trade_type in trades_17_types]))
         
-        for i, trade in enumerate(trades):
+        i16, i17 = 0, 0
+        for trade in trades:
             # Entry time
             entry_item = QTableWidgetItem(trade.entry_time.strftime('%Y-%m-%d\n%H:%M'))
             entry_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.trades_table.setItem(i, 0, entry_item)
+            if(trade.trade_type in trades_16_types):
+                self.trades_16_table.setItem(i16, 0, entry_item)
+            elif (trade.trade_type in trades_17_types):
+                self.trades_table_17.setItem(i17, 0, entry_item)
             
             # Exit time
             if trade.exit_time:
@@ -738,25 +805,37 @@ class ResultsWidget(QWidget):
                 exit_text = "Open"
             exit_item = QTableWidgetItem(exit_text)
             exit_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.trades_table.setItem(i, 1, exit_item)
+            if(trade.trade_type in trades_16_types):
+                self.trades_16_table.setItem(i16, 1, exit_item)
+            elif (trade.trade_type in trades_17_types):
+                self.trades_table_17.setItem(i17, 1, exit_item)
             
             # Type with color coding
             type_item = QTableWidgetItem(f"{trade.trade_type} \n {trade.metadata.get('representation', '')}")
             type_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             type_item.setBackground(QColor("#E3F2FD"))
-            self.trades_table.setItem(i, 2, type_item)
+            if(trade.trade_type in trades_16_types):
+                self.trades_16_table.setItem(i16, 2, type_item)
+            elif (trade.trade_type in trades_17_types):
+                self.trades_table_17.setItem(i17, 2, type_item)
             
             # Entry SPX Price
             entry_spx_price = trade.metadata.get('entry_spx_price', 'N/A')
             spx_item = QTableWidgetItem(f"${entry_spx_price:,.2f}" if isinstance(entry_spx_price, (int, float)) else str(entry_spx_price))
             spx_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.trades_table.setItem(i, 3, spx_item)
+            if(trade.trade_type in trades_16_types):
+                self.trades_16_table.setItem(i16, 3, spx_item)
+            elif (trade.trade_type in trades_17_types):
+                self.trades_table_17.setItem(i17, 3, spx_item)
             
             # Exit SPX Price
             exit_spx_price = trade.metadata.get('exit_spx_price', 'N/A')
             spx_item = QTableWidgetItem(f"${exit_spx_price:,.2f}" if isinstance(exit_spx_price, (int, float)) else str(exit_spx_price))
             spx_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.trades_table.setItem(i, 4, spx_item)
+            if(trade.trade_type in trades_16_types):
+                self.trades_16_table.setItem(i16, 4, spx_item)
+            elif (trade.trade_type in trades_17_types):
+                self.trades_table_17.setItem(i17, 4, spx_item)
             
             # Legs details with elegant formatting
             legs_widget = QWidget()
@@ -825,12 +904,18 @@ class ResultsWidget(QWidget):
                 legs_layout.addWidget(leg_frame)
             
             legs_widget.setLayout(legs_layout)
-            self.trades_table.setCellWidget(i, 5, legs_widget)
+            if(trade.trade_type in trades_16_types):
+                self.trades_16_table.setCellWidget(i16, 5, legs_widget)
+            elif (trade.trade_type in trades_17_types):
+                self.trades_table_17.setCellWidget(i17, 5, legs_widget)
             
             # Size
             size_item = QTableWidgetItem(str(trade.size))
             size_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.trades_table.setItem(i, 6, size_item)
+            if(trade.trade_type in trades_16_types):
+                self.trades_16_table.setItem(i16, 6, size_item)
+            elif (trade.trade_type in trades_17_types):
+                self.trades_table_17.setItem(i17, 6, size_item)
             
             # Net Premium
             sign = 1 if "Iron" in trade.trade_type else -1
@@ -842,7 +927,10 @@ class ResultsWidget(QWidget):
                 premium_item.setForeground(QColor("#4CAF50"))
             else:
                 premium_item.setForeground(QColor("#F44336"))
-            self.trades_table.setItem(i, 7, premium_item)
+            if(trade.trade_type in trades_16_types):
+                self.trades_16_table.setItem(i16, 7, premium_item)
+            elif (trade.trade_type in trades_17_types):
+                self.trades_table_17.setItem(i17, 7, premium_item)
             
             # P&L with enhanced styling
             pnl_item = QTableWidgetItem(f"${trade.pnl:,.2f}")
@@ -856,10 +944,20 @@ class ResultsWidget(QWidget):
                 pnl_item.setForeground(QColor("#F44336"))
                 pnl_item.setBackground(QColor("#FFEBEE"))
             
-            self.trades_table.setItem(i, 8, pnl_item)
+            if(trade.trade_type in trades_16_types):
+                self.trades_16_table.setItem(i16, 8, pnl_item)
+            elif (trade.trade_type in trades_17_types):
+                self.trades_table_17.setItem(i17, 8, pnl_item)
+            
+            if(trade.trade_type in trades_16_types):
+               i16 += 1
+            elif (trade.trade_type in trades_17_types):
+               i17 += 1
         
         # Adjust row heights
-        self.trades_table.resizeRowsToContents()
+        self.trades_16_table.resizeRowsToContents()
+        self.trades_table_17.resizeRowsToContents()
+        
     
     def _plot_daily_pnl(self, daily_pnl: Dict[datetime, float]):
         """Plot enhanced daily P&L"""

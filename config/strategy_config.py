@@ -8,15 +8,15 @@ class StrategyConfig:
     trade_type: str = "Iron Condor 1 & Straddle 1"
     
     # Iron Condor 1 Entry signal parameters
-    iron_1_consecutive_candles: int = 3  # Three consecutive 5min candles
-    iron_1_volume_threshold: float = 0.5  # 50% of first candle volume
-    iron_1_lookback_candles: int = 4  # Last four 5min candles for direction check
-    iron_1_avg_range_candles: int = 2  # Last two 5min candles for range check
-    iron_1_range_threshold: float = 0.8  # 80% of day's average range
-    iron_1_trade_size: int = 10  # 10 contracts (configurable)
-    iron_1_target_win_loss_ratio: float = 1.5  # Target 1.5:1 win/loss ratio
-    min_wing_width: int = 15  # Minimum distance from ATM
-    max_wing_width: int = 70  # Maximum distance from ATM
+    iron_1_consecutive_candles: int = 3  
+    iron_1_volume_threshold: float = 0.5 
+    iron_1_lookback_candles: int = 4 
+    iron_1_avg_range_candles: int = 2  
+    iron_1_range_threshold: float = 0.8  
+    iron_1_trade_size: int = 10  
+    iron_1_target_win_loss_ratio: float = 1.5  
+    min_wing_width: int = 15  
+    max_wing_width: int = 70  
     
     # Straddle 1 parameters
     straddle_1_trade_size: int = 2
@@ -54,8 +54,16 @@ class StrategyConfig:
     straddle_3_trigger_multiplier: float = 1.0  # 100% of Iron 2 net premium for strike calculation
     straddle_3_exit_percentage: float = 0.5  # Exit 50% of position
     straddle_3_exit_multiplier: float = 2.0  # Exit when price is 2x entry
-    
     straddle_itm_override_multiplier: float = 2.5
+    
+    #Credit Spread 1 parameters
+    cs_1_consecutive_candles: int = 3  
+    cs_1_volume_threshold: float = 0.5 
+    cs_1_lookback_candles: int = 4 
+    cs_1_avg_range_candles: int = 2  
+    cs_1_range_threshold: float = 0.8  
+    cs_1_trade_size: int = 10  
+    cs_1_target_win_loss_ratio: float = 3.0
     
     def to_dict(self) -> dict:
         return {
@@ -103,7 +111,15 @@ class StrategyConfig:
             'straddle_3_trigger_multiplier': self.straddle_3_trigger_multiplier,
             'straddle_3_exit_percentage': self.straddle_3_exit_percentage,
             'straddle_3_exit_multiplier': self.straddle_3_exit_multiplier,
-            'straddle_itm_override_multiplier': self.straddle_itm_override_multiplier
+            'straddle_itm_override_multiplier': self.straddle_itm_override_multiplier,
+            # Credit Spread 1 parameters
+            'cs_1_consecutive_candles': self.cs_1_consecutive_candles,
+            'cs_1_volume_threshold': self.cs_1_volume_threshold,
+            'cs_1_lookback_candles': self.cs_1_lookback_candles,
+            'cs_1_avg_range_candles': self.cs_1_avg_range_candles,
+            'cs_1_range_threshold': self.cs_1_range_threshold,
+            'cs_1_trade_size': self.cs_1_trade_size,
+            'cs_1_target_win_loss_ratio': self.cs_1_target_win_loss_ratio    
 
         }
     

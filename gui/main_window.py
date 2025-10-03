@@ -547,11 +547,12 @@ class MainWindow(QMainWindow):
         straddle_2_size = strategy_config.straddle_2_trade_size
         iron_3_size = strategy_config.iron_3_trade_size
         straddle_3_size = strategy_config.straddle_3_trade_size
+        cs_1_size = strategy_config.cs_1_trade_size
     
         self.status_bar.showMessage("Updating results with new trade sizes...")
     
         # Create scaled copy of results
-        scaled_results = self._scale_results(self.last_results, iron_1_size, straddle_1_size, iron_2_size, straddle_2_size, iron_3_size, straddle_3_size)
+        scaled_results = self._scale_results(self.last_results, iron_1_size, straddle_1_size, iron_2_size, straddle_2_size, iron_3_size, straddle_3_size, cs_1_size)
         self.last_results = scaled_results  # Update last_results to the scaled version
         # Update results widget
         self.results_widget.update_results(scaled_results)
@@ -572,7 +573,7 @@ class MainWindow(QMainWindow):
     
         logger.info(f"Results updated with Iron 1 size: {iron_1_size}, Straddle 1 size: {straddle_1_size}, Iron 2 size: {iron_2_size} Straddle 2 size: {straddle_2_size}")
     
-    def _scale_results(self, original_results, iron_1_size, straddle_1_size, iron_2_size, straddle_2_size, iron_3_size, straddle_3_size):
+    def _scale_results(self, original_results, iron_1_size, straddle_1_size, iron_2_size, straddle_2_size, iron_3_size, straddle_3_size, cs_1_size):
         scaled_results = copy.deepcopy(original_results)
         scaled_daily_pnl = {}
         total_capital_used = 0.0
@@ -590,6 +591,8 @@ class MainWindow(QMainWindow):
                scale_factor = iron_3_size
             elif "Straddle 3" in trade.trade_type:
                scale_factor = straddle_3_size
+            elif trade.trade_type == "Credit Spread 1(a)" or trade.trade_type == "Credit Spread 1(b)":
+               scale_factor = cs_1_size
             else:
                 scale_factor = 1  # Default fallback
         

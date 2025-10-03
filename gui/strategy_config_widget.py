@@ -348,9 +348,59 @@ class StrategyConfigWidget(QWidget):
         self.straddle_itm_override_multiplier.setValue(2.5)
         self.straddle_itm_override_multiplier.setToolTip("Multiplier override for ITM straddles")
         layout.addRow("Straddle ITM Override Multiplier:", self.straddle_itm_override_multiplier)
-
-
         
+        
+        # === CREDIT SPREAD 1 settings ===
+        cs_1_label = QLabel("=== CREDIT SPREAD 1 SETTINGS ===")
+        cs_1_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+        layout.addRow(cs_1_label)
+        
+        self.cs_1_trade_size = QSpinBox()
+        self.cs_1_trade_size.setRange(0, 1000000)
+        self.cs_1_trade_size.setValue(10)
+        self.cs_1_trade_size.setToolTip("Number of contracts per cs_1 trade")
+        layout.addRow("CS 1 Size:", self.cs_1_trade_size)
+
+        self.cs_1_consecutive_candles = QSpinBox()
+        self.cs_1_consecutive_candles.setRange(1, 100)
+        self.cs_1_consecutive_candles.setValue(3)
+        self.cs_1_consecutive_candles.setToolTip("Number of consecutive 5-min candles to check for volume condition")
+        layout.addRow("CS 1 Consecutive Candles (Volume Check):", self.cs_1_consecutive_candles)
+
+        self.cs_1_volume_threshold = QDoubleSpinBox()
+        self.cs_1_volume_threshold.setRange(0.0, 10000.0)
+        self.cs_1_volume_threshold.setSingleStep(0.05)
+        self.cs_1_volume_threshold.setValue(0.5)
+        self.cs_1_volume_threshold.setToolTip("Volume threshold as fraction of first 5-min candle (0.5 = 50%)")
+        layout.addRow("CS 1 Volume Threshold (% of 1st candle):", self.cs_1_volume_threshold)
+
+        self.cs_1_lookback_candles = QSpinBox()
+        self.cs_1_lookback_candles.setRange(1, 100)
+        self.cs_1_lookback_candles.setValue(4)
+        self.cs_1_lookback_candles.setToolTip("Number of recent candles to check direction (not all same color)")
+        layout.addRow("CS 1 Direction Check Candles:", self.cs_1_lookback_candles)
+
+        self.cs_1_avg_range_candles = QSpinBox()
+        self.cs_1_avg_range_candles.setRange(1, 100)
+        self.cs_1_avg_range_candles.setValue(2)
+        self.cs_1_avg_range_candles.setToolTip("Number of recent candles to average for range comparison")
+        layout.addRow("CS 1 Range Avg Candles:", self.cs_1_avg_range_candles)
+
+        self.cs_1_range_threshold = QDoubleSpinBox()
+        self.cs_1_range_threshold.setRange(0.0, 100000.0)
+        self.cs_1_range_threshold.setSingleStep(0.05)
+        self.cs_1_range_threshold.setValue(0.8)
+        self.cs_1_range_threshold.setToolTip("Range threshold as fraction of day's average range (0.8 = 80%)")
+        layout.addRow("CS 1 Range Threshold (% of day avg):", self.cs_1_range_threshold)
+
+
+        self.cs_1_target_win_loss_ratio = QDoubleSpinBox()
+        self.cs_1_target_win_loss_ratio.setRange(0.0, 100000.0)
+        self.cs_1_target_win_loss_ratio.setSingleStep(0.1)
+        self.cs_1_target_win_loss_ratio.setValue(3.0)
+        self.cs_1_target_win_loss_ratio.setToolTip("Target win/loss ratio for strike selection (1.5 = 1.5:1)")
+        layout.addRow("CS 1 Target Win/Loss Ratio:", self.cs_1_target_win_loss_ratio)
+
         # Add some spacing at the end
         spacer_label = QLabel("")
         spacer_label.setMinimumHeight(20)
@@ -467,6 +517,14 @@ class StrategyConfigWidget(QWidget):
             straddle_3_exit_percentage = self.straddle_3_exit_percentage.value(),
             straddle_3_exit_multiplier = self.straddle_3_exit_multiplier.value(),
             straddle_itm_override_multiplier = self.straddle_itm_override_multiplier.value(),
+            cs_1_consecutive_candles=self.cs_1_consecutive_candles.value(),
+            cs_1_volume_threshold=self.cs_1_volume_threshold.value(),
+            cs_1_lookback_candles=self.cs_1_lookback_candles.value(),
+            cs_1_avg_range_candles=self.cs_1_avg_range_candles.value(),
+            cs_1_range_threshold=self.cs_1_range_threshold.value(),
+            cs_1_trade_size=self.cs_1_trade_size.value(),
+            cs_1_target_win_loss_ratio=self.cs_1_target_win_loss_ratio.value(),
+            
         )
     
     def set_config(self, config: StrategyConfig):
@@ -510,5 +568,12 @@ class StrategyConfigWidget(QWidget):
         self.straddle_3_exit_percentage.setValue(config.straddle_3_exit_percentage)
         self.straddle_3_exit_multiplier.setValue(config.straddle_3_exit_multiplier)
         self.straddle_itm_override_multiplier.setValue(config.straddle_itm_override_multiplier)
+        self.cs_1_consecutive_candles.setValue(config.cs_1_consecutive_candles)
+        self.cs_1_volume_threshold.setValue(config.cs_1_volume_threshold)
+        self.cs_1_lookback_candles.setValue(config.cs_1_lookback_candles)
+        self.cs_1_avg_range_candles.setValue(config.cs_1_avg_range_candles)
+        self.cs_1_range_threshold.setValue(config.cs_1_range_threshold)
+        self.cs_1_trade_size.setValue(config.cs_1_trade_size)
+        self.cs_1_target_win_loss_ratio.setValue(config.cs_1_target_win_loss_ratio)
 
         

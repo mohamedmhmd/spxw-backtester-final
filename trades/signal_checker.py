@@ -154,3 +154,45 @@ class OptimizedSignalChecker:
         threshold = avg_reference * range_threshold_mult
         
         return avg_recent <= threshold
+    
+    def cs_1_check_entry_signals_5min(self, current_idx: int, strategy: StrategyConfig) -> bool:
+        """Check Iron 1 entry signals - ULTRA OPTIMIZED VERSION"""
+        # Condition 1: Volume check
+        volume_threshold = self.spy_volume[0] * strategy.cs_1_volume_threshold
+        vol_start = max(0, current_idx - strategy.cs_1_consecutive_candles)
+        vol_end = min(self.len_spy, current_idx)
+        
+        if vol_end <= vol_start:
+            return False
+            
+        volume_slice = self.spy_volume[vol_start:vol_end]
+        if not np.all(volume_slice <= volume_threshold):
+            return False
+        
+        # Condition 2: Direction check
+        dir_start = max(0, current_idx - strategy.cs_1_lookback_candles)
+        dir_end = min(self.len_spx, current_idx)
+        
+        if dir_end <= dir_start:
+            return False
+            
+        # Use pre-calculated directions
+        directions = self.all_directions[dir_start:dir_end]
+        
+        # Fast check if all same
+        if np.all(directions == directions[0]):
+            return False
+        
+        # Condition 3: Range check
+        range_start = max(0, current_idx - strategy.cs_1_avg_range_candles)
+        range_end = min(self.len_spx, current_idx)
+        
+        if range_end <= range_start or current_idx <= 0:
+            return False
+            
+        # Use pre-calculated ranges
+        avg_recent_range = np.mean(self.all_ranges[range_start:range_end])
+        avg_day_range = np.mean(self.all_ranges[:current_idx])
+        range_threshold = avg_day_range * strategy.cs_1_range_threshold
+        
+        return avg_recent_range < range_threshold

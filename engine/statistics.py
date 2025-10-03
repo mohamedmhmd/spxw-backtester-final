@@ -41,7 +41,12 @@ class Statistics:
         ic3 = {t.entry_time: t.pnl for t in trades if "Iron Condor 3" in t.trade_type}
         st3 = {t.entry_time: t.pnl for t in trades if "Straddle 3" in t.trade_type}
         couples3 = [(ic3[t] + st3[t]) > 0 for t in ic3 if t in st3]
-        win_rate = (sum(couples1) + sum(couples2) + sum(couples3))/ (len(couples1) + len(couples2) + len(couples3)) if couples1 else 0
+        trade_16_win_rate = (sum(couples1) + sum(couples2) + sum(couples3))/ (len(couples1) + len(couples2) + len(couples3)) if couples1 else 0
+        
+        cs1a = {t.entry_time: t.pnl for t in trades if t.trade_type == "Credit Spread 1(a)"}
+        cs1b = {t.entry_time: t.pnl for t in trades if t.trade_type == "Credit Spread 1(b)"}
+        couples4 = [(cs1a[t] + cs1b[t]) > 0 for t in cs1a if t in cs1b]
+        trade_17_win_rate = sum(couples4) / len(couples4) if couples4 else 0
         
         # Overall statistics
         winning_trades = [t for t in trades if t.pnl > 0]
@@ -88,7 +93,7 @@ class Statistics:
             'total_trades': len(trades)/2,
             'winning_trades': len(winning_trades),
             'losing_trades': len(losing_trades),
-            'win_rate': win_rate,
+            'trade_16_win_rate': trade_16_win_rate,
             'total_pnl': total_pnl,
             'avg_win': avg_win,
             'avg_loss': avg_loss,
@@ -118,5 +123,12 @@ class Statistics:
             'straddle_3_trades': len(st3),
             'straddle_3_pnl': sum(st3.values()),
             'straddle_3_win_rate': sum(1 for pnl in st3.values() if pnl > 0) / len(st3) if st3 else 0,
+            'trade_17_win_rate': trade_17_win_rate,
+            'cs_1a_trades': len(cs1a),
+            'cs_1a_pnl': sum(cs1a.values()),
+            'cs_1a_win_rate': sum(1 for pnl in cs1a.values() if pnl > 0) / len(cs1a) if cs1a else 0,
+            'cs_1b_trades': len(cs1b),
+            'cs_1b_pnl': sum(cs1b.values()),
+            'cs_1b_win_rate': sum(1 for pnl in cs1b.values() if pnl > 0) / len(cs1b) if cs1b else 0,
             
         }
