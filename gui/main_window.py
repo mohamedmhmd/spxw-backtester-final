@@ -107,7 +107,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(left_panel, 1)
         
         # Right panel - Results
-        self.results_widget = ResultsWidget()
+        self.results_widget = ResultsWidget(self.get_selected_strategy())
         main_layout.addWidget(self.results_widget, 3)
         
         central_widget.setLayout(main_layout)
@@ -187,11 +187,27 @@ class MainWindow(QMainWindow):
         backtest_group.setLayout(backtest_layout)
         layout.addWidget(backtest_group)
         
+        strategy_selection_group = QGroupBox("Strategy Selection")
+        strategy_selection_layout = QVBoxLayout()
+
+        self.strategy_combo = QComboBox()
+        self.strategy_combo.addItems(["Trades 16", "Trades 17"])
+        self.strategy_combo.setCurrentIndex(0)  # Default to Trades 16
+        
+        self.strategy_combo.currentIndexChanged.connect(self.on_strategy_changed)
+
+        strategy_selection_layout.addWidget(QLabel("Select strategy to run:"))
+        strategy_selection_layout.addWidget(self.strategy_combo)
+
+        strategy_selection_group.setLayout(strategy_selection_layout)
+        layout.addWidget(strategy_selection_group)
+        
         # Strategy Configuration
         strategy_group = QGroupBox("Strategy Parameters")
+        strategy_group.setObjectName("Strategy Parameters") 
         strategy_layout = QVBoxLayout()
-        self.strategy_config_widget = StrategyConfigWidget()
-        self.strategy_config_widget = StrategyConfigWidget()
+        strategy = self.get_selected_strategy()
+        self.strategy_config_widget = StrategyConfigWidget(strategy)
         # Connect strategy widget signals
         self.strategy_config_widget.load_configuration_requested.connect(self.load_configuration)
         self.strategy_config_widget.export_results_requested.connect(self.export_results)
@@ -268,6 +284,50 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         panel.setLayout(layout)
         return panel
+    
+    def get_selected_strategy(self):
+        """Get the selected strategy name"""
+        return self.strategy_combo.currentText()
+    
+    def on_strategy_changed(self, index):
+        """Handle strategy selection change"""
+        strategy = self.get_selected_strategy()
+    
+        # Remove old strategy config widget
+        strategy_group = self.findChild(QGroupBox, "Strategy Parameters")
+        if strategy_group:
+           layout = strategy_group.layout()
+           if layout:
+              # Remove old widget
+              old_widget = layout.takeAt(0)
+              if old_widget:
+                old_widget.widget().deleteLater()
+            
+              # Create new widget with selected strategy
+              self.strategy_config_widget = StrategyConfigWidget(strategy)
+              self.strategy_config_widget.load_configuration_requested.connect(self.load_configuration)
+              self.strategy_config_widget.export_results_requested.connect(self.export_results)
+              layout.addWidget(self.strategy_config_widget)
+              
+        central_widget = self.centralWidget()
+        if central_widget:
+           main_layout = central_widget.layout()
+           if main_layout and main_layout.count() >= 2:
+              # Remove old results widget (it's the second item in the horizontal layout)
+              old_results_item = main_layout.itemAt(1)
+              if old_results_item:
+                old_results_widget = old_results_item.widget()
+                if old_results_widget:
+                    main_layout.removeWidget(old_results_widget)
+                    old_results_widget.deleteLater()
+            
+              # Create new results widget with the selected strategy
+              self.results_widget = ResultsWidget(strategy)
+              main_layout.addWidget(self.results_widget, 3)  # Keep the 3:1 ratio
+            
+    
+        logger.info(f"Strategy changed to: {strategy}")
+        self.status_bar.showMessage(f"Strategy changed to: {strategy}", 3000)
     
     def _create_menu_bar(self):
         """Create menu bar"""
@@ -429,6 +489,8 @@ class MainWindow(QMainWindow):
         backtest_config = self.backtest_config_widget.get_config()
         strategy_config = self.strategy_config_widget.get_config()
         
+        selected_strategy = self.get_selected_strategy()
+        
         # Create data provider based on checkbox
         if self.use_mock_data.isChecked():
             self.data_provider = MockDataProvider()
@@ -459,7 +521,7 @@ class MainWindow(QMainWindow):
         
         # Create and start worker
         self.backtest_worker = BacktestWorker(
-            self.data_provider, backtest_config, strategy_config
+            self.data_provider, backtest_config, strategy_config, selected_strategy
         )
         # Disconnect the original progress signal and connect to finished only
         # self.backtest_worker.progress.connect(self.update_progress)  # Comment out or remove
@@ -680,7 +742,8 @@ class MainWindow(QMainWindow):
         if filename:
             config = {
                 'backtest': self.backtest_config_widget.get_config().to_dict(),
-                'strategy': self.strategy_config_widget.get_config().to_dict(),
+                'strategy': self.get_selected_strategy(),
+                'strategy_parameters': self.strategy_config_widget.get_config().to_dict(),
                 'api_key': self.api_key_input.text(),
                 'use_mock_data': self.use_mock_data.isChecked()
             }
@@ -723,44 +786,59 @@ class MainWindow(QMainWindow):
                    
                     self.backtest_config_widget.commission.setValue(bc['commission_per_contract'])
                 
+                
                 # Load strategy config
-                if 'strategy' in config:
-                    sc = config['strategy']
-                    self.strategy_config_widget.iron_1_consecutive_candles.setValue(sc['iron_1_consecutive_candles'])
-                    self.strategy_config_widget.iron_1_volume_threshold.setValue(sc['iron_1_volume_threshold'])
-                    self.strategy_config_widget.iron_1_lookback_candles.setValue(sc['iron_1_lookback_candles'])
-                    self.strategy_config_widget.iron_1_avg_range_candles.setValue(sc['iron_1_avg_range_candles'])
-                    self.strategy_config_widget.iron_1_range_threshold.setValue(sc['iron_1_range_threshold'])
-                    self.strategy_config_widget.straddle_1_trade_size.setValue(sc['straddle_1_trade_size'])
-                    self.strategy_config_widget.iron_1_trade_size.setValue(sc['iron_1_trade_size'])
-                    self.strategy_config_widget.iron_1_target_win_loss_ratio.setValue(sc['iron_1_target_win_loss_ratio'])
-                    self.strategy_config_widget.iron_2_trade_size.setValue(sc['iron_2_trade_size'])
-                    self.strategy_config_widget.iron_2_trigger_multiplier.setValue(sc['iron_2_trigger_multiplier'])
-                    self.strategy_config_widget.iron_2_direction_lookback.setValue(sc['iron_2_direction_lookback'])
-                    self.strategy_config_widget.iron_2_range_recent_candles.setValue(sc['iron_2_range_recent_candles'])
-                    self.strategy_config_widget.iron_2_range_reference_candles.setValue(sc['iron_2_range_reference_candles'])
-                    self.strategy_config_widget.iron_2_range_threshold.setValue(sc['iron_2_range_threshold'])
-                    self.strategy_config_widget.iron_2_target_win_loss_ratio.setValue(sc['iron_2_target_win_loss_ratio'])
-                    self.strategy_config_widget.straddle_2_trade_size.setValue(sc['straddle_2_trade_size'])
-                    self.strategy_config_widget.straddle_2_trigger_multiplier.setValue(sc['straddle_2_trigger_multiplier'])
-                    self.strategy_config_widget.straddle_2_exit_percentage.setValue(sc['straddle_2_exit_percentage'])
-                    self.strategy_config_widget.straddle_2_exit_multiplier.setValue(sc['straddle_2_exit_multiplier'])
-                    self.strategy_config_widget.straddle_1_distance_multiplier.setValue(sc['straddle_1_distance_multiplier'])
-                    self.strategy_config_widget.straddle_1_exit_percentage.setValue(sc['straddle_1_exit_percentage'])
-                    self.strategy_config_widget.straddle_1_exit_multiplier.setValue(sc['straddle_1_exit_multiplier'])
-                    self.strategy_config_widget.iron_3_trade_size.setValue(sc['iron_3_trade_size'])
-                    self.strategy_config_widget.iron_3_trigger_multiplier.setValue(sc['iron_3_trigger_multiplier'])
-                    self.strategy_config_widget.iron_3_distance_multiplier.setValue(sc['iron_3_distance_multiplier'])
-                    self.strategy_config_widget.iron_3_target_win_loss_ratio.setValue(sc['iron_3_target_win_loss_ratio'])
-                    self.strategy_config_widget.iron_3_direction_lookback.setValue(sc['iron_3_direction_lookback'])
-                    self.strategy_config_widget.iron_3_range_recent_candles.setValue(sc['iron_3_range_recent_candles'])
-                    self.strategy_config_widget.iron_3_range_reference_candles.setValue(sc['iron_3_range_reference_candles'])
-                    self.strategy_config_widget.iron_3_range_threshold.setValue(sc['iron_3_range_threshold'])
-                    self.strategy_config_widget.straddle_3_trade_size.setValue(sc['straddle_3_trade_size'])
-                    self.strategy_config_widget.straddle_3_trigger_multiplier.setValue(sc['straddle_3_trigger_multiplier'])
-                    self.strategy_config_widget.straddle_3_exit_percentage.setValue(sc['straddle_3_exit_percentage'])
-                    self.strategy_config_widget.straddle_3_exit_multiplier.setValue(sc['straddle_3_exit_multiplier'])
-                    self.strategy_config_widget.straddle_itm_override_multiplier.setValue(sc['straddle_itm_override_multiplier'])
+                if 'strategy_parameters' in config:
+                    strategy = config['strategy']
+                    index = self.strategy_combo.findText(strategy)
+                    if index != -1:
+                        self.strategy_combo.setCurrentIndex(index)
+                          
+                    sc = config['strategy_parameters']
+                    if strategy == "Trades 16":
+                       self.strategy_config_widget.iron_1_consecutive_candles.setValue(sc['iron_1_consecutive_candles'])
+                       self.strategy_config_widget.iron_1_volume_threshold.setValue(sc['iron_1_volume_threshold'])
+                       self.strategy_config_widget.iron_1_lookback_candles.setValue(sc['iron_1_lookback_candles'])
+                       self.strategy_config_widget.iron_1_avg_range_candles.setValue(sc['iron_1_avg_range_candles'])
+                       self.strategy_config_widget.iron_1_range_threshold.setValue(sc['iron_1_range_threshold'])
+                       self.strategy_config_widget.straddle_1_trade_size.setValue(sc['straddle_1_trade_size'])
+                       self.strategy_config_widget.iron_1_trade_size.setValue(sc['iron_1_trade_size'])
+                       self.strategy_config_widget.iron_1_target_win_loss_ratio.setValue(sc['iron_1_target_win_loss_ratio'])
+                       self.strategy_config_widget.iron_2_trade_size.setValue(sc['iron_2_trade_size'])
+                       self.strategy_config_widget.iron_2_trigger_multiplier.setValue(sc['iron_2_trigger_multiplier'])
+                       self.strategy_config_widget.iron_2_direction_lookback.setValue(sc['iron_2_direction_lookback'])
+                       self.strategy_config_widget.iron_2_range_recent_candles.setValue(sc['iron_2_range_recent_candles'])
+                       self.strategy_config_widget.iron_2_range_reference_candles.setValue(sc['iron_2_range_reference_candles'])
+                       self.strategy_config_widget.iron_2_range_threshold.setValue(sc['iron_2_range_threshold'])
+                       self.strategy_config_widget.iron_2_target_win_loss_ratio.setValue(sc['iron_2_target_win_loss_ratio'])
+                       self.strategy_config_widget.straddle_2_trade_size.setValue(sc['straddle_2_trade_size'])
+                       self.strategy_config_widget.straddle_2_trigger_multiplier.setValue(sc['straddle_2_trigger_multiplier'])
+                       self.strategy_config_widget.straddle_2_exit_percentage.setValue(sc['straddle_2_exit_percentage'])
+                       self.strategy_config_widget.straddle_2_exit_multiplier.setValue(sc['straddle_2_exit_multiplier'])
+                       self.strategy_config_widget.straddle_1_distance_multiplier.setValue(sc['straddle_1_distance_multiplier'])
+                       self.strategy_config_widget.straddle_1_exit_percentage.setValue(sc['straddle_1_exit_percentage'])
+                       self.strategy_config_widget.straddle_1_exit_multiplier.setValue(sc['straddle_1_exit_multiplier'])
+                       self.strategy_config_widget.iron_3_trade_size.setValue(sc['iron_3_trade_size'])
+                       self.strategy_config_widget.iron_3_trigger_multiplier.setValue(sc['iron_3_trigger_multiplier'])
+                       self.strategy_config_widget.iron_3_distance_multiplier.setValue(sc['iron_3_distance_multiplier'])
+                       self.strategy_config_widget.iron_3_target_win_loss_ratio.setValue(sc['iron_3_target_win_loss_ratio'])
+                       self.strategy_config_widget.iron_3_direction_lookback.setValue(sc['iron_3_direction_lookback'])
+                       self.strategy_config_widget.iron_3_range_recent_candles.setValue(sc['iron_3_range_recent_candles'])
+                       self.strategy_config_widget.iron_3_range_reference_candles.setValue(sc['iron_3_range_reference_candles'])
+                       self.strategy_config_widget.iron_3_range_threshold.setValue(sc['iron_3_range_threshold'])
+                       self.strategy_config_widget.straddle_3_trade_size.setValue(sc['straddle_3_trade_size'])
+                       self.strategy_config_widget.straddle_3_trigger_multiplier.setValue(sc['straddle_3_trigger_multiplier'])
+                       self.strategy_config_widget.straddle_3_exit_percentage.setValue(sc['straddle_3_exit_percentage'])
+                       self.strategy_config_widget.straddle_3_exit_multiplier.setValue(sc['straddle_3_exit_multiplier'])
+                       self.strategy_config_widget.straddle_itm_override_multiplier.setValue(sc['straddle_itm_override_multiplier'])
+                    elif strategy == "Trades 17":
+                          self.strategy_config_widget.cs_1_trade_size.setValue(sc['cs_1_trade_size'])
+                          self.strategy_config_widget.cs_1_lookback_candles.setValue(sc['cs_1_lookback_candles'])
+                          self.strategy_config_widget.cs_1_avg_range_candles.setValue(sc['cs_1_avg_range_candles'])
+                          self.strategy_config_widget.cs_1_range_threshold.setValue(sc['cs_1_range_threshold'])
+                          self.strategy_config_widget.cs_1_target_win_loss_ratio.setValue(sc['cs_1_target_win_loss_ratio'])
+                          self.strategy_config_widget.cs_1_volume_threshold.setValue(sc['cs_1_volume_threshold'])
+                          self.strategy_config_widget.cs_1_consecutive_candles.setValue(sc['cs_1_consecutive_candles'])
 
 
 

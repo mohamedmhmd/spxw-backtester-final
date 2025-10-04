@@ -172,8 +172,9 @@ class LegsDisplayWidget(QWidget):
 class ResultsWidget(QWidget):
     """Enhanced widget for displaying backtest results"""
     
-    def __init__(self):
+    def __init__(self, selected_strategy):
         super().__init__()
+        self.selected_strategy = selected_strategy
         self.setStyleSheet("""
             QWidget {
                 background-color: #FAFAFA;
@@ -315,10 +316,10 @@ class ResultsWidget(QWidget):
     
         # Initialize stat cards (now with 27 stats including capital used)
         self.stat_cards = {}
-        stats_config = [
+        if self.selected_strategy == "Trades 16":
+           stats_config = [
         ('total_trades', 'Total Trades', '#2196F3'),
         ('trade_16_win_rate', 'Trades 16 Win Rate', '#4CAF50'),
-        ('trade_17_win_rate', 'Trades 17 Win Rate', '#4CAF50'),
         ('total_pnl', 'Total P&L', '#FF9800'),
         ('total_capital_used', 'Capital Used', '#9E9E9E'),
         ('avg_trade_pnl', 'Avg Trade P&L', '#9C27B0'),
@@ -344,6 +345,18 @@ class ResultsWidget(QWidget):
         ('straddle_3_trades', 'Straddle 3 Trades', '#E91E63'),
         ('straddle_3_pnl', 'Straddle 3 P&L', '#8BC34A'),
         ('straddle_3_win_rate', 'Straddle 3 Win Rate', '#FF9800'),
+    ]
+        elif self.selected_strategy == "Trades 17":
+             stats_config = [
+        ('total_trades', 'Total Trades', '#2196F3'),
+        ('trade_17_win_rate', 'Trades 17 Win Rate', '#4CAF50'),
+        ('total_pnl', 'Total P&L', '#FF9800'),
+        ('total_capital_used', 'Capital Used', '#9E9E9E'),
+        ('avg_trade_pnl', 'Avg Trade P&L', '#9C27B0'),
+        ('profit_factor', 'Profit Factor', '#00BCD4'),
+        ('sharpe_ratio', 'Sharpe Ratio', '#795548'),
+        ('max_drawdown', 'Max Drawdown', '#F44336'),
+        ('return_pct', 'Return on Capital', '#607D8B'),
         ('cs_1a_trades', 'CS 1(a) Trades', '#3F51B5'),
         ('cs_1a_pnl', 'CS 1(a) P&L', '#E91E63'),
         ('cs_1a_win_rate', 'CS 1(a) Win Rate', '#8BC34A'),
@@ -351,7 +364,6 @@ class ResultsWidget(QWidget):
         ('cs_1b_pnl', 'CS 1(b) P&L', '#E91E63'),
         ('cs_1b_win_rate', 'CS 1(b) Win Rate', '#8BC34A'),
     ]
-    
         # Arrange in 3 rows x 3 columns for better layout
         for i, (key, name, color) in enumerate(stats_config):
             card = StatsCard(name, "--", color)

@@ -19,11 +19,12 @@ class BacktestWorker(QThread):
     finished = pyqtSignal(dict)
     error = pyqtSignal(str)
     
-    def __init__(self, data_provider, config, strategy):
+    def __init__(self, data_provider, config, strategy, selected_strategy):
         super().__init__()
         self.data_provider = data_provider
         self.config = config
         self.strategy = strategy
+        self.selected_strategy = selected_strategy
         
     def run(self):
         """Run backtest in thread"""
@@ -35,7 +36,7 @@ class BacktestWorker(QThread):
             asyncio.set_event_loop(loop)
             
             # Run backtest
-            engine = BacktestEngine(self.data_provider)
+            engine = BacktestEngine(self.data_provider, self.selected_strategy)
             results = loop.run_until_complete(
                 engine.run_backtest(self.config, self.strategy)
             )

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class BacktestEngine:
     """Complete backtesting engine implementation with Iron Condor and Straddle - Parallelized"""
     
-    def __init__(self, data_provider: Union[MockDataProvider, PolygonDataProvider]):
+    def __init__(self, data_provider: Union[MockDataProvider, PolygonDataProvider], selected_strategy: str):
         self.data_provider = data_provider
         self.trades: List[Trade] = []
         self.daily_pnl: Dict[datetime, float] = {}
@@ -38,6 +38,7 @@ class BacktestEngine:
         self.current_capital: float = 0.0
         self.open_straddles: List[Trade] = []  # Track open straddles for intraday management
         self.total_capital_used: float = 0.0
+        self.selected_strategy = selected_strategy
         
     async def run_backtest(self, config: BacktestConfig, strategy: StrategyConfig) -> Dict[str, Any]:
         """Run complete backtest with parallel daily strategy execution"""
@@ -53,10 +54,16 @@ class BacktestEngine:
         logger.info(f"Found {len(trading_dates)} trading dates to process")
         
         # Create tasks for each trading day
-        tasks = [
-            self._run_daily_strategy_task(date, config, strategy)
+        if(self.selected_strategy == "Trades 16"):
+           tasks = [
+               self._run_daily_strategy_16_task(date, config, strategy)
+               for date in trading_dates
+           ]
+        elif (self.selected_strategy == "Trades 17"):
+           tasks = [
+            self._run_daily_strategy_17_task(date, config, strategy)
             for date in trading_dates
-        ]
+           ]
         
         # Run all daily strategies in parallel
         logger.info("Running daily strategies in parallel...")
@@ -93,6 +100,7 @@ class BacktestEngine:
             self.trades, 
             self.equity_curve, 
             self.daily_pnl, 
+            self.selected_strategy
         )
         
         logger.info(f"Backtest completed: {len(self.trades)} total trades.")
@@ -139,18 +147,29 @@ class BacktestEngine:
         
         self.current_capital = running_capital
     
-    async def _run_daily_strategy_task(self, date: datetime, config: BacktestConfig, 
+    async def _run_daily_strategy_16_task(self, date: datetime, config: BacktestConfig, 
                                       strategy: StrategyConfig) -> Tuple[List[Trade], float]:
         """Wrapper for daily strategy that returns trades and P&L"""
         try:
-            daily_trades = await self._run_daily_strategy(date, config, strategy)
+            daily_trades = await self._run_daily_strategy_16(date, config, strategy)
+            daily_pnl = sum(trade.pnl for trade in daily_trades)
+            return daily_trades, daily_pnl
+        except Exception as e:
+            logger.error(f"Error in daily strategy for {date}: {e}")
+            return [], 0.0
+        
+    async def _run_daily_strategy_17_task(self, date: datetime, config: BacktestConfig, 
+                                      strategy: StrategyConfig) -> Tuple[List[Trade], float]:
+        """Wrapper for daily strategy that returns trades and P&L"""
+        try:
+            daily_trades = await self._run_daily_strategy_17(date, config, strategy)
             daily_pnl = sum(trade.pnl for trade in daily_trades)
             return daily_trades, daily_pnl
         except Exception as e:
             logger.error(f"Error in daily strategy for {date}: {e}")
             return [], 0.0
     
-    async def _run_daily_strategy(self, date: datetime, config: BacktestConfig, 
+    async def _run_daily_strategy_16(self, date: datetime, config: BacktestConfig, 
                                   strategy: StrategyConfig) -> List[Trade]:
         """Run strategy for a single day with both Iron Condor and Straddle - allows multiple entries per day"""
         trades = []
@@ -331,6 +350,69 @@ class BacktestEngine:
             
             #break condition - all trades found for the day
             if ic1_found and ic2_found and Straddle1.Straddle1_exited and Straddle2.Straddle2_exited and (Straddle3.Straddle3a_exited or Straddle3.Straddle3b_exited) and cs1a_found:
+                break
+                    
+                    
+                        
+        # Close any remaining open trades at expiry
+        for trade in trades:
+            if trade.status == "OPEN":
+                await trade._close_trade_at_expiry(spx_ohlc_data, date, config)
+        
+        logger.info(f"Day {date.strftime('%Y-%m-%d')} completed: {len([t for t in trades if t.trade_type == 'Iron Condor 1'])} Iron Condors, {len([t for t in trades if t.trade_type == 'Straddle 1'])} Straddles")
+        return trades
+    
+    
+    async def _run_daily_strategy_17(self, date: datetime, config: BacktestConfig, 
+                                  strategy: StrategyConfig) -> List[Trade]:
+        """Run strategy for a single day with both Iron Condor and Straddle - allows multiple entries per day"""
+        trades = []
+        spy_ohlc_data = await self.data_provider.get_ohlc_data(date, "SPY")
+        spx_ohlc_data = await self.data_provider.get_ohlc_data(date, "I:SPX")
+
+        if spy_ohlc_data.empty or spx_ohlc_data.empty:
+            logger.warning(f"No data available for {date}")
+            return trades
+        
+        #iron 1 and straddle 1
+        cs_1_min_bars_needed = max(
+            strategy.cs_1_consecutive_candles,
+            strategy.cs_1_lookback_candles,
+            strategy.cs_1_avg_range_candles
+        )
+        if len(spy_ohlc_data) < cs_1_min_bars_needed:
+            logger.warning(f"Insufficient bars for {date}: {len(spy_ohlc_data)} < {cs_1_min_bars_needed}")
+            return trades
+        
+        cs1a_found = False
+        cs1b_found = False
+        checker = OptimizedSignalChecker(spx_ohlc_data, spy_ohlc_data)
+        
+        for i in range(cs_1_min_bars_needed, len(spx_ohlc_data)):
+            current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
+            current_price = spx_ohlc_data.iloc[i]['open']
+            
+            if not cs1a_found:
+                cs1a_trade = await CreditSpread1._find_credit_spread_trade(i,strategy,date,current_price,current_bar_time,
+                                                                            self.data_provider, config, checker, spx_ohlc_data,'a')
+                if cs1a_trade:
+                   trades.append(cs1a_trade)
+                   cs1a_found = True 
+                   logger.info(f"Entered Credit Spread 1(a) at {current_bar_time}.")
+                   
+            if not cs1b_found:
+                cs1b_trade = await CreditSpread1._find_credit_spread_trade(i,strategy,date,current_price,current_bar_time,
+                                                                            self.data_provider, config, checker, spx_ohlc_data,'b')
+                if cs1b_trade:
+                   trades.append(cs1b_trade)
+                   cs1b_found = True 
+                   logger.info(f"Entered Credit Spread 1(b) at {current_bar_time}.")
+                
+            
+            
+            
+            #break condition - all trades found for the day
+            if cs1b_found and cs1a_found:
                 break
                     
                     
