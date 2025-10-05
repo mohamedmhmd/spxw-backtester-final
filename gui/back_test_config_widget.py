@@ -41,6 +41,13 @@ class BacktestConfigWidget(QWidget):
         self.commission.setPrefix("$")
         layout.addRow("Commission/Contract:", self.commission)
         
+        self.spy_commission_per_share = QDoubleSpinBox()
+        self.spy_commission_per_share.setRange(0, 10)
+        self.spy_commission_per_share.setSingleStep(0.05)
+        self.spy_commission_per_share.setValue(0.01)
+        self.spy_commission_per_share.setPrefix("$")
+        layout.addRow("SPY comission per share:", self.spy_commission_per_share)
+        
         
         self.setLayout(layout)
     
@@ -50,4 +57,5 @@ class BacktestConfigWidget(QWidget):
             start_date=self.start_date.date().toPyDate(),
             end_date=self.end_date.date().toPyDate(),
             commission_per_contract=self.commission.value(),
+            spy_commission_per_share=self.spy_commission_per_share.value()
         )

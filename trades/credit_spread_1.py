@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 import logging
 from typing import Dict, Optional, Union
+
+import numpy as np
 from config.back_test_config import BacktestConfig
 from config.strategy_config import StrategyConfig
 from trades.trade import Trade
@@ -31,7 +33,7 @@ class CreditSpread1:
         Returns: 'up' if current price > open, 'down' otherwise
         """
         
-        yesterday_close = await data_provider.get_spx_closing_price(date - timedelta(days=1))
+        yesterday_close = await data_provider.get_sp_closing_price(date - timedelta(days=1), "I:SPX")
         
         return 'up' if current_price > yesterday_close else 'down'
     
@@ -65,7 +67,12 @@ class CreditSpread1:
         Find optimal credit spread strikes with Loss:Win ratio closest to target (default 3:1)
         """
         # Round target to nearest 5-point strike
-        short_strike = int(round(target_strike / 5) * 5)
+        if is_call_spread:
+           # For calls, round UP away from the price
+           short_strike = int(np.ceil(target_strike / 5) * 5)
+        else:
+           # For puts, round DOWN away from the price  
+           short_strike = int(np.floor(target_strike / 5) * 5)
         
         # Get min/max spread width from strategy config
         min_spread = getattr(strategy, 'min_width', 5)

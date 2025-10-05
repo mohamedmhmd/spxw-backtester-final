@@ -15,6 +15,7 @@ from engine.statistics import Statistics
 from trades.iron_condor_1 import IronCondor1
 from trades.iron_condor_2 import IronCondor2
 from trades.straddle1 import Straddle1
+from trades.underlying_cover_1 import UnderlyingCover1
 from utilities.utilities import Utilities
 import time as time_module
 from trades.credit_spread_1 import CreditSpread1
@@ -387,6 +388,12 @@ class BacktestEngine:
         cs1a_found = False
         cs1b_found = False
         checker = OptimizedSignalChecker(spx_ohlc_data, spy_ohlc_data)
+        active_cs_1_a_trades = []
+        active_cs_1_b_trades = []
+        active_cover_a_trades = []
+        active_cover_b_trades = []
+        cv_1_a_found = False
+        cv_1_b_found = False
         
         for i in range(cs_1_min_bars_needed, len(spx_ohlc_data)):
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
@@ -397,8 +404,11 @@ class BacktestEngine:
                                                                             self.data_provider, config, checker, spx_ohlc_data,'a')
                 if cs1a_trade:
                    trades.append(cs1a_trade)
+                   active_cs_1_a_trades.append(cs1a_trade)
                    cs1a_found = True 
                    logger.info(f"Entered Credit Spread 1(a) at {current_bar_time}.")
+                   
+                   
                    
             if not cs1b_found:
                 cs1b_trade = await CreditSpread1._find_credit_spread_trade(i,strategy,date,current_price,current_bar_time,
@@ -407,12 +417,44 @@ class BacktestEngine:
                    trades.append(cs1b_trade)
                    cs1b_found = True 
                    logger.info(f"Entered Credit Spread 1(b) at {current_bar_time}.")
+                   
+            if not cv_1_a_found and cs1a_found:
+                cv_1_a_list = await UnderlyingCover1.check_and_execute_covers(
+                                    active_cs_trades=active_cs_1_a_trades,
+                                    current_spx_price=current_price,
+                                    current_bar_time=current_bar_time,
+                                    date=date,
+                                    strategy=strategy,
+                                    data_provider=self.data_provider,
+                                    config=config)
+                
+                if(len(cv_1_a_list) > 0):
+                   cv_1_a_trade = cv_1_a_list[0]
+                   active_cover_a_trades.append(cv_1_a_trade)
+                   cv_1_a_found = True
+                   logger.info(f"Entered Underlying Cover 1(a) at {current_bar_time}.")
+                   
+            if not cv_1_b_found and cs1b_found:
+                cv_1_b_list = await UnderlyingCover1.check_and_execute_covers(
+                                    active_cs_trades=active_cs_1_b_trades,
+                                    current_spx_price=current_price,
+                                    current_bar_time=current_bar_time,
+                                    date=date,
+                                    strategy=strategy,
+                                    data_provider=self.data_provider,
+                                    config=config)
+                
+                if(len(cv_1_b_list) > 0):
+                   cv_1_b_trade = cv_1_b_list[0]
+                   active_cover_b_trades.append(cv_1_b_trade)
+                   cv_1_b_found = True
+                   logger.info(f"Entered Underlying Cover 1(b) at {current_bar_time}.")
                 
             
             
             
             #break condition - all trades found for the day
-            if cs1b_found and cs1a_found:
+            if cs1b_found and cs1a_found and cv_1_a_found and cv_1_b_found:
                 break
                     
                     
@@ -421,6 +463,23 @@ class BacktestEngine:
         for trade in trades:
             if trade.status == "OPEN":
                 await trade._close_trade_at_expiry(spx_ohlc_data, date, config)
+                
+        await UnderlyingCover1.close_covers_at_market_close(active_cover_a_trades,
+        date,
+        self.data_provider,
+        config)
+        
+        for cover_a_trade in active_cover_a_trades:
+            trades.append(cover_a_trade)
+            
+            
+        await UnderlyingCover1.close_covers_at_market_close(active_cover_b_trades,
+        date,
+        self.data_provider,
+        config)
+        
+        for cover_b_trade in active_cover_b_trades:
+            trades.append(cover_b_trade)
         
         logger.info(f"Day {date.strftime('%Y-%m-%d')} completed: {len([t for t in trades if t.trade_type == 'Iron Condor 1'])} Iron Condors, {len([t for t in trades if t.trade_type == 'Straddle 1'])} Straddles")
         return trades

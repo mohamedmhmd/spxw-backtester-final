@@ -65,6 +65,8 @@ class StrategyConfig:
     cs_1_trade_size: int = 10  
     cs_1_target_win_loss_ratio: float = 3.0
     
+    #Underlying Cover 1 parameters
+    uc_1_cash_risk_percentage: float = 1.0     
     def to_dict(self) -> dict:
         return {
             'name': self.name,
@@ -119,7 +121,9 @@ class StrategyConfig:
             'cs_1_avg_range_candles': self.cs_1_avg_range_candles,
             'cs_1_range_threshold': self.cs_1_range_threshold,
             'cs_1_trade_size': self.cs_1_trade_size,
-            'cs_1_target_win_loss_ratio': self.cs_1_target_win_loss_ratio    
+            'cs_1_target_win_loss_ratio': self.cs_1_target_win_loss_ratio,
+            # Underlying Cover 1 parameters
+            'uc_1_cash_risk_percentage': self.uc_1_cash_risk_percentage   
 
         }
     

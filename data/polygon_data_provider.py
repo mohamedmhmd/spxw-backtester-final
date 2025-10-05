@@ -274,13 +274,13 @@ class PolygonDataProvider:
         return quotes
     
     
-    async def get_spx_closing_price(self, date: datetime) -> Optional[float]:
+    async def get_sp_closing_price(self, date: datetime, underlying) -> Optional[float]:
     
           # Format date for API call
           date_str = date.strftime('%Y-%m-%d')
     
            # Use daily aggregates endpoint for closing price
-          url = f"{self.base_url}/v2/aggs/ticker/I:SPX/range/1/day/{date_str}/{date_str}"
+          url = f"{self.base_url}/v2/aggs/ticker/{underlying}/range/1/day/{date_str}/{date_str}"
           params = {
         "apiKey": self.api_key,
         "adjusted": "true"
@@ -307,3 +307,60 @@ class PolygonDataProvider:
           except Exception as e:
             logger.error(f"Error fetching SPX closing price for {date_str}: {e}")
             return None
+        
+        
+        
+    async def get_spy_quote(self, timestamp: datetime) -> Optional[Dict]:
+    # Try quotes first
+          url = f"{self.base_url}/v3/quotes/SPY"
+          ts = int(timestamp.timestamp() * 1000000000)  # nanoseconds
+          params = {
+        "timestamp.lte": ts,
+        "limit": 1,
+        "order": "desc",
+        "apiKey": self.api_key
+    }
+    
+          try:
+             data = await self._rate_limited_request(url, params)
+             quotes = data.get('results', [])
+             if quotes:
+                q = quotes[0]
+                return {
+                'bid': q.get('bid_price', 0.01),
+                'ask': q.get('ask_price', 0.01),
+                'last': q.get('last_price', (q.get('bid_price', 0) + q.get('ask_price', 0)) / 2),
+                'volume': q.get('bid_size', 0) + q.get('ask_size', 0)
+            }
+          except Exception as e:
+             logger.error(f"Error fetching SPY quote: {e}")
+    
+          # Fallback to trades
+          url = f"{self.base_url}/v3/trades/SPY"
+          params = {
+        "timestamp.lte": ts,
+        "limit": 1,
+        "order": "desc",
+        "apiKey": self.api_key
+    }
+    
+          try:
+             data = await self._rate_limited_request(url, params)
+             trades = data.get('results', [])
+             if trades:
+                t = trades[0]
+                price = t.get('price', 0.01)
+                # Estimate bid/ask from last trade
+                spread = max(0.01, price * 0.001)  # 0.1% spread or 1 cent minimum
+                return {
+                'bid': max(0.01, price - spread/2),
+                'ask': price + spread/2,
+                'last': price,
+                'volume': t.get('size', 0)
+            }
+          except Exception as e:
+                logger.error(f"Error fetching SPY trade: {e}")
+    
+        # No data available
+          logger.warning(f"No SPY quote/trade data available for timestamp {timestamp}")
+          return None

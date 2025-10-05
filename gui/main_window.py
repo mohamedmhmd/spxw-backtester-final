@@ -655,6 +655,8 @@ class MainWindow(QMainWindow):
                scale_factor = straddle_3_size
             elif trade.trade_type == "Credit Spread 1(a)" or trade.trade_type == "Credit Spread 1(b)":
                scale_factor = cs_1_size
+            elif trade.trade_type == "Underlying Cover 1(a)":
+               scale_factor = int(cs_1_size*trade.metadata.get('uc_1_cash_risk_percentage',1))
             else:
                 scale_factor = 1  # Default fallback
         
@@ -664,7 +666,8 @@ class MainWindow(QMainWindow):
             trade.calculate_used_capital()
             
             for contract, details in trade.contracts.items():
-                   details['position'] = scale_factor
+                   sign = 1 if details['position'] > 0 else -1
+                   details['position'] = scale_factor*sign if trade.trade_type != "Underlying Cover 1(a)" else int(scale_factor*100*trade.metadata.get('spx_spy_ratio',10.0))*sign
                    trade.contracts[contract] = details
                
     
@@ -688,6 +691,7 @@ class MainWindow(QMainWindow):
         scaled_results['trades'], 
         scaled_results['equity_curve'], 
         scaled_daily_pnl,
+        self.get_selected_strategy()
     )
     
         return scaled_results
@@ -785,6 +789,7 @@ class MainWindow(QMainWindow):
                     )
                    
                     self.backtest_config_widget.commission.setValue(bc['commission_per_contract'])
+                    self.backtest_config_widget.spy_commission_per_share.setValue(bc['spy_commission_per_share'])
                 
                 
                 # Load strategy config

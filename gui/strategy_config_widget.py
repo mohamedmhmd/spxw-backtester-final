@@ -405,6 +405,18 @@ class StrategyConfigWidget(QWidget):
             self.cs_1_target_win_loss_ratio.setValue(3.0)
             self.cs_1_target_win_loss_ratio.setToolTip("Target win/loss ratio for strike selection (1.5 = 1.5:1)")
             layout.addRow("CS 1 Target Win/Loss Ratio:", self.cs_1_target_win_loss_ratio)
+            
+             # === UNDERLYING COVER 1 settings ===
+            uc_1_label = QLabel("=== UNDERLYING COVER 1 SETTINGS ===")
+            uc_1_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+            layout.addRow(uc_1_label)
+            
+            self.uc_1_cash_risk_percentage = QDoubleSpinBox()
+            self.uc_1_cash_risk_percentage.setRange(0.0, 100.0)
+            self.uc_1_cash_risk_percentage.setSingleStep(0.1)
+            self.uc_1_cash_risk_percentage.setValue(1.0)
+            self.uc_1_cash_risk_percentage.setToolTip("Percentage of credit spread cash.")
+            layout.addRow("UC 1 Cash  Percentage:", self.uc_1_cash_risk_percentage)
 
         # Add some spacing at the end
         spacer_label = QLabel("")
@@ -532,6 +544,7 @@ class StrategyConfigWidget(QWidget):
             cs_1_range_threshold=self.cs_1_range_threshold.value(),
             cs_1_trade_size=self.cs_1_trade_size.value(),
             cs_1_target_win_loss_ratio=self.cs_1_target_win_loss_ratio.value(),
+            uc_1_cash_risk_percentage=self.uc_1_cash_risk_percentage.value(),
             
         )
     
@@ -585,5 +598,6 @@ class StrategyConfigWidget(QWidget):
            self.cs_1_range_threshold.setValue(config.cs_1_range_threshold)
            self.cs_1_trade_size.setValue(config.cs_1_trade_size)
            self.cs_1_target_win_loss_ratio.setValue(config.cs_1_target_win_loss_ratio)
+           self.uc_1_cash_risk_percentage.setValue(config.uc_1_cash_risk_percentage)
 
         
