@@ -157,8 +157,11 @@ class Statistics:
         
         cs1a = {t.entry_time: t.pnl for t in trades if t.trade_type == "Credit Spread 1(a)"}
         cs1b = {t.entry_time: t.pnl for t in trades if t.trade_type == "Credit Spread 1(b)"}
-        couples1 = [(cs1a[t] + cs1b[t]) > 0 for t in cs1a if t in cs1b]
-        trade_17_win_rate = sum(couples1) / len(couples1) if couples1 else 0
+        cv1a = {t.entry_time: t.pnl for t in trades if t.trade_type == "Underlying Cover 1(a)"}
+        cv1b = {t.entry_time: t.pnl for t in trades if t.trade_type == "Underlying Cover 1(b)"}
+        lo1a = {t.entry_time: t.pnl for t in trades if t.trade_type == "Long Option 1(a)"}
+        lo1b = {t.entry_time: t.pnl for t in trades if t.trade_type == "Long Option 1(b)"}
+        trade_17_win_rate = len([t for t in trades if t.pnl > 0])/ len(trades) if trades else 0
         
         # Overall statistics
         winning_trades = [t for t in trades if t.pnl > 0]
@@ -202,7 +205,7 @@ class Statistics:
        
         
         return {
-            'total_trades': len(trades)/2,
+            'total_trades': len(trades),
             'winning_trades': len(winning_trades),
             'losing_trades': len(losing_trades),
             'total_pnl': total_pnl,
@@ -223,5 +226,17 @@ class Statistics:
             'cs_1b_trades': len(cs1b),
             'cs_1b_pnl': sum(cs1b.values()),
             'cs_1b_win_rate': sum(1 for pnl in cs1b.values() if pnl > 0) / len(cs1b) if cs1b else 0,
+            'uc_1a_trades': len(cv1a),
+            'uc_1a_pnl': sum(cv1a.values()),
+            'uc_1a_win_rate': sum(1 for pnl in cv1a.values() if pnl > 0) / len(cv1a) if cv1a else 0,
+            'uc_1b_trades': len(cv1b),
+            'uc_1b_pnl': sum(cv1b.values()),
+            'uc_1b_win_rate': sum(1 for pnl in cv1b.values() if pnl > 0) / len(cv1b) if cv1b else 0,
+            'lo_1a_trades': len(lo1a),
+            'lo_1a_pnl': sum(lo1a.values()),
+            'lo_1a_win_rate': sum(1 for pnl in lo1a.values() if pnl > 0) / len(lo1a) if lo1a else 0,
+            'lo_1b_trades': len(lo1b),
+            'lo_1b_pnl': sum(lo1b.values()),
+            'lo_1b_win_rate': sum(1 for pnl in lo1b.values() if pnl > 0) / len(lo1b) if lo1b else 0,
             
         }

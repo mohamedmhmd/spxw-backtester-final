@@ -363,6 +363,18 @@ class ResultsWidget(QWidget):
         ('cs_1b_trades', 'CS 1(b) Trades', '#3F51B5'),
         ('cs_1b_pnl', 'CS 1(b) P&L', '#E91E63'),
         ('cs_1b_win_rate', 'CS 1(b) Win Rate', '#8BC34A'),
+        ('uc_1a_trades', 'UC 1(a) Trades', '#FF5722'),
+        ('uc_1a_pnl', 'UC 1(a) P&L', '#009688'),
+        ('uc_1a_win_rate', 'UC 1(a) Win Rate', '#CDDC39'),
+        ('uc_1b_trades', 'UC 1(b) Trades', '#FF5722'),
+        ('uc_1b_pnl', 'UC 1(b) P&L', '#009688'),
+        ('uc_1b_win_rate', 'UC 1(b) Win Rate', '#CDDC39'),
+        ('lo_1a_trades', 'LO 1(a) Trades', '#673AB7'),
+        ('lo_1a_pnl', 'LO 1(a) P&L', '#FFC107'),
+        ('lo_1a_win_rate', 'LO 1(a) Win Rate', '#03A9F4'),
+        ('lo_1b_trades', 'LO 1(b) Trades', '#673AB7'),
+        ('lo_1b_pnl', 'LO 1(b) P&L', '#FFC107'),
+        ('lo_1b_win_rate', 'LO 1(b) Win Rate', '#03A9F4'),
     ]
         # Arrange in 3 rows x 3 columns for better layout
         for i, (key, name, color) in enumerate(stats_config):
@@ -610,7 +622,8 @@ class ResultsWidget(QWidget):
             if key in stats:
                value = stats[key]
             if key in ['total_pnl', 'avg_trade_pnl', 'total_capital_used', 'iron_1_pnl', 'iron_2_pnl', 'iron_3_pnl',
-                       'straddle_1_pnl', 'straddle_2_pnl', 'straddle_3_pnl', 'cs_1a_pnl', 'cs_1b_pnl']:
+                       'straddle_1_pnl', 'straddle_2_pnl', 'straddle_3_pnl', 'cs_1a_pnl', 'cs_1b_pnl', 'uc_1a_pnl',
+                       'uc_1b_pnl', 'lo_1a_pnl', 'lo_1b_pnl']:
                 # Use shorter format for large numbers
                 if abs(value) >= 1000000:
                     formatted_value = f"${value/1000000:.2f}M"
@@ -624,12 +637,14 @@ class ResultsWidget(QWidget):
                 else:
                     color = "#4CAF50" if value >= 0 else "#F44336"
             elif key in ['trade_16_win_rate', 'trade_17_win_rate', 'max_drawdown', 'return_pct', 'iron_1_win_rate', 'iron_2_win_rate', 'iron_3_win_rate',
-                         'straddle_1_win_rate', 'straddle_2_win_rate', 'straddle_3_win_rate', 'cs_1a_win_rate', 'cs_1b_win_rate']:
+                         'straddle_1_win_rate', 'straddle_2_win_rate', 'straddle_3_win_rate', 'cs_1a_win_rate', 'cs_1b_win_rate', 'uc_1a_win_rate',
+                         'uc_1b_win_rate', 'lo_1a_win_rate', 'lo_1b_win_rate']:
                 formatted_value = f"{value:.1%}"
                 if key == 'max_drawdown':
                     color = "#F44336"
                 elif key in ['trade_16_win_rate', 'trade_17_win_rate', 'iron_1_win_rate', 'iron_2_win_rate', 'iron_3_win_rate',
-                             'straddle_1_win_rate', 'straddle_2_win_rate', 'straddle_3_win_rate', 'cs_1a_win_rate', 'cs_1b_win_rate']:
+                             'straddle_1_win_rate', 'straddle_2_win_rate', 'straddle_3_win_rate', 'cs_1a_win_rate', 'cs_1b_win_rate', 'uc_1a_win_rate',
+                             'uc_1b_win_rate', 'lo_1a_win_rate', 'lo_1b_win_rate']:
                     color = "#4CAF50" if value >= 0.5 else "#FF9800"
                 else:
                     color = "#4CAF50" if value >= 0 else "#F44336"
