@@ -417,6 +417,25 @@ class StrategyConfigWidget(QWidget):
             self.uc_1_cash_risk_percentage.setValue(1.0)
             self.uc_1_cash_risk_percentage.setToolTip("Percentage of credit spread cash.")
             layout.addRow("UC 1 Cash  Percentage:", self.uc_1_cash_risk_percentage)
+            
+            #=== LONG OPTION 1 settings ===
+            lo_1_label = QLabel("=== LONG OPTION 1 SETTINGS ===")
+            lo_1_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+            layout.addRow(lo_1_label)
+            
+            self.lo_1_strike_multiplier = QDoubleSpinBox()
+            self.lo_1_strike_multiplier.setRange(0.0, 100000.0)
+            self.lo_1_strike_multiplier.setSingleStep(0.1)
+            self.lo_1_strike_multiplier.setValue(5.0)
+            self.lo_1_strike_multiplier.setToolTip("Multiplier of ATM strike for long option strike.")
+            layout.addRow("LO 1 Strike Multiplier:", self.lo_1_strike_multiplier)
+            
+            self.lo_1_cover_risk_percentage = QDoubleSpinBox()
+            self.lo_1_cover_risk_percentage.setRange(0.0, 100.0)
+            self.lo_1_cover_risk_percentage.setSingleStep(0.1)
+            self.lo_1_cover_risk_percentage.setValue(1.0)
+            self.lo_1_cover_risk_percentage.setToolTip("Percentage of underlying cover cash.")
+            layout.addRow("LO 1 Cover Risk Percentage:", self.lo_1_cover_risk_percentage)
 
         # Add some spacing at the end
         spacer_label = QLabel("")
@@ -545,6 +564,8 @@ class StrategyConfigWidget(QWidget):
             cs_1_trade_size=self.cs_1_trade_size.value(),
             cs_1_target_win_loss_ratio=self.cs_1_target_win_loss_ratio.value(),
             uc_1_cash_risk_percentage=self.uc_1_cash_risk_percentage.value(),
+            lo_1_strike_multiplier=self.lo_1_strike_multiplier.value(),
+            lo_1_cover_risk_percentage=self.lo_1_cover_risk_percentage.value(),
             
         )
     
@@ -599,5 +620,7 @@ class StrategyConfigWidget(QWidget):
            self.cs_1_trade_size.setValue(config.cs_1_trade_size)
            self.cs_1_target_win_loss_ratio.setValue(config.cs_1_target_win_loss_ratio)
            self.uc_1_cash_risk_percentage.setValue(config.uc_1_cash_risk_percentage)
+           self.lo_1_cover_risk_percentage = config.lo_1_cover_risk_percentage
+           self.lo_1_strike_multiplier.setValue(config.lo_1_strike_multiplier)
 
         

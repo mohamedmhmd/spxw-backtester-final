@@ -67,6 +67,9 @@ class StrategyConfig:
     
     #Underlying Cover 1 parameters
     uc_1_cash_risk_percentage: float = 1.0     
+    #Long Option 1 parameters
+    lo_1_strike_multiplier: float = 5.0 
+    lo_1_cover_risk_percentage: float = 1.0
     def to_dict(self) -> dict:
         return {
             'name': self.name,
@@ -123,7 +126,11 @@ class StrategyConfig:
             'cs_1_trade_size': self.cs_1_trade_size,
             'cs_1_target_win_loss_ratio': self.cs_1_target_win_loss_ratio,
             # Underlying Cover 1 parameters
-            'uc_1_cash_risk_percentage': self.uc_1_cash_risk_percentage   
+            'uc_1_cash_risk_percentage': self.uc_1_cash_risk_percentage,
+            # Long Option 1 parameters
+            'lo_1_strike_multiplier': self.lo_1_strike_multiplier,
+            'lo_1_cover_risk_percentage': self.lo_1_cover_risk_percentage
+            
 
         }
     

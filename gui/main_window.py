@@ -844,6 +844,8 @@ class MainWindow(QMainWindow):
                           self.strategy_config_widget.cs_1_target_win_loss_ratio.setValue(sc['cs_1_target_win_loss_ratio'])
                           self.strategy_config_widget.cs_1_volume_threshold.setValue(sc['cs_1_volume_threshold'])
                           self.strategy_config_widget.cs_1_consecutive_candles.setValue(sc['cs_1_consecutive_candles'])
+                          self.strategy_config_widget.lo_1_cover_risk_percentage.setValue(sc['lo_1_cover_risk_percentage'])
+                          self.strategy_config_widget.lo_1_strike_multiplier.setValue(sc['lo_1_strike_multiplier'])
 
 
 
@@ -879,6 +881,14 @@ class MainWindow(QMainWindow):
                   for contract, details in trade.contracts.items():
                     if "short" in details.get('leg_type', ''):
                         short_strikes = f"{details.get('strike', '')}"
+               elif "Credit Spread" in trade.trade_type:
+                  for contract, details in trade.contracts.items():
+                    if "short" in details.get('leg_type', ''):
+                        short_strikes = f"{details.get('strike', '')}"
+               elif "Long Option" in trade.trade_type:
+                   for contract, details in trade.contracts.items():
+                    if "long" in details.get('leg_type', ''):
+                        short_strikes = f"{details.get('strike', '')}"
 
                trade_label = trade.trade_type
                if trade.metadata.get("representation"):
@@ -903,10 +913,11 @@ class MainWindow(QMainWindow):
            for trade in self.last_results["trades"]:
                trade_group = trade.trade_type
                for contract, details in trade.contracts.items():
-                   position_type = "Long" if "long" in details.get('leg_type', '') else "Short" if "short" in details.get('leg_type', '') else ""
+                   position_type = "Long" if ("long" in details.get('leg_type', '') or "buy" in details.get('leg_type', '')) else "Short" if ("short" in details.get('leg_type', '') or "sell" in details.get('leg_type', '')) else ""
                    option_type = "Call" if "call" in details.get('leg_type', '') else "Put" if "put" in details.get('leg_type', '') else ""
-
-                   trade_detail = f"{details.get('strike', 0)} {position_type} {option_type}".strip()
+                   
+                   strike_string  = f"{details.get('strike', '')}"
+                   trade_detail = f"{strike_string} {position_type} {option_type}".strip()
                    entry_price = details.get('entry_price', 0)
                    exit_price = details.get('exit_price', 0)
                    position = details.get('position', 0)

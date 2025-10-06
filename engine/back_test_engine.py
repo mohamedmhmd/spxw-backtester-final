@@ -7,6 +7,7 @@ from config.back_test_config import BacktestConfig
 from data.polygon_data_provider import PolygonDataProvider
 from config.strategy_config import StrategyConfig
 from trades.iron_condor_3 import IronCondor3
+from trades.long_option_1 import LongOption1
 from trades.signal_checker import OptimizedSignalChecker
 from trades.straddle2 import Straddle2
 from trades.straddle3 import Straddle3
@@ -434,6 +435,18 @@ class BacktestEngine:
                    cv_1_a_found = True
                    logger.info(f"Entered Underlying Cover 1(a) at {current_bar_time}.")
                    
+                   long_opt_1a = await LongOption1.execute_long_option_with_cover(
+                                                                               cs1a_trade,
+                                                                               cv_1_a_trade,
+                                                                               current_bar_time,
+                                                                               date,
+                                                                               strategy,
+                                                                               self.data_provider,
+                                                                               config
+                                                                                       )
+                   if long_opt_1a:
+                       trades.append(long_opt_1a)
+                   
             if not cv_1_b_found and cs1b_found:
                 cv_1_b_list = await UnderlyingCover1.check_and_execute_covers(
                                     active_cs_trades=active_cs_1_b_trades,
@@ -449,6 +462,18 @@ class BacktestEngine:
                    active_cover_b_trades.append(cv_1_b_trade)
                    cv_1_b_found = True
                    logger.info(f"Entered Underlying Cover 1(b) at {current_bar_time}.")
+                   
+                   long_opt_1b = await LongOption1.execute_long_option_with_cover(
+                                                                                  cs1b_trade,
+                                                                                  cv_1_b_trade,
+                                                                                  current_bar_time,
+                                                                                  date,
+                                                                                  strategy,
+                                                                                  self.data_provider,
+                                                                                  config
+                                                                                        )
+                   if long_opt_1b:
+                      trades.append(long_opt_1b)
                 
             
             
