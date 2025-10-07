@@ -182,7 +182,11 @@ class LongOption1:
                 'net_premium': -option_price,  # Negative because we're buying
                 'representation': f"Long {option_type.capitalize()} @ {strike}",
                 'lo_1_cover_risk_percentage': cover_risk_pct,
-                'lo_1_strike_multiplier': getattr(strategy, 'lo_1_strike_multiplier', 5.0)
+                'lo_1_strike_multiplier': getattr(strategy, 'lo_1_strike_multiplier', 5.0),
+                'market_direction': cover_trade.metadata.get('market_direction', ''),
+                'high_of_day': cover_trade.metadata.get('high_of_day', None),
+                'low_of_day': cover_trade.metadata.get('low_of_day', None),
+                'spx_spy_ratio': cover_trade.metadata.get('spx_spy_ratio', None)
             }
         )
         
@@ -234,7 +238,7 @@ class LongOption1:
             date,
             strategy,
             data_provider,
-            config
+            config,
         )
         
         return long_option_trade

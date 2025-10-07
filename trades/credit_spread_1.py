@@ -5,11 +5,14 @@ from typing import Dict, Optional, Union
 import numpy as np
 from config.back_test_config import BacktestConfig
 from config.strategy_config import StrategyConfig
+from trades.common import Common
 from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
 from trades.signal_checker import OptimizedSignalChecker
 import asyncio
+
+from trades.underlying_cover_1 import UnderlyingCover1
 
 # Set up logging
 logging.basicConfig(
@@ -26,32 +29,6 @@ class CreditSpread1:
     - Credit Spread 1(b): Trend-following (sell at same extreme)
     """
     
-    @staticmethod
-    async def _determine_market_direction(current_price : float, date : datetime, data_provider : Union[MockDataProvider, PolygonDataProvider]) -> str:
-        """
-        Determine if SPY (the market) is up or down for the day
-        Returns: 'up' if current price > open, 'down' otherwise
-        """
-        
-        yesterday_close = await data_provider.get_sp_closing_price(date - timedelta(days=1), "I:SPX")
-        
-        return 'up' if current_price > yesterday_close else 'down'
-    
-    @staticmethod
-    def _get_day_extremes(spx_ohlc_data, current_idx: int) -> tuple:
-        """
-        Get the high and low of the day up to current index
-        Returns: (high_of_day, low_of_day)
-        """
-        if current_idx < 0:
-            return None, None
-        
-        # Get data from start of day to current index
-        day_data = spx_ohlc_data.iloc[:current_idx + 1]
-        high_of_day = day_data['high'].max()
-        low_of_day = day_data['low'].min()
-        
-        return high_of_day, low_of_day
     
     @staticmethod
     async def _find_credit_spread_strikes(
@@ -198,6 +175,8 @@ class CreditSpread1:
         long_strike: float,
         spread_type: str,
         expiration: datetime
+        
+        
     ) -> Dict[str, str]:
         """Create option contract symbols for credit spread"""
         exp_str = expiration.strftime('%y%m%d')
@@ -225,7 +204,11 @@ class CreditSpread1:
         current_price: float,
         spread_type: str,
         variant: str,
-        config: BacktestConfig
+        config: BacktestConfig,
+        market_direction: str,
+        spx_spy_ratio: float,
+        high_of_day: float,
+        low_of_day: float
     ) -> Optional[Trade]:
         """Execute credit spread trade"""
         
@@ -291,6 +274,11 @@ class CreditSpread1:
                 'spread_type': spread_type,
                 'variant': variant,
                 'wing': abs(long_strike - short_strike),
+                'market_direction': market_direction,
+                'spx_spy_ratio': spx_spy_ratio,
+                'high_of_day': high_of_day,
+                'low_of_day': low_of_day,
+                
                 
             }
         )
@@ -317,10 +305,10 @@ class CreditSpread1:
             return None
         
         # Determine market direction using SPY data
-        market_direction = await CreditSpread1._determine_market_direction(current_price, date, data_provider)
+        market_direction = await Common._determine_market_direction(current_price, date, data_provider)
         
         # Get day's extremes from SPX data
-        high_of_day, low_of_day = CreditSpread1._get_day_extremes(spx_ohlc_data, i)
+        high_of_day, low_of_day = Common._get_day_extremes(spx_ohlc_data, i)
         
         if high_of_day is None or low_of_day is None:
             logger.warning("Could not determine day's extremes")
@@ -377,6 +365,7 @@ class CreditSpread1:
         )
         
         # Execute trade
+        spx_spy_ratio = await Common._calculate_spx_spy_ratio(date, data_provider)
         trade = await CreditSpread1._execute_spread(
             spread_result['quotes'],
             current_bar_time,
@@ -386,7 +375,11 @@ class CreditSpread1:
             current_price,
             spread_result['spread_type'],
             variant,
-            config
+            config,
+            market_direction,
+            spx_spy_ratio,
+            high_of_day,
+            low_of_day
         )
         
         if trade:

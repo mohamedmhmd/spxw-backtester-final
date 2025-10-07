@@ -421,6 +421,8 @@ class BacktestEngine:
                    
             if not cv_1_a_found and cs1a_found:
                 cv_1_a_list = await UnderlyingCover1.check_and_execute_covers(
+                                    spx_ohlc_data,
+                                    i,
                                     active_cs_trades=active_cs_1_a_trades,
                                     current_spx_price=current_price,
                                     current_bar_time=current_bar_time,
@@ -449,6 +451,8 @@ class BacktestEngine:
                    
             if not cv_1_b_found and cs1b_found:
                 cv_1_b_list = await UnderlyingCover1.check_and_execute_covers(
+                                    spx_ohlc_data,
+                                    i,
                                     active_cs_trades=active_cs_1_b_trades,
                                     current_spx_price=current_price,
                                     current_bar_time=current_bar_time,

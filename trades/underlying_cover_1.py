@@ -1,8 +1,11 @@
 from datetime import datetime, timedelta
 import logging
 from typing import Dict, List, Optional, Union, Tuple
+
+import pandas as pd
 from config.back_test_config import BacktestConfig
 from config.strategy_config import StrategyConfig
+from trades.common import Common
 from trades.trade import Trade
 from data.mock_data_provider import MockDataProvider
 from data.polygon_data_provider import PolygonDataProvider
@@ -26,29 +29,7 @@ class UnderlyingCover1:
     - Cover 1(b): When SPX breaches short strike of CS 1(b), trade SPY in same direction
     """
     
-    @staticmethod
-    async def _calculate_spx_spy_ratio(
-        date: datetime,
-        data_provider: Union[MockDataProvider, PolygonDataProvider]
-    ) -> float:
-        """
-        Calculate the SPX:SPY conversion ratio for the day.
-        Typically around 10:1 but needs daily calculation.
-        """
-        try:
-            # Get SPX price
-            spx_price = await data_provider.get_sp_closing_price(date - timedelta(days=1), "I:SPX")
-            
-            # Get SPY price
-            spy_price = await data_provider.get_sp_closing_price(date - timedelta(days=1), "SPY")
-            
-            ratio = spx_price / spy_price
-            logger.info(f"SPX:SPY ratio for {date}: {ratio:.2f} (SPX: ${spx_price:.2f}, SPY: ${spy_price:.2f})")
-            return ratio
-            
-        except Exception as e:
-            logger.warning(f"Could not calculate SPX:SPY ratio, using default 10:1. Error: {e}")
-            return 10.0
+    
     
     @staticmethod
     def _calculate_spy_shares(
@@ -145,7 +126,10 @@ class UnderlyingCover1:
         short_strike: float,
         strategy: StrategyConfig,
         config: BacktestConfig,
-        spx_spy_ratio: float
+        spx_spy_ratio: float,
+        high_of_day: float,
+        low_of_day: float,
+        market_direction: str
     ) -> Optional[Trade]:
         """Execute the Underlying Cover trade"""
         
@@ -197,7 +181,7 @@ class UnderlyingCover1:
                 'entry_spy_price': spy_price,
                 'cs_short_strike': short_strike,
                 'breach_type': 'above' if spx_price > short_strike else 'below',
-                'direction': direction,
+                'market_direction': market_direction,
                 'shares': abs(spy_shares),
                 'related_cs_trade': cs_trade.metadata.get('representation', ''),
                 'variant': variant,
@@ -205,7 +189,9 @@ class UnderlyingCover1:
                 'net_premium': 0.0, # No premium for underlying trades
                 'representation': "",
                 'uc_1_cash_risk_percentage': strategy.uc_1_cash_risk_percentage,
-                'spx_spy_ratio': spx_spy_ratio
+                'spx_spy_ratio': spx_spy_ratio,
+                'high_of_day': high_of_day,
+                'low_of_day': low_of_day
             }
         )
         
@@ -216,6 +202,8 @@ class UnderlyingCover1:
     
     @staticmethod
     async def check_and_execute_covers(
+        spx_ohlc_data: pd.DataFrame,
+        i: int,
         active_cs_trades: List[Trade],
         current_spx_price: float,
         current_bar_time: datetime,
@@ -236,7 +224,7 @@ class UnderlyingCover1:
             return new_covers
         
         # Calculate SPX:SPY ratio once for the day
-        spx_spy_ratio = await UnderlyingCover1._calculate_spx_spy_ratio(date, data_provider)
+        spx_spy_ratio = await Common._calculate_spx_spy_ratio(date, data_provider)
         
         # Get cash risk percentage from strategy config
         cash_risk_pct = getattr(strategy, 'uc_1_cash_risk_percentage', 1.0)
@@ -284,6 +272,8 @@ class UnderlyingCover1:
                 continue
             
             # Execute cover trade
+            high_of_day, low_of_day = Common._get_day_extremes(spx_ohlc_data, i)
+            market_direction = await Common._determine_market_direction(current_spx_price, date, data_provider)
             cover_trade = await UnderlyingCover1._execute_cover_trade(
                 cs_trade,
                 direction,
@@ -294,7 +284,10 @@ class UnderlyingCover1:
                 short_strike,
                 strategy,
                 config,
-                spx_spy_ratio
+                spx_spy_ratio,
+                high_of_day,
+                low_of_day,
+                market_direction
             )
             
             if cover_trade:
