@@ -320,12 +320,13 @@ class MainWindow(QMainWindow):
                 if old_results_widget:
                     main_layout.removeWidget(old_results_widget)
                     old_results_widget.deleteLater()
-            
+              
+              
               # Create new results widget with the selected strategy
               self.results_widget = ResultsWidget(strategy)
               main_layout.addWidget(self.results_widget, 3)  # Keep the 3:1 ratio
             
-    
+        
         logger.info(f"Strategy changed to: {strategy}")
         self.status_bar.showMessage(f"Strategy changed to: {strategy}", 3000)
     
