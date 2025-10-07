@@ -253,9 +253,9 @@ class CreditSpread1:
         
         # Create representation string
         if spread_type == 'call':
-            representation = f"Call Spread: {short_strike}/{long_strike} ({abs(long_strike - short_strike)})"
+            representation = f"Bear Call Spread: {short_strike}/{long_strike} ({abs(long_strike - short_strike)})"
         else:
-            representation = f"Put Spread: {long_strike}/{short_strike} ({abs(long_strike - short_strike)})"
+            representation = f"Bull Put Spread: {long_strike}/{short_strike} ({abs(long_strike - short_strike)})"
         
         # Create trade
         trade = Trade(
@@ -266,7 +266,7 @@ class CreditSpread1:
             size=size,
             used_capital=0.0,
             metadata={
-                'net_premium': -net_credit,
+                'net_premium': net_credit,
                 'strategy_name': f"Credit Spread 1({variant})",
                 'entry_spx_price': current_price,
                 'representation': representation,

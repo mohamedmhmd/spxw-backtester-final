@@ -86,19 +86,12 @@ class UnderlyingCover1:
         spx_price: float,
         short_strike: float
     ) -> str:
-        variant = cs_trade.metadata.get('variant', 'a')
         spread_type = cs_trade.metadata.get('spread_type', '')
         
-        if variant == 'a':  # Counter-trend
-            if spread_type == 'call' and spx_price > short_strike:
+        if spread_type == 'call' and spx_price > short_strike:
                 return 'buy'
-            elif spread_type == 'put' and spx_price < short_strike:
+        elif spread_type == 'put' and spx_price < short_strike:
                 return 'sell'
-        else:  # variant == 'b', Trend-following
-            if spread_type == 'call' and spx_price > short_strike:
-                return 'sell'
-            elif spread_type == 'put' and spx_price < short_strike:
-                return 'buy'
         
         return None
     
@@ -149,7 +142,7 @@ class UnderlyingCover1:
         # For SPY, commission is typically per share
         commission_per_share = getattr(config, 'spy_commission_per_share', 0.01)
         total_commission = abs(spy_shares) * commission_per_share
-        unit_used_capital = abs(spy_price)*100 + commission_per_share
+        unit_used_capital = abs(spy_price)*100 + commission_per_share if position > 0 else commission_per_share
         capital_used = abs(spy_shares * spy_price) + total_commission
         
         # Build trade contract
@@ -369,6 +362,7 @@ class UnderlyingCover1:
             trade.unit_pnl_without_commission = unit_pnl_before_commission
             trade.pnl = total_pnl
             trade.pnl_without_commission = pnl_before_commission
+            trade.unit_used_capital = exit_price*100 + commission_per_share if position < 0 else commission_per_share
             trade.exit_signals = {'market_close': True, 'exit_spy_price': exit_price}
             
             if not trade.metadata:

@@ -416,6 +416,7 @@ class BacktestEngine:
                                                                             self.data_provider, config, checker, spx_ohlc_data,'b')
                 if cs1b_trade:
                    trades.append(cs1b_trade)
+                   active_cs_1_b_trades.append(cs1b_trade)
                    cs1b_found = True 
                    logger.info(f"Entered Credit Spread 1(b) at {current_bar_time}.")
                    
