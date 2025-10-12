@@ -52,8 +52,8 @@ class CreditSpread1:
            short_strike = int(np.floor(target_strike / 5) * 5)
         
         # Get min/max spread width from strategy config
-        min_spread = getattr(strategy, 'min_width', 5)
-        max_spread = getattr(strategy, 'max_width', 50)
+        min_spread = getattr(strategy, 'min_wing_width', 5)
+        max_spread = getattr(strategy, 'max_wing_width', 50)
         step = 5
         
         quote_cache = {}
@@ -341,7 +341,7 @@ class CreditSpread1:
             option_date = datetime.combine(date, datetime.min.time())
         
         # Get target Loss:Win ratio from strategy config
-        target_ratio = getattr(strategy, 'cs_1_target_win_loss_ratio', 3.0)
+        target_ratio = getattr(strategy, 'cs_1_target_loss_win_ratio', 3.0)
         
         spread_result = await CreditSpread1._find_credit_spread_strikes(
             is_call_spread,

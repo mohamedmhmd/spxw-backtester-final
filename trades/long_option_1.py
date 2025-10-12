@@ -186,7 +186,8 @@ class LongOption1:
                 'market_direction': cover_trade.metadata.get('market_direction', ''),
                 'high_of_day': cover_trade.metadata.get('high_of_day', None),
                 'low_of_day': cover_trade.metadata.get('low_of_day', None),
-                'spx_spy_ratio': cover_trade.metadata.get('spx_spy_ratio', None)
+                'spx_spy_ratio': cover_trade.metadata.get('spx_spy_ratio', None),
+                'uc_size' : cover_trade.size
             }
         )
         

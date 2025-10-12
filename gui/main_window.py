@@ -615,7 +615,7 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage("Updating results with new trade sizes...")
     
         # Create scaled copy of results
-        scaled_results = self._scale_results(self.last_results, iron_1_size, straddle_1_size, iron_2_size, straddle_2_size, iron_3_size, straddle_3_size, cs_1_size)
+        scaled_results = self._scale_results(self.last_results, strategy_config)
         self.last_results = scaled_results  # Update last_results to the scaled version
         # Update results widget
         self.results_widget.update_results(scaled_results)
@@ -636,28 +636,32 @@ class MainWindow(QMainWindow):
     
         logger.info(f"Results updated with Iron 1 size: {iron_1_size}, Straddle 1 size: {straddle_1_size}, Iron 2 size: {iron_2_size} Straddle 2 size: {straddle_2_size}")
     
-    def _scale_results(self, original_results, iron_1_size, straddle_1_size, iron_2_size, straddle_2_size, iron_3_size, straddle_3_size, cs_1_size):
+    def _scale_results(self, original_results, strategy_config):
         scaled_results = copy.deepcopy(original_results)
         scaled_daily_pnl = {}
         total_capital_used = 0.0
     
         for trade in scaled_results['trades']:
             if trade.trade_type == "Iron Condor 1":
-               scale_factor = iron_1_size
+               scale_factor = strategy_config.iron_1_trade_size
             elif trade.trade_type == "Straddle 1":
-               scale_factor = straddle_1_size
+               scale_factor = strategy_config.straddle_1_trade_size
             elif trade.trade_type == "Iron Condor 2":
-               scale_factor = iron_2_size
+               scale_factor = strategy_config.iron_2_trade_size
             elif trade.trade_type == "Straddle 2":
-               scale_factor = straddle_2_size
+               scale_factor = strategy_config.straddle_2_trade_size
             elif "Iron Condor 3" in trade.trade_type:
-               scale_factor = iron_3_size
+               scale_factor = strategy_config.iron_3_trade_size
             elif "Straddle 3" in trade.trade_type:
-               scale_factor = straddle_3_size
-            elif trade.trade_type == "Credit Spread 1(a)" or trade.trade_type == "Credit Spread 1(b)":
-               scale_factor = cs_1_size
-            elif trade.trade_type == "Underlying Cover 1(a)":
-               scale_factor = int(cs_1_size*trade.metadata.get('uc_1_cash_risk_percentage',1))
+               scale_factor = strategy_config.straddle_3_trade_size
+            elif "Credit Spread 1" in trade.trade_type:
+               scale_factor = strategy_config.cs_1_trade_size
+            elif "Underlying Cover 1" in trade.trade_type or "Long Option" in trade.trade_type:
+               scale_factor = int(strategy_config.cs_1_trade_size*strategy_config.uc_1_cash_risk_percentage)
+            elif "Long Option" in trade.trade_type:
+                cover_risk_pct = strategy_config.cover_risk_pct
+                uc_size = int(strategy_config.cs_1_trade_size*strategy_config.uc_1_cash_risk_percentage)
+                scale_factor = int(uc_size * cover_risk_pct)
             else:
                 scale_factor = 1  # Default fallback
         
@@ -801,6 +805,8 @@ class MainWindow(QMainWindow):
                         self.strategy_combo.setCurrentIndex(index)
                           
                     sc = config['strategy_parameters']
+                    self.strategy_config_widget.min_wing_width.setValue(sc['min_wing_width'])
+                    self.strategy_config_widget.max_wing_width.setValue(sc['max_wing_width'])
                     if strategy == "Trades 16":
                        self.strategy_config_widget.iron_1_consecutive_candles.setValue(sc['iron_1_consecutive_candles'])
                        self.strategy_config_widget.iron_1_volume_threshold.setValue(sc['iron_1_volume_threshold'])
@@ -842,7 +848,7 @@ class MainWindow(QMainWindow):
                           self.strategy_config_widget.cs_1_lookback_candles.setValue(sc['cs_1_lookback_candles'])
                           self.strategy_config_widget.cs_1_avg_range_candles.setValue(sc['cs_1_avg_range_candles'])
                           self.strategy_config_widget.cs_1_range_threshold.setValue(sc['cs_1_range_threshold'])
-                          self.strategy_config_widget.cs_1_target_win_loss_ratio.setValue(sc['cs_1_target_win_loss_ratio'])
+                          self.strategy_config_widget.cs_1_target_loss_win_ratio.setValue(sc['cs_1_target_loss_win_ratio'])
                           self.strategy_config_widget.cs_1_volume_threshold.setValue(sc['cs_1_volume_threshold'])
                           self.strategy_config_widget.cs_1_consecutive_candles.setValue(sc['cs_1_consecutive_candles'])
                           self.strategy_config_widget.lo_1_cover_risk_percentage.setValue(sc['lo_1_cover_risk_percentage'])

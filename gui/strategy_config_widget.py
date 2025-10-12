@@ -399,12 +399,12 @@ class StrategyConfigWidget(QWidget):
             layout.addRow("CS 1 Range Threshold (% of day avg):", self.cs_1_range_threshold)
 
 
-            self.cs_1_target_win_loss_ratio = QDoubleSpinBox()
-            self.cs_1_target_win_loss_ratio.setRange(0.0, 100000.0)
-            self.cs_1_target_win_loss_ratio.setSingleStep(0.1)
-            self.cs_1_target_win_loss_ratio.setValue(3.0)
-            self.cs_1_target_win_loss_ratio.setToolTip("Target win/loss ratio for strike selection (1.5 = 1.5:1)")
-            layout.addRow("CS 1 Target Win/Loss Ratio:", self.cs_1_target_win_loss_ratio)
+            self.cs_1_target_loss_win_ratio = QDoubleSpinBox()
+            self.cs_1_target_loss_win_ratio.setRange(0.0, 100000.0)
+            self.cs_1_target_loss_win_ratio.setSingleStep(0.1)
+            self.cs_1_target_loss_win_ratio.setValue(3.0)
+            self.cs_1_target_loss_win_ratio.setToolTip("Target loss/win ratio for strike selection")
+            layout.addRow("CS 1 Target Loss/Win Ratio:", self.cs_1_target_loss_win_ratio)
             
              # === UNDERLYING COVER 1 settings ===
             uc_1_label = QLabel("=== UNDERLYING COVER 1 SETTINGS ===")
@@ -562,10 +562,12 @@ class StrategyConfigWidget(QWidget):
             cs_1_avg_range_candles=self.cs_1_avg_range_candles.value(),
             cs_1_range_threshold=self.cs_1_range_threshold.value(),
             cs_1_trade_size=self.cs_1_trade_size.value(),
-            cs_1_target_win_loss_ratio=self.cs_1_target_win_loss_ratio.value(),
+            cs_1_target_loss_win_ratio=self.cs_1_target_loss_win_ratio.value(),
             uc_1_cash_risk_percentage=self.uc_1_cash_risk_percentage.value(),
             lo_1_strike_multiplier=self.lo_1_strike_multiplier.value(),
             lo_1_cover_risk_percentage=self.lo_1_cover_risk_percentage.value(),
+            min_wing_width=self.min_wing_width.value(),
+            max_wing_width=self.max_wing_width.value(),
             
         )
     
@@ -618,9 +620,11 @@ class StrategyConfigWidget(QWidget):
            self.cs_1_avg_range_candles.setValue(config.cs_1_avg_range_candles)
            self.cs_1_range_threshold.setValue(config.cs_1_range_threshold)
            self.cs_1_trade_size.setValue(config.cs_1_trade_size)
-           self.cs_1_target_win_loss_ratio.setValue(config.cs_1_target_win_loss_ratio)
+           self.cs_1_target_loss_win_ratio.setValue(config.cs_1_target_loss_win_ratio)
            self.uc_1_cash_risk_percentage.setValue(config.uc_1_cash_risk_percentage)
            self.lo_1_cover_risk_percentage = config.lo_1_cover_risk_percentage
            self.lo_1_strike_multiplier.setValue(config.lo_1_strike_multiplier)
+           self.min_wing_width.setValue(config.min_wing_width)
+           self.max_wing_width.setValue(config.max_wing_width)
 
         
