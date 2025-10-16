@@ -37,21 +37,22 @@ class StrategyConfigWidget(QWidget):
         
         # Add section headers and organize parameters
         
-        self.min_wing_width = QSpinBox()
-        self.min_wing_width.setRange(0, 100000)
-        self.min_wing_width.setSingleStep(5)
-        self.min_wing_width.setValue(15)
-        self.min_wing_width.setToolTip("Minimum distance from ATM strike for long options")
-        layout.addRow("Min Wing Width ($):", self.min_wing_width)
-
-        self.max_wing_width = QSpinBox()
-        self.max_wing_width.setRange(0, 200000)
-        self.max_wing_width.setSingleStep(5)
-        self.max_wing_width.setValue(70)
-        self.max_wing_width.setToolTip("Maximum distance from ATM strike for long options")
-        layout.addRow("Max Wing Width ($):", self.max_wing_width)
+        
         
         if self.selected_strategy == "Trades 16":
+            self.min_wing_width = QSpinBox()
+            self.min_wing_width.setRange(0, 100000)
+            self.min_wing_width.setSingleStep(5)
+            self.min_wing_width.setValue(15)
+            self.min_wing_width.setToolTip("Minimum distance from ATM strike for long options")
+            layout.addRow("Min Wing Width ($):", self.min_wing_width)
+
+            self.max_wing_width = QSpinBox()
+            self.max_wing_width.setRange(0, 200000)
+            self.max_wing_width.setSingleStep(5)
+            self.max_wing_width.setValue(70)
+            self.max_wing_width.setToolTip("Maximum distance from ATM strike for long options")
+            layout.addRow("Max Wing Width ($):", self.max_wing_width)
             # === IRON  CONDOR 1 settings ===
             iron_1_label = QLabel("=== IRON CONDOR 1 SETTINGS ===")
             iron_1_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
@@ -354,6 +355,19 @@ class StrategyConfigWidget(QWidget):
         
         
         elif self.selected_strategy == "Trades 17":
+            self.min_wing_width = QSpinBox()
+            self.min_wing_width.setRange(0, 100000)
+            self.min_wing_width.setSingleStep(5)
+            self.min_wing_width.setValue(15)
+            self.min_wing_width.setToolTip("Minimum distance from ATM strike for long options")
+            layout.addRow("Min Wing Width ($):", self.min_wing_width)
+
+            self.max_wing_width = QSpinBox()
+            self.max_wing_width.setRange(0, 200000)
+            self.max_wing_width.setSingleStep(5)
+            self.max_wing_width.setValue(70)
+            self.max_wing_width.setToolTip("Maximum distance from ATM strike for long options")
+            layout.addRow("Max Wing Width ($):", self.max_wing_width)
         
              # === CREDIT SPREAD 1 settings ===
             cs_1_label = QLabel("=== CREDIT SPREAD 1 SETTINGS ===")
@@ -436,6 +450,57 @@ class StrategyConfigWidget(QWidget):
             self.lo_1_cover_risk_percentage.setValue(1.0)
             self.lo_1_cover_risk_percentage.setToolTip("Percentage of underlying cover cash.")
             layout.addRow("LO 1 Cover Risk Percentage:", self.lo_1_cover_risk_percentage)
+            
+        elif self.selected_strategy == "Trades 18":
+            # ===Long Strangle 1 settings ===
+            ls_1_label = QLabel("=== Long Strangle 1 SETTINGS ===")
+            ls_1_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+            layout.addRow(ls_1_label)
+            
+        
+            self.ls_1_trade_a_size = QSpinBox()
+            self.ls_1_trade_a_size.setRange(0, 1000000)
+            self.ls_1_trade_a_size.setValue(10)
+            self.ls_1_trade_a_size.setToolTip("Number of calls per long strangle 1 trade")
+            layout.addRow("LS 1 Call Size:", self.ls_1_trade_a_size)
+            
+            self.ls_1_trade_b_size = QSpinBox()
+            self.ls_1_trade_b_size.setRange(0, 1000000)
+            self.ls_1_trade_b_size.setValue(10)
+            self.ls_1_trade_b_size.setToolTip("Number of Puts per long strangle 1 trade")
+            layout.addRow("LS 1 Put Size:", self.ls_1_trade_b_size)
+
+            self.ls_1_consecutive_candles = QSpinBox()
+            self.ls_1_consecutive_candles.setRange(1, 100)
+            self.ls_1_consecutive_candles.setValue(3)
+            self.ls_1_consecutive_candles.setToolTip("Number of consecutive 5-min candles to check for volume condition")
+            layout.addRow("LS 1 Consecutive Candles (Volume Check):", self.ls_1_consecutive_candles)
+
+            self.ls_1_volume_threshold = QDoubleSpinBox()
+            self.ls_1_volume_threshold.setRange(0.0, 10000.0)
+            self.ls_1_volume_threshold.setSingleStep(0.05)
+            self.ls_1_volume_threshold.setValue(0.5)
+            self.ls_1_volume_threshold.setToolTip("Volume threshold as fraction of first 5-min candle (0.5 = 50%)")
+            layout.addRow("LS 1 Volume Threshold (% of 1st candle):", self.ls_1_volume_threshold)
+
+            self.ls_1_lookback_candles = QSpinBox()
+            self.ls_1_lookback_candles.setRange(1, 100)
+            self.ls_1_lookback_candles.setValue(4)
+            self.ls_1_lookback_candles.setToolTip("Number of recent candles to check direction (not all same color)")
+            layout.addRow("LS 1 Direction Check Candles:", self.ls_1_lookback_candles)
+
+            self.ls_1_avg_range_candles = QSpinBox()
+            self.ls_1_avg_range_candles.setRange(1, 100)
+            self.ls_1_avg_range_candles.setValue(2)
+            self.ls_1_avg_range_candles.setToolTip("Number of recent candles to average for range comparison")
+            layout.addRow("LS 1 Range Avg Candles:", self.ls_1_avg_range_candles)
+
+            self.ls_1_range_threshold = QDoubleSpinBox()
+            self.ls_1_range_threshold.setRange(0.0, 100000.0)
+            self.ls_1_range_threshold.setSingleStep(0.05)
+            self.ls_1_range_threshold.setValue(0.8)
+            self.ls_1_range_threshold.setToolTip("Range threshold as fraction of day's average range (0.8 = 80%)")
+            layout.addRow("LS 1 Range Threshold (% of day avg):", self.ls_1_range_threshold)
 
         # Add some spacing at the end
         spacer_label = QLabel("")
@@ -570,6 +635,16 @@ class StrategyConfigWidget(QWidget):
             max_wing_width=self.max_wing_width.value(),
             
         )
+        elif self.selected_strategy == "Trades 18":
+             return StrategyConfig(
+            ls_1_trade_a_size=self.ls_1_trade_a_size.value(),
+            ls_1_trade_b_size=self.ls_1_trade_b_size.value(),
+            ls_1_consecutive_candles=self.ls_1_consecutive_candles.value(),
+            ls_1_volume_threshold=self.ls_1_volume_threshold.value(),
+            ls_1_lookback_candles=self.ls_1_lookback_candles.value(),
+            ls_1_avg_range_candles=self.ls_1_avg_range_candles.value(),
+            ls_1_range_threshold=self.ls_1_range_threshold.value(),
+        )
     
     def set_config(self, config: StrategyConfig):
         """Set widget values from a strategy configuration."""
@@ -626,5 +701,15 @@ class StrategyConfigWidget(QWidget):
            self.lo_1_strike_multiplier.setValue(config.lo_1_strike_multiplier)
            self.min_wing_width.setValue(config.min_wing_width)
            self.max_wing_width.setValue(config.max_wing_width)
+        elif self.selected_strategy == "Trades 18":
+           self.ls_1_trade_a_size.setValue(config.ls_1_trade_a_size)
+           self.ls_1_trade_b_size.setValue(config.ls_1_trade_b_size)
+           self.ls_1_consecutive_candles.setValue(config.ls_1_consecutive_candles)
+           self.ls_1_volume_threshold.setValue(config.ls_1_volume_threshold)
+           self.ls_1_lookback_candles.setValue(config.ls_1_lookback_candles)
+           self.ls_1_avg_range_candles.setValue(config.ls_1_avg_range_candles)
+           self.ls_1_range_threshold.setValue(config.ls_1_range_threshold)
+           
+              
 
         

@@ -191,7 +191,7 @@ class MainWindow(QMainWindow):
         strategy_selection_layout = QVBoxLayout()
 
         self.strategy_combo = QComboBox()
-        self.strategy_combo.addItems(["Trades 16", "Trades 17"])
+        self.strategy_combo.addItems(["Trades 16", "Trades 17", "Trades 18"])
         self.strategy_combo.setCurrentIndex(0)  # Default to Trades 16
         
         self.strategy_combo.currentIndexChanged.connect(self.on_strategy_changed)
@@ -805,9 +805,9 @@ class MainWindow(QMainWindow):
                         self.strategy_combo.setCurrentIndex(index)
                           
                     sc = config['strategy_parameters']
-                    self.strategy_config_widget.min_wing_width.setValue(sc['min_wing_width'])
-                    self.strategy_config_widget.max_wing_width.setValue(sc['max_wing_width'])
                     if strategy == "Trades 16":
+                       self.strategy_config_widget.min_wing_width.setValue(sc['min_wing_width'])
+                       self.strategy_config_widget.max_wing_width.setValue(sc['max_wing_width'])
                        self.strategy_config_widget.iron_1_consecutive_candles.setValue(sc['iron_1_consecutive_candles'])
                        self.strategy_config_widget.iron_1_volume_threshold.setValue(sc['iron_1_volume_threshold'])
                        self.strategy_config_widget.iron_1_lookback_candles.setValue(sc['iron_1_lookback_candles'])
@@ -844,6 +844,8 @@ class MainWindow(QMainWindow):
                        self.strategy_config_widget.straddle_3_exit_multiplier.setValue(sc['straddle_3_exit_multiplier'])
                        self.strategy_config_widget.straddle_itm_override_multiplier.setValue(sc['straddle_itm_override_multiplier'])
                     elif strategy == "Trades 17":
+                          self.strategy_config_widget.min_wing_width.setValue(sc['min_wing_width'])
+                          self.strategy_config_widget.max_wing_width.setValue(sc['max_wing_width'])
                           self.strategy_config_widget.cs_1_trade_size.setValue(sc['cs_1_trade_size'])
                           self.strategy_config_widget.cs_1_lookback_candles.setValue(sc['cs_1_lookback_candles'])
                           self.strategy_config_widget.cs_1_avg_range_candles.setValue(sc['cs_1_avg_range_candles'])
@@ -853,6 +855,15 @@ class MainWindow(QMainWindow):
                           self.strategy_config_widget.cs_1_consecutive_candles.setValue(sc['cs_1_consecutive_candles'])
                           self.strategy_config_widget.lo_1_cover_risk_percentage.setValue(sc['lo_1_cover_risk_percentage'])
                           self.strategy_config_widget.lo_1_strike_multiplier.setValue(sc['lo_1_strike_multiplier'])
+                    elif strategy == "Trades 18":
+                          self.strategy_config_widget.ls_1_trade_a_size.setValue(sc['ls_1_trade_a_size'])
+                          self.strategy_config_widget.ls_1_trade_b_size.setValue(sc['ls_1_trade_b_size'])
+                          self.strategy_config_widget.ls_1_lookback_candles.setValue(sc['ls_1_lookback_candles'])
+                          self.strategy_config_widget.ls_1_avg_range_candles.setValue(sc['ls_1_avg_range_candles'])
+                          self.strategy_config_widget.ls_1_range_threshold.setValue(sc['ls_1_range_threshold'])
+                          self.strategy_config_widget.ls_1_volume_threshold.setValue(sc['ls_1_volume_threshold'])
+                          self.strategy_config_widget.ls_1_consecutive_candles.setValue(sc['ls_1_consecutive_candles'])
+                          self.strategy_config_widget.ls_1_range_threshold.setValue(sc['ls_1_range_threshold'])
 
 
 

@@ -70,6 +70,16 @@ class StrategyConfig:
     #Long Option 1 parameters
     lo_1_strike_multiplier: float = 5.0 
     lo_1_cover_risk_percentage: float = 1.0
+    
+    #Long Strangle 1 parameters
+    ls_1_consecutive_candles: int = 3  
+    ls_1_volume_threshold: float = 0.5 
+    ls_1_lookback_candles: int = 4 
+    ls_1_avg_range_candles: int = 2  
+    ls_1_range_threshold: float = 0.8  
+    ls_1_trade_a_size: int = 10  
+    ls_1_trade_b_size: int = 10
+    
     def to_dict(self) -> dict:
         return {
             'name': self.name,
@@ -129,7 +139,16 @@ class StrategyConfig:
             'uc_1_cash_risk_percentage': self.uc_1_cash_risk_percentage,
             # Long Option 1 parameters
             'lo_1_strike_multiplier': self.lo_1_strike_multiplier,
-            'lo_1_cover_risk_percentage': self.lo_1_cover_risk_percentage
+            'lo_1_cover_risk_percentage': self.lo_1_cover_risk_percentage,
+            #Long Strangle 1 parameters
+            'ls_1_consecutive_candles': self.ls_1_consecutive_candles,
+            'ls_1_volume_threshold': self.ls_1_volume_threshold,
+            'ls_1_lookback_candles': self.ls_1_lookback_candles,
+            'ls_1_avg_range_candles': self.ls_1_avg_range_candles,
+            'ls_1_range_threshold': self.ls_1_range_threshold,
+            'ls_1_trade_a_size': self.ls_1_trade_a_size,
+            'ls_1_trade_b_size': self.ls_1_trade_b_size,
+            
             
 
         }

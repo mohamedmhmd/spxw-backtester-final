@@ -8,6 +8,7 @@ from data.polygon_data_provider import PolygonDataProvider
 from config.strategy_config import StrategyConfig
 from trades.iron_condor_3 import IronCondor3
 from trades.long_option_1 import LongOption1
+from trades.long_strangle_1 import LongStrangle1
 from trades.signal_checker import OptimizedSignalChecker
 from trades.straddle2 import Straddle2
 from trades.straddle3 import Straddle3
@@ -64,6 +65,11 @@ class BacktestEngine:
         elif (self.selected_strategy == "Trades 17"):
            tasks = [
             self._run_daily_strategy_17_task(date, config, strategy)
+            for date in trading_dates
+           ]
+        elif (self.selected_strategy == "Trades 18"):
+           tasks = [
+            self._run_daily_strategy_18_task(date, config, strategy)
             for date in trading_dates
            ]
         
@@ -170,6 +176,18 @@ class BacktestEngine:
         except Exception as e:
             logger.error(f"Error in daily strategy for {date}: {e}")
             return [], 0.0
+        
+    async def _run_daily_strategy_18_task(self, date: datetime, config: BacktestConfig, 
+                                      strategy: StrategyConfig) -> Tuple[List[Trade], float]:
+        """Wrapper for daily strategy that returns trades and P&L"""
+        try:
+            daily_trades = await self._run_daily_strategy_18(date, config, strategy)
+            daily_pnl = sum(trade.pnl for trade in daily_trades)
+            return daily_trades, daily_pnl
+        except Exception as e:
+            logger.error(f"Error in daily strategy for {date}: {e}")
+            return [], 0.0
+                                          
     
     async def _run_daily_strategy_16(self, date: datetime, config: BacktestConfig, 
                                   strategy: StrategyConfig) -> List[Trade]:
@@ -511,5 +529,53 @@ class BacktestEngine:
         for cover_b_trade in active_cover_b_trades:
             trades.append(cover_b_trade)
         
+        logger.info(f"Day {date.strftime('%Y-%m-%d')} completed: {len([t for t in trades if t.trade_type == 'Iron Condor 1'])} Iron Condors, {len([t for t in trades if t.trade_type == 'Straddle 1'])} Straddles")
+        return trades
+    
+    
+    
+    async def _run_daily_strategy_18(self, date: datetime, config: BacktestConfig, 
+                                  strategy: StrategyConfig) -> List[Trade]:
+        """Run strategy for a single day with both Iron Condor and Straddle - allows multiple entries per day"""
+        trades = []
+        spy_ohlc_data = await self.data_provider.get_ohlc_data(date, "SPY")
+        spx_ohlc_data = await self.data_provider.get_ohlc_data(date, "I:SPX")
+
+        if spy_ohlc_data.empty or spx_ohlc_data.empty:
+            logger.warning(f"No data available for {date}")
+            return trades
+        
+        #iron 1 and straddle 1
+        ls_1_min_bars_needed = max(
+            strategy.ls_1_consecutive_candles,
+            strategy.ls_1_lookback_candles,
+            strategy.ls_1_avg_range_candles
+        )
+        if len(spy_ohlc_data) < ls_1_min_bars_needed:
+            logger.warning(f"Insufficient bars for {date}: {len(spy_ohlc_data)} < {ls_1_min_bars_needed}")
+            return trades
+        
+        ls1_found = False
+        checker = OptimizedSignalChecker(spx_ohlc_data, spy_ohlc_data)
+        
+        for i in range(ls_1_min_bars_needed, len(spx_ohlc_data)):
+            current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
+            current_price = spx_ohlc_data.iloc[i]['open']
+            
+            ls1trades = await LongStrangle1._find_long_strangle_trades(i,strategy,date,current_price,current_bar_time,
+                                                                            self.data_provider, config, checker, spx_ohlc_data)
+            if ls1trades and not ls1_found:
+               for ls1trade in ls1trades:
+                   trades.append(ls1trade)
+               ls1_found = True 
+               logger.info(f"Entered Long Strangle 1 at {current_bar_time}.")
+            
+            if ls1_found:
+               break
+        # Close any remaining open trades at expiry
+        for trade in trades:
+            if trade.status == "OPEN":
+                await trade._close_trade_at_expiry(spx_ohlc_data, date, config)
+                
         logger.info(f"Day {date.strftime('%Y-%m-%d')} completed: {len([t for t in trades if t.trade_type == 'Iron Condor 1'])} Iron Condors, {len([t for t in trades if t.trade_type == 'Straddle 1'])} Straddles")
         return trades
