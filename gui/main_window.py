@@ -864,6 +864,16 @@ class MainWindow(QMainWindow):
                           self.strategy_config_widget.ls_1_volume_threshold.setValue(sc['ls_1_volume_threshold'])
                           self.strategy_config_widget.ls_1_consecutive_candles.setValue(sc['ls_1_consecutive_candles'])
                           self.strategy_config_widget.ls_1_range_threshold.setValue(sc['ls_1_range_threshold'])
+                          self.strategy_config_widget.ls_2_trade_a_size.setValue(sc['ls_2_trade_a_size'])
+                          self.strategy_config_widget.ls_2_trade_b_size.setValue(sc['ls_2_trade_b_size'])
+                          self.strategy_config_widget.ls_2_lookback_candles.setValue(sc['ls_2_lookback_candles'])
+                          self.strategy_config_widget.ls_2_avg_range_candles.setValue(sc['ls_2_avg_range_candles'])
+                          self.strategy_config_widget.ls_2_range_threshold.setValue(sc['ls_2_range_threshold'])
+                          self.strategy_config_widget.ls_2_volume_threshold.setValue(sc['ls_2_volume_threshold'])
+                          self.strategy_config_widget.ls_2_consecutive_candles.setValue(sc['ls_2_consecutive_candles'])
+                          self.strategy_config_widget.ls_2_range_threshold.setValue(sc['ls_2_range_threshold'])
+                          self.strategy_config_widget.ls_2_range_multiplier.setValue(sc['ls_2_range_multiplier'])
+                          self.strategy_config_widget.ls_2_dte.setValue(sc['ls_2_dte'])
 
 
 

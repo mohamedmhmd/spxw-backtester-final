@@ -9,6 +9,7 @@ from config.strategy_config import StrategyConfig
 from trades.iron_condor_3 import IronCondor3
 from trades.long_option_1 import LongOption1
 from trades.long_strangle_1 import LongStrangle1
+from trades.long_strangle_2 import LongStrangle2
 from trades.signal_checker import OptimizedSignalChecker
 from trades.straddle2 import Straddle2
 from trades.straddle3 import Straddle3
@@ -556,6 +557,7 @@ class BacktestEngine:
             return trades
         
         ls1_found = False
+        ls_2_found = False
         checker = OptimizedSignalChecker(spx_ohlc_data, spy_ohlc_data)
         
         for i in range(ls_1_min_bars_needed, len(spx_ohlc_data)):
@@ -569,13 +571,24 @@ class BacktestEngine:
                    trades.append(ls1trade)
                ls1_found = True 
                logger.info(f"Entered Long Strangle 1 at {current_bar_time}.")
+               
+            ls2trades = await LongStrangle2._find_long_strangle_trades(i,strategy,date,current_price,current_bar_time,
+                                                                            self.data_provider, config, checker, spx_ohlc_data)
+            if ls2trades and not ls_2_found:
+               for ls2trade in ls2trades:
+                   trades.append(ls2trade)
+               ls_2_found = True 
+               logger.info(f"Entered Long Strangle 2 at {current_bar_time}.")
             
-            if ls1_found:
+            if ls1_found and ls_2_found:
                break
+           
+            
         # Close any remaining open trades at expiry
+        timestamp = current_bar_time = spx_ohlc_data.iloc[-1]['timestamp']
         for trade in trades:
             if trade.status == "OPEN":
-                await trade._close_trade_at_expiry(spx_ohlc_data, date, config)
+                await trade._close_trade_at_expiry(spx_ohlc_data, date, config, self.data_provider, timestamp)
                 
         logger.info(f"Day {date.strftime('%Y-%m-%d')} completed: {len([t for t in trades if t.trade_type == 'Iron Condor 1'])} Iron Condors, {len([t for t in trades if t.trade_type == 'Straddle 1'])} Straddles")
         return trades

@@ -80,6 +80,19 @@ class StrategyConfig:
     ls_1_trade_a_size: int = 10  
     ls_1_trade_b_size: int = 10
     
+    #Long Strangle 2 parameters
+    ls_2_consecutive_candles: int = 3  
+    ls_2_volume_threshold: float = 0.5 
+    ls_2_lookback_candles: int = 4 
+    ls_2_avg_range_candles: int = 2  
+    ls_2_range_threshold: float = 0.8  
+    ls_2_trade_a_size: int = 10  
+    ls_2_trade_b_size: int = 10
+    ls_2_range_multiplier: float = 1.0
+    ls_2_dte : int = 1
+    
+    
+    
     def to_dict(self) -> dict:
         return {
             'name': self.name,
@@ -148,6 +161,16 @@ class StrategyConfig:
             'ls_1_range_threshold': self.ls_1_range_threshold,
             'ls_1_trade_a_size': self.ls_1_trade_a_size,
             'ls_1_trade_b_size': self.ls_1_trade_b_size,
+            #Long Strangle 2 parameters
+            'ls_2_consecutive_candles': self.ls_2_consecutive_candles,
+            'ls_2_volume_threshold': self.ls_2_volume_threshold,
+            'ls_2_lookback_candles': self.ls_2_lookback_candles,
+            'ls_2_avg_range_candles': self.ls_2_avg_range_candles,
+            'ls_2_range_threshold': self.ls_2_range_threshold,
+            'ls_2_trade_a_size': self.ls_2_trade_a_size,
+            'ls_2_trade_b_size': self.ls_2_trade_b_size,
+            'ls_2_range_multiplier': self.ls_2_range_multiplier,
+            'ls_2_dte': self.ls_2_dte
             
             
 

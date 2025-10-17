@@ -1,3 +1,4 @@
+from ctypes import Union
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -6,6 +7,8 @@ import logging
 import pandas as pd
 
 from config.back_test_config import BacktestConfig
+from data.mock_data_provider import MockDataProvider
+from data.polygon_data_provider import PolygonDataProvider
 #Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -92,7 +95,7 @@ class Trade:
     
 
     async def _close_trade_at_expiry(self, ohlc_data : pd.DataFrame, date: datetime, 
-                                   config: BacktestConfig):
+                                   config: BacktestConfig, data_provider = None, timestamp: datetime = None):
         """Close trade at market close using settlement prices"""
         # Get SPX close price
         if ohlc_data.empty:
@@ -122,6 +125,9 @@ class Trade:
             # Calculate intrinsic value at expiration
             if 'call' in leg_type:
                 value = max(0, settlement_price - strike)
+                if "Long Strangle 2" in self.trade_type:
+                    quote = await data_provider._get_option_tick_quote(contract, timestamp)
+                    value = quote.get('ask', 0) if quote is not None else value
                 if 'short' in leg_type and value > 0:
                    # add cash required to settle short calls
                    details["used_capital"] += value * 100 + config.commission_per_contract
@@ -130,6 +136,9 @@ class Trade:
                      details["used_capital"] += config.commission_per_contract* exit_factor
             else:  # put
                 value = max(0, strike - settlement_price)
+                if "Long Strangle 2" in self.trade_type:
+                    quote = await data_provider._get_option_tick_quote(contract, timestamp)
+                    value = quote.get('ask', 0) if quote is not None else value
                 if 'short' in leg_type and value > 0:
                    # add cash required to settle short puts
                    details["used_capital"] += value* 100 + config.commission_per_contract

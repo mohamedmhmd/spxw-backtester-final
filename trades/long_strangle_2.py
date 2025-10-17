@@ -20,11 +20,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class LongStrangle1:
+class LongStrangle2:
     """
-    Long Strangle 1 implementation:
-    - Long Strangle 1(a): Buy call at strike closest to high of day
-    - Long Strangle 1(b): Buy put at strike closest to low of day
+    Long Strangle 2 implementation:
+    - Long Strangle 2(a): Buy call at strike = market + distance
+    - Long Strangle 2(b): Buy put at strike = market - distance
+    
+    Distance = configurable % of largest 5-minute bar range of the day
     
     Entry conditions same as Iron 1:
     1) Three consecutive 5-minute candles at volume below 50% of first candle
@@ -33,10 +35,42 @@ class LongStrangle1:
     """
     
     @staticmethod
-    def _round_to_nearest_strike(price: float, is_call: bool = True) -> int:
-        """Round price to nearest 5-point strike"""
-        # Round to nearest 5
-        return int(round(price / 5) * 5)
+    def _round_to_nearest_strike(price: float, interval: int = 5) -> int:
+        """Round price to nearest strike interval (default 5)"""
+        return int(round(price / interval) * interval)
+    
+    @staticmethod
+    def _get_largest_bar_range(spx_ohlc_data, up_to_index: int) -> float:
+        """Get the largest 5-minute bar range of the day up to current index"""
+        if up_to_index <= 0:
+            return 0.0
+        
+        # Calculate range for each bar up to current index
+        high_values = spx_ohlc_data['high'].values[:up_to_index]
+        low_values = spx_ohlc_data['low'].values[:up_to_index]
+        ranges = high_values - low_values
+        
+        # Return the maximum range
+        return float(np.max(ranges)) if len(ranges) > 0 else 0.0
+    
+    @staticmethod
+    def _get_expiration_date(current_date: datetime, dte: int) -> datetime:
+        """
+        Get the expiration date based on DTE (Days To Expiration)
+        dte: Number of trading days until expiration
+        """
+        # For simplicity, assuming all weekdays are trading days
+        # In production, should check for holidays
+        exp_date = current_date
+        days_added = 0
+        
+        while days_added < dte:
+            exp_date += timedelta(days=1)
+            # Skip weekends
+            if exp_date.weekday() < 5:  # Monday = 0, Friday = 4
+                days_added += 1
+        
+        return exp_date
     
     @staticmethod
     def _create_option_contract(
@@ -73,9 +107,12 @@ class LongStrangle1:
         strike: float,
         config: BacktestConfig,
         current_price: float,
-        high_of_day: float,
-        low_of_day: float,
-        variant: str
+        distance: float,
+        largest_range: float,
+        range_multiplier: float,
+        variant: str,
+        expiration: datetime,
+        contract_symbol: str
     ) -> Optional[Trade]:
         """Execute a single long option leg (call or put)"""
         
@@ -92,6 +129,7 @@ class LongStrangle1:
                 'entry_price': ask_price,
                 'leg_type': f'long_{leg_type}',
                 'strike': strike,
+                'expiration': expiration,
                 'used_capital': ask_price * 100 + config.commission_per_contract
             }
         }
@@ -103,20 +141,23 @@ class LongStrangle1:
         trade = Trade(
             entry_time=entry_time,
             exit_time=None,
-            trade_type=f"Long Strangle 1({variant})",
+            trade_type=f"Long Strangle 2({variant})",
             contracts=trade_contracts,
             size=size,
             used_capital=0.0,
             metadata={
                 'net_premium': -ask_price,
-                'strategy_name': f"Long Strangle 1({variant})",
+                'strategy_name': f"Long Strangle 2({variant})",
                 'entry_spx_price': current_price,
                 'representation': representation,
                 'leg_type': leg_type,
                 'variant': variant,
                 'strike': strike,
-                'high_of_day': high_of_day,
-                'low_of_day': low_of_day
+                'distance_from_market': distance,
+                'largest_bar_range': largest_range,
+                'range_multiplier': range_multiplier,
+                'expiration': expiration,
+                'contract_symbol': contract_symbol
             }
         )
         
@@ -134,51 +175,70 @@ class LongStrangle1:
         checker: OptimizedSignalChecker,
         spx_ohlc_data
     ) -> List[Optional[Trade]]:
-        """Find and execute Long Strangle 1(a) and 1(b) trades"""
+        """Find and execute Long Strangle 2(a) and 2(b) trades"""
         
         # Check entry signals (same as Iron 1)
-        # Using Iron 1 parameters with Long Strangle 1 prefix if available
-        if not checker.long_strangle_1_check_entry_signals(i, strategy):
+        # Using checker method - assuming it exists
+        if not checker.long_strangle_2_check_entry_signals(i, strategy):
             return None
         
-        # Get day's extremes from SPX data
-        high_of_day, low_of_day = Common._get_day_extremes(spx_ohlc_data, i)
+        # Get largest bar range of the day
+        largest_range = LongStrangle2._get_largest_bar_range(spx_ohlc_data, i)
         
-        if high_of_day is None or low_of_day is None:
-            logger.warning("Could not determine day's extremes")
+        if largest_range <= 0:
+            logger.warning("No valid bar ranges found for the day")
             return None
         
-        logger.info(f"Long Strangle 1 conditions met - High: {high_of_day:.2f}, Low: {low_of_day:.2f}")
+        # Get range multiplier (default to 100% if not specified)
+        range_multiplier = getattr(strategy, 'ls_2_range_multiplier', 1.0)
         
-        # Round to nearest strikes
-        call_strike = int(round(high_of_day / 5) * 5)
-        put_strike = int(round(low_of_day / 5) * 5)
+        # Calculate distance from market
+        calculated_distance = largest_range * range_multiplier
+        
+        # Round distance to nearest 5
+        distance = LongStrangle2._round_to_nearest_strike(calculated_distance, 5)
+        
+        # Round current price to nearest 5
+        center_strike = LongStrangle2._round_to_nearest_strike(current_price, 5)
+        
+        # Calculate strikes
+        call_strike = center_strike + distance
+        put_strike = center_strike - distance
+        
+        logger.info(f"Long Strangle 2 conditions met - Market: {current_price:.2f} (rounded to {center_strike}), "
+                   f"Largest range: {largest_range:.2f}, Multiplier: {range_multiplier:.1%}, "
+                   f"Distance: {distance}, Call: {call_strike}, Put: {put_strike}")
+        
+        # Get DTE setting (default to 1DTE - next trading day)
+        dte = getattr(strategy, 'ls_2_dte', 1)
         
         # Get expiration date
         if isinstance(date, datetime):
-            option_date = date
+            current_date = date
         else:
-            option_date = datetime.combine(date, datetime.min.time())
+            current_date = datetime.combine(date, datetime.min.time())
+        
+        expiration_date = LongStrangle2._get_expiration_date(current_date, dte)
         
         # Create contracts
-        call_contract = LongStrangle1._create_option_contract(call_strike, 'call', option_date)
-        put_contract = LongStrangle1._create_option_contract(put_strike, 'put', option_date)
+        call_contract = LongStrangle2._create_option_contract(call_strike, 'call', expiration_date)
+        put_contract = LongStrangle2._create_option_contract(put_strike, 'put', expiration_date)
         
         # Get quotes
         call_quote, put_quote = await asyncio.gather(
-            LongStrangle1._get_option_quote(call_contract, current_bar_time, data_provider),
-            LongStrangle1._get_option_quote(put_contract, current_bar_time, data_provider),
+            LongStrangle2._get_option_quote(call_contract, current_bar_time, data_provider),
+            LongStrangle2._get_option_quote(put_contract, current_bar_time, data_provider),
             return_exceptions=True
         )
         
         trades = []
         
-        # Execute Long Strangle 1(a) - Call
+        # Execute Long Strangle 2(a) - Call
         if not isinstance(call_quote, Exception) and call_quote:
             # Get trade size for variant (a)
-            call_size = getattr(strategy, 'ls_1_trade_a_size', 10)
+            call_size = getattr(strategy, 'ls_2_trade_a_size', 10)
             
-            call_trade = await LongStrangle1._execute_long_leg(
+            call_trade = await LongStrangle2._execute_long_leg(
                 call_contract,
                 call_quote,
                 current_bar_time,
@@ -187,14 +247,18 @@ class LongStrangle1:
                 call_strike,
                 config,
                 current_price,
-                high_of_day,
-                low_of_day,
-                'a'
+                distance,
+                largest_range,
+                range_multiplier,
+                'a', 
+                expiration_date,
+                call_contract
             )
             
             if call_trade:
-                logger.info(f"Entered Long Strangle 1(a) at {current_bar_time}: "
-                           f"Long Call {call_strike} for ${call_quote.get('ask', 0):.2f}")
+                logger.info(f"Entered Long Strangle 2(a) at {current_bar_time}: "
+                           f"Long Call {call_strike} for ${call_quote.get('ask', 0):.2f} "
+                           f"(expires {expiration_date.strftime('%Y-%m-%d')})")
                 trades.append(call_trade)
             else:
                 trades.append(None)
@@ -202,12 +266,12 @@ class LongStrangle1:
             logger.warning(f"Could not get quote for call contract {call_contract}")
             trades.append(None)
         
-        # Execute Long Strangle 1(b) - Put
+        # Execute Long Strangle 2(b) - Put
         if not isinstance(put_quote, Exception) and put_quote:
             # Get trade size for variant (b)
-            put_size = getattr(strategy, 'ls_1_trade_b_size', 10)
+            put_size = getattr(strategy, 'ls_2_trade_b_size', 10)
             
-            put_trade = await LongStrangle1._execute_long_leg(
+            put_trade = await LongStrangle2._execute_long_leg(
                 put_contract,
                 put_quote,
                 current_bar_time,
@@ -216,14 +280,18 @@ class LongStrangle1:
                 put_strike,
                 config,
                 current_price,
-                high_of_day,
-                low_of_day,
-                'b'
+                distance,
+                largest_range,
+                range_multiplier,
+                'b',
+                expiration_date,
+                put_contract
             )
             
             if put_trade:
-                logger.info(f"Entered Long Strangle 1(b) at {current_bar_time}: "
-                           f"Long Put {put_strike} for ${put_quote.get('ask', 0):.2f}")
+                logger.info(f"Entered Long Strangle 2(b) at {current_bar_time}: "
+                           f"Long Put {put_strike} for ${put_quote.get('ask', 0):.2f} "
+                           f"(expires {expiration_date.strftime('%Y-%m-%d')})")
                 trades.append(put_trade)
             else:
                 trades.append(None)
@@ -245,11 +313,11 @@ class LongStrangle1:
         checker: OptimizedSignalChecker,
         spx_ohlc_data
     ) -> List[Optional[Trade]]:
-        """Public interface to find Long Strangle trades
+        """Public interface to find Long Strangle 2 trades
         
         Returns list of [call_trade, put_trade] where each can be None if not executed
         """
-        return await LongStrangle1._find_long_strangle_trades(
+        return await LongStrangle2._find_long_strangle_trades(
             i, strategy, date, current_price, current_bar_time,
             data_provider, config, checker, spx_ohlc_data
         )

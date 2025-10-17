@@ -501,6 +501,70 @@ class StrategyConfigWidget(QWidget):
             self.ls_1_range_threshold.setValue(0.8)
             self.ls_1_range_threshold.setToolTip("Range threshold as fraction of day's average range (0.8 = 80%)")
             layout.addRow("LS 1 Range Threshold (% of day avg):", self.ls_1_range_threshold)
+            
+            # ===Long Strangle 2 settings ===
+            ls_2_label = QLabel("=== Long Strangle 2 SETTINGS ===")
+            ls_2_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+            layout.addRow(ls_2_label)
+            
+        
+            self.ls_2_trade_a_size = QSpinBox()
+            self.ls_2_trade_a_size.setRange(0, 1000000)
+            self.ls_2_trade_a_size.setValue(10)
+            self.ls_2_trade_a_size.setToolTip("Number of calls per long strangle 2 trade")
+            layout.addRow("LS 2 Call Size:", self.ls_2_trade_a_size)
+            
+            self.ls_2_trade_b_size = QSpinBox()
+            self.ls_2_trade_b_size.setRange(0, 1000000)
+            self.ls_2_trade_b_size.setValue(10)
+            self.ls_2_trade_b_size.setToolTip("Number of Puts per long strangle 2 trade")
+            layout.addRow("LS 2 Put Size:", self.ls_2_trade_b_size)
+
+            self.ls_2_consecutive_candles = QSpinBox()
+            self.ls_2_consecutive_candles.setRange(1, 100)
+            self.ls_2_consecutive_candles.setValue(3)
+            self.ls_2_consecutive_candles.setToolTip("Number of consecutive 5-min candles to check for volume condition")
+            layout.addRow("LS 2 Consecutive Candles (Volume Check):", self.ls_2_consecutive_candles)
+
+            self.ls_2_volume_threshold = QDoubleSpinBox()
+            self.ls_2_volume_threshold.setRange(0.0, 10000.0)
+            self.ls_2_volume_threshold.setSingleStep(0.05)
+            self.ls_2_volume_threshold.setValue(0.5)
+            self.ls_2_volume_threshold.setToolTip("Volume threshold as fraction of first 5-min candle (0.5 = 50%)")
+            layout.addRow("LS 2 Volume Threshold (% of 1st candle):", self.ls_2_volume_threshold)
+
+            self.ls_2_lookback_candles = QSpinBox()
+            self.ls_2_lookback_candles.setRange(1, 100)
+            self.ls_2_lookback_candles.setValue(4)
+            self.ls_2_lookback_candles.setToolTip("Number of recent candles to check direction (not all same color)")
+            layout.addRow("LS 2 Direction Check Candles:", self.ls_2_lookback_candles)
+
+            self.ls_2_avg_range_candles = QSpinBox()
+            self.ls_2_avg_range_candles.setRange(1, 100)
+            self.ls_2_avg_range_candles.setValue(2)
+            self.ls_2_avg_range_candles.setToolTip("Number of recent candles to average for range comparison")
+            layout.addRow("LS 1 Range Avg Candles:", self.ls_2_avg_range_candles)
+
+            self.ls_2_range_threshold = QDoubleSpinBox()
+            self.ls_2_range_threshold.setRange(0.0, 100000.0)
+            self.ls_2_range_threshold.setSingleStep(0.05)
+            self.ls_2_range_threshold.setValue(0.8)
+            self.ls_2_range_threshold.setToolTip("Range threshold as fraction of day's average range (0.8 = 80%)")
+            layout.addRow("LS 2 Range Threshold (% of day avg):", self.ls_2_range_threshold)
+            
+            self.ls_2_range_multiplier = QDoubleSpinBox()
+            self.ls_2_range_multiplier.setRange(0.0, 100000.0)
+            self.ls_2_range_multiplier.setSingleStep(0.1)
+            self.ls_2_range_multiplier.setValue(1.0)
+            self.ls_2_range_multiplier.setToolTip("Range multiplier for Long Strangle 2")
+            layout.addRow("LS 2 Range Multiplier:", self.ls_2_range_multiplier)
+            
+            self.ls_2_dte = QSpinBox()
+            self.ls_2_dte.setRange(0, 100000)
+            self.ls_2_dte.setSingleStep(1)
+            self.ls_2_dte.setValue(1)
+            self.ls_2_dte.setToolTip("Days to expiration for Long Strangle 2")
+            layout.addRow("LS 2 DTE:", self.ls_2_dte)
 
         # Add some spacing at the end
         spacer_label = QLabel("")
@@ -644,6 +708,15 @@ class StrategyConfigWidget(QWidget):
             ls_1_lookback_candles=self.ls_1_lookback_candles.value(),
             ls_1_avg_range_candles=self.ls_1_avg_range_candles.value(),
             ls_1_range_threshold=self.ls_1_range_threshold.value(),
+            ls_2_trade_a_size=self.ls_2_trade_a_size.value(),
+            ls_2_trade_b_size=self.ls_2_trade_b_size.value(),
+            ls_2_consecutive_candles=self.ls_2_consecutive_candles.value(),
+            ls_2_volume_threshold=self.ls_2_volume_threshold.value(),
+            ls_2_lookback_candles=self.ls_2_lookback_candles.value(),
+            ls_2_avg_range_candles=self.ls_2_avg_range_candles.value(),
+            ls_2_range_threshold=self.ls_2_range_threshold.value(),
+            ls_2_range_multiplier=self.ls_2_range_multiplier.value(),
+            ls_2_dte=self.ls_2_dte.value(),
         )
     
     def set_config(self, config: StrategyConfig):
@@ -709,6 +782,16 @@ class StrategyConfigWidget(QWidget):
            self.ls_1_lookback_candles.setValue(config.ls_1_lookback_candles)
            self.ls_1_avg_range_candles.setValue(config.ls_1_avg_range_candles)
            self.ls_1_range_threshold.setValue(config.ls_1_range_threshold)
+           self.ls_2_trade_a_size.setValue(config.ls_2_trade_a_size)
+           self.ls_2_trade_b_size.setValue(config.ls_2_trade_b_size)
+           self.ls_2_consecutive_candles.setValue(config.ls_2_consecutive_candles)
+           self.ls_2_volume_threshold.setValue(config.ls_2_volume_threshold)
+           self.ls_2_lookback_candles.setValue(config.ls_2_lookback_candles)
+           self.ls_2_avg_range_candles.setValue(config.ls_2_avg_range_candles)
+           self.ls_2_range_threshold.setValue(config.ls_2_range_threshold)
+           self.ls_2_range_multiplier.setValue(config.ls_2_range_multiplier)
+           self.ls_2_dte.setValue(config.ls_2_dte)
+              
            
               
 
