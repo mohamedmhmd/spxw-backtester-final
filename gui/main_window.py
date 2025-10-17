@@ -662,6 +662,16 @@ class MainWindow(QMainWindow):
                 cover_risk_pct = strategy_config.cover_risk_pct
                 uc_size = int(strategy_config.cs_1_trade_size*strategy_config.uc_1_cash_risk_percentage)
                 scale_factor = int(uc_size * cover_risk_pct)
+            elif trade.trade_type == "Long Strangle 1(a)":
+                scale_factor = strategy_config.ls_1_trade_a_size
+            elif trade.trade_type == "Long Strangle 1(b)":
+                scale_factor = strategy_config.ls_1_trade_b_size
+            elif trade.trade_type == "Long Strangle 2(a)":
+                scale_factor = strategy_config.ls_2_trade_a_size
+            elif trade.trade_type == "Long Strangle 2(b)":
+                scale_factor = strategy_config.ls_2_trade_b_size
+            elif trade.trade_type == "Iron Condor Time-Based":
+                scale_factor = strategy_config.ic_tb_trade_size
             else:
                 scale_factor = 1  # Default fallback
         
@@ -896,8 +906,10 @@ class MainWindow(QMainWindow):
            self.export_results_trades_16()
         elif self.get_selected_strategy() == "Trades 17":
            self.export_results_trades_17()
+        elif self.get_selected_strategy() == "Trades 18":
+           self.export_results_trades_18() 
     
-    def export_results_16(self):
+    def export_results_trades_16(self):
         """Export backtest results to Excel file with three tabs using XlsxWriter"""
         if not self.last_results:
            QMessageBox.information(self, "No Results", "Please run a backtest first")
@@ -1189,6 +1201,204 @@ class MainWindow(QMainWindow):
                     "Entry SPX Price": f"{trade.metadata.get('entry_spx_price', ''):.2f}" if trade.metadata and trade.metadata.get('entry_spx_price') else "",
                     "Exit SPX Price": f"{trade.metadata.get('exit_spx_price', ''):.2f}" if trade.metadata and trade.metadata.get('exit_spx_price') else "",
                     "SPX/SPY Ratio": f"{trade.metadata.get('spx_spy_ratio', ''):.2f}" if trade.metadata and trade.metadata.get('spx_spy_ratio') else "",
+                    "PnL without Commission": f"${individual_pnl_no_comm:,.0f}",
+                    "PnL": f"${individual_pnl:,.0f}"
+                })
+
+        # Prepare data for Tab 3: Daily PnL
+           daily_pnl_dict = {}
+           for trade in self.last_results["trades"]:
+               # Use exit_time if available (for closed trades), otherwise use entry_time
+               trade_date = trade.exit_time if trade.exit_time else trade.entry_time
+               if trade_date:
+                  date_key = trade_date.date()
+                  if date_key not in daily_pnl_dict:
+                     daily_pnl_dict[date_key] = {
+                        'pnl': 0.0,
+                        'pnl_without_commission': 0.0
+                    }
+                  daily_pnl_dict[date_key]['pnl'] += trade.pnl
+                  daily_pnl_dict[date_key]['pnl_without_commission'] += trade.pnl_without_commission
+
+        # Convert daily PnL dictionary to list format and sort by date
+           daily_pnl_data = []
+           for date, pnl_values in sorted(daily_pnl_dict.items()):
+               daily_pnl_data.append({
+                "Date": date.strftime("%b %d, %Y"),
+                "PnL": f"${pnl_values['pnl']:,.0f}",
+                "PnL without Commission": f"${pnl_values['pnl_without_commission']:,.0f}"
+            })
+
+        # Create DataFrames
+           df_grouped = pd.DataFrame(grouped_trades_data)
+           df_individual = pd.DataFrame(individual_trades_data)
+           df_daily_pnl = pd.DataFrame(daily_pnl_data)
+
+           # Export with XlsxWriter
+           with pd.ExcelWriter(filename, engine='xlsxwriter') as writer:
+                df_grouped.to_excel(writer, sheet_name='Grouped Trades', index=False)
+                df_individual.to_excel(writer, sheet_name='Individual Trades', index=False)
+                df_daily_pnl.to_excel(writer, sheet_name='Daily PnL', index=False)
+
+                workbook = writer.book
+                grouped_sheet = writer.sheets['Grouped Trades']
+                individual_sheet = writer.sheets['Individual Trades']
+                daily_pnl_sheet = writer.sheets['Daily PnL']
+
+                # Formatting
+                header_format = workbook.add_format({'bold': True, 'align': 'center', 'bg_color': '#366092', 'font_color': 'white'})
+                light_fill_format = workbook.add_format({'bg_color': '#F2F2F2'})
+                center_align = workbook.add_format({'align': 'center'})
+                right_align = workbook.add_format({'align': 'right'})
+
+                # Function to format a sheet
+                def format_sheet(sheet, df):
+                    for col_num, col_name in enumerate(df.columns):
+                        sheet.write(0, col_num, col_name, header_format)
+                        column_width = min(max(df[col_name].astype(str).map(len).max(), len(col_name)) + 2, 50)
+                        sheet.set_column(col_num, col_num, column_width)
+
+                    for row_num in range(1, len(df) + 1):
+                        if row_num % 2 == 0:
+                           sheet.set_row(row_num, cell_format=light_fill_format)
+
+                    # Align PnL columns right, others center
+                    for col_num, col_name in enumerate(df.columns):
+                        if 'PnL' in col_name or 'Price' in col_name:
+                           sheet.set_column(col_num, col_num, None, right_align)
+                        elif col_name in ['Short Strikes', 'Wings', 'Size', 'Date', 'Market Direction', 'SPY Shares', 'LO Strike']:
+                           sheet.set_column(col_num, col_num, None, center_align)
+
+                format_sheet(grouped_sheet, df_grouped)
+                format_sheet(individual_sheet, df_individual)
+                format_sheet(daily_pnl_sheet, df_daily_pnl)
+
+                # Add a summary row to Daily PnL sheet if there's data
+                if len(daily_pnl_data) > 0:
+                   total_row = len(df_daily_pnl) + 1
+                   total_format = workbook.add_format({'bold': True, 'bg_color': '#E0E0E0', 'align': 'right'})
+                
+                   # Write "Total" label
+                   daily_pnl_sheet.write(total_row, 0, "Total", total_format)
+                
+                   # Calculate and write totals
+                   total_pnl = sum(daily_pnl_dict[date]['pnl'] for date in daily_pnl_dict)
+                   total_pnl_no_comm = sum(daily_pnl_dict[date]['pnl_without_commission'] for date in daily_pnl_dict)
+                
+                   daily_pnl_sheet.write(total_row, 1, f"${total_pnl:,.0f}", total_format)
+                   daily_pnl_sheet.write(total_row, 2, f"${total_pnl_no_comm:,.0f}", total_format)
+
+           QMessageBox.information(
+            self,
+            "Export Successful",
+            f"Results exported successfully to:\n{filename}\n\n"
+            f"📊 {len(grouped_trades_data)} grouped trades\n"
+            f"📋 {len(individual_trades_data)} individual contract/position details\n"
+            f"📅 {len(daily_pnl_data)} daily PnL records"
+        )
+           self.status_bar.showMessage(f"Results exported to {filename}", 5000)
+           logger.info(f"Results exported to Excel: {filename}")
+
+        except ImportError:
+            QMessageBox.warning(
+            self,
+            "Missing Dependency",
+            "Please install XlsxWriter to export to Excel:\npip install XlsxWriter"
+        )
+        except Exception as e:
+            QMessageBox.warning(self, "Export Error", f"Failed to export results:\n{str(e)}")
+            logger.error(f"Export error: {e}")
+            
+            
+    def export_results_trades_18(self):
+        """Export backtest results for Trades 18 strategy to Excel file with three tabs using XlsxWriter"""
+        if not self.last_results:
+           QMessageBox.information(self, "No Results", "Please run a backtest first")
+           return
+
+        filename, _ = QFileDialog.getSaveFileName(
+         self,
+        "Export Results",
+        f"backtest_results_trades18_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+        "Excel Files (*.xlsx)"
+    )
+
+        if not filename:
+           return
+
+        try:
+           # Prepare data for Tab 1: Grouped Trades
+           grouped_trades_data = []
+           for trade in self.last_results["trades"]:
+               # Determine trade-specific fields
+               short_strikes = ""
+               wings = ""
+               spy_shares = ""
+               lo_strike = ""
+            
+               short_strikes = trade.metadata.get('strike','')
+               wings = trade.metadata.get("wing", "")
+                    
+                  
+                
+
+               trade_label = trade.trade_type
+               if trade.metadata.get("representation"):
+                  trade_label = f"{trade.trade_type} {trade.metadata['representation']}"
+
+               grouped_trades_data.append({
+                "Date": trade.entry_time.strftime("%b %d, %Y") if trade.entry_time else "",
+                "Trade Label": trade_label,
+                "Strikes": short_strikes,
+                "Wings": wings,
+                "Size": trade.size,
+                "Entry Time": trade.entry_time.strftime("%I:%M %p"),
+                "Net Premium": f"{trade.metadata.get('net_premium', 0):.2f}",
+                "Entry SPX Price": f"{trade.metadata.get('entry_spx_price', ''):.2f}" if trade.metadata.get('entry_spx_price') else "",
+                "Exit SPX Price": f"{trade.metadata.get('exit_spx_price', ''):.2f}" if trade.metadata.get('exit_spx_price') else "",
+                "High of Day": f"{trade.metadata.get('high_of_day', ''):.2f}" if trade.metadata.get('high_of_day') else "",
+                "Low of Day": f"{trade.metadata.get('low_of_day', ''):.2f}" if trade.metadata.get('low_of_day') else "",
+                "PnL without Commission": f"${trade.pnl_without_commission:,.0f}",
+                "PnL": f"${trade.pnl:,.0f}"
+            })
+
+           # Prepare data for Tab 2: Individual Trades
+           individual_trades_data = []
+           for trade in self.last_results["trades"]:
+               trade_group = trade.trade_type
+            
+               for contract, details in trade.contracts.items():
+                   # Handle SPY trades differently
+                   if contract == 'SPY':
+                      trade_detail = f"SPY {details.get('leg_type', '').upper()} {details.get('shares', 0)} shares"
+                      entry_price = details.get('entry_price', 0)
+                      exit_price = details.get('exit_price', 0)
+                      position = details.get('shares', 0)
+                      individual_pnl_no_comm = trade.pnl_without_commission
+                      individual_pnl = trade.pnl
+                   else:
+                      # Handle option contracts
+                      position_type = "Long" if ("long" in details.get('leg_type', '') or "buy" in details.get('leg_type', '')) else "Short" if ("short" in details.get('leg_type', '') or "sell" in details.get('leg_type', '')) else ""
+                      option_type = "Call" if "call" in details.get('leg_type', '') else "Put" if "put" in details.get('leg_type', '') else ""
+                    
+                      strike_string = f"{details.get('strike', '')}"
+                      trade_detail = f"{strike_string} {position_type} {option_type}".strip()
+                      entry_price = details.get('entry_price', 0)
+                      exit_price = details.get('exit_price', 0)
+                      position = details.get('position', 0)
+                      individual_pnl_no_comm = details.get('pnl_without_commission', 0) * abs(position)
+                      individual_pnl = details.get('pnl', 0) * abs(position)
+
+                   individual_trades_data.append({
+                    "Date": trade.entry_time.strftime("%b %d, %Y") if trade.entry_time else "",
+                    "Trade Detail": trade_detail,
+                    "Trade Group": trade_group,
+                    "Entry Size": abs(position),
+                    "Entry Time": trade.entry_time.strftime("%I:%M %p") if trade.entry_time else "",
+                    "Entry Price": f"{entry_price:.2f}",
+                    "Exit Price": f"{exit_price:.2f}" if exit_price else "",
+                    "Entry SPX Price": f"{trade.metadata.get('entry_spx_price', ''):.2f}" if trade.metadata and trade.metadata.get('entry_spx_price') else "",
+                    "Exit SPX Price": f"{trade.metadata.get('exit_spx_price', ''):.2f}" if trade.metadata and trade.metadata.get('exit_spx_price') else "",
                     "PnL without Commission": f"${individual_pnl_no_comm:,.0f}",
                     "PnL": f"${individual_pnl:,.0f}"
                 })

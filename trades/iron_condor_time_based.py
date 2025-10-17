@@ -268,7 +268,9 @@ class IronCondorTimeBased(IronCondorBase):
                 'wing_width': ic_result['wing_width'],
                 'win_loss_ratio': ic_result['ratio'],
                 'high_of_day' : high_of_day,
-                'low_of_day' : low_of_day
+                'low_of_day' : low_of_day,
+                'wing' : f"{ic_result['short_distance']}/{ic_result['wing_width']}",
+                'strike' : f"{ic_result['long_put']}/{ic_result['short_put']} - {ic_result['short_call']}/{ic_result['long_call']}"
             })
             
             logger.info(f"Entered Iron Condor Time-Based at {current_bar_time}: "
