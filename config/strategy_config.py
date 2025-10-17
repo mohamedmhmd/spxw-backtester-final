@@ -91,6 +91,15 @@ class StrategyConfig:
     ls_2_range_multiplier: float = 1.0
     ls_2_dte : int = 1
     
+    # Iron Condor Time-Based parameters (NEW)
+    ic_tb_entry_interval: int = 55  # Which 5-minute bar to enter (0-77, where 0 is market open)
+    ic_tb_min_short_distance: int = 10  # Minimum distance from market for short options
+    ic_tb_max_short_distance: int = 40  # Maximum distance from market for short options
+    ic_tb_min_wing_width: int = 10  # Minimum distance between short and long options
+    ic_tb_max_wing_width: int = 40  # Maximum distance between short and long options
+    ic_tb_target_win_loss_ratio: float = 1.5  # Target win:loss ratio
+    ic_tb_trade_size: int = 10  # Number of contracts per trade
+    
     
     
     def to_dict(self) -> dict:
@@ -170,7 +179,15 @@ class StrategyConfig:
             'ls_2_trade_a_size': self.ls_2_trade_a_size,
             'ls_2_trade_b_size': self.ls_2_trade_b_size,
             'ls_2_range_multiplier': self.ls_2_range_multiplier,
-            'ls_2_dte': self.ls_2_dte
+            'ls_2_dte': self.ls_2_dte,
+            # Iron Condor Time-Based parameters (NEW)
+            'ic_tb_entry_interval': self.ic_tb_entry_interval,  # Which 5-minute bar to enter (0-77, where 0 is market open)
+            'ic_tb_min_short_distance': self.ic_tb_min_short_distance, # Minimum distance from market for short options
+            'ic_tb_max_short_distance': self.ic_tb_max_short_distance,  # Maximum distance from market for short options
+            'ic_tb_min_wing_width': self.ic_tb_min_wing_width,  # Minimum distance between short and long options
+            'ic_tb_max_wing_width': self.ic_tb_max_wing_width,  # Maximum distance between short and long options
+            'ic_tb_target_win_loss_ratio': self.ic_tb_target_win_loss_ratio,  # Target win:loss ratio
+            'ic_tb_trade_size': self.ic_tb_trade_size  # Number of contracts per trade
             
             
 

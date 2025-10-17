@@ -112,7 +112,9 @@ class LongStrangle2:
         range_multiplier: float,
         variant: str,
         expiration: datetime,
-        contract_symbol: str
+        contract_symbol: str,
+        high_of_day,
+        low_of_day
     ) -> Optional[Trade]:
         """Execute a single long option leg (call or put)"""
         
@@ -157,7 +159,9 @@ class LongStrangle2:
                 'largest_bar_range': largest_range,
                 'range_multiplier': range_multiplier,
                 'expiration': expiration,
-                'contract_symbol': contract_symbol
+                'contract_symbol': contract_symbol,
+                'high_of_day' : high_of_day,
+                'low_of_day' : low_of_day
             }
         )
         
@@ -233,6 +237,7 @@ class LongStrangle2:
         
         trades = []
         
+        high_of_day, low_of_day = Common._get_day_extremes(spx_ohlc_data, i) 
         # Execute Long Strangle 2(a) - Call
         if not isinstance(call_quote, Exception) and call_quote:
             # Get trade size for variant (a)
@@ -252,7 +257,9 @@ class LongStrangle2:
                 range_multiplier,
                 'a', 
                 expiration_date,
-                call_contract
+                call_contract,
+                high_of_day,
+                low_of_day
             )
             
             if call_trade:
@@ -285,7 +292,9 @@ class LongStrangle2:
                 range_multiplier,
                 'b',
                 expiration_date,
-                put_contract
+                put_contract,
+                high_of_day,
+                low_of_day
             )
             
             if put_trade:

@@ -874,6 +874,13 @@ class MainWindow(QMainWindow):
                           self.strategy_config_widget.ls_2_range_threshold.setValue(sc['ls_2_range_threshold'])
                           self.strategy_config_widget.ls_2_range_multiplier.setValue(sc['ls_2_range_multiplier'])
                           self.strategy_config_widget.ls_2_dte.setValue(sc['ls_2_dte'])
+                          self.strategy_config_widget.ic_tb_entry_interval.setValue(sc['ic_tb_entry_interval'])
+                          self.strategy_config_widget.ic_tb_min_short_distance.setValue(sc['ic_tb_min_short_distance'])
+                          self.strategy_config_widget.ic_tb_max_short_distance.setValue(sc['ic_tb_max_short_distance'])
+                          self.strategy_config_widget.ic_tb_min_wing_width.setValue(sc['ic_tb_min_wing_width'])
+                          self.strategy_config_widget.ic_tb_max_wing_width.setValue(sc['ic_tb_max_wing_width'])
+                          self.strategy_config_widget.ic_tb_target_win_loss_ratio.setValue(sc['ic_tb_target_win_loss_ratio'])
+                          self.strategy_config_widget.ic_tb_trade_size.setValue(sc['ic_tb_trade_size'])
 
 
 

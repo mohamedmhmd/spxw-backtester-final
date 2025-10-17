@@ -565,6 +565,72 @@ class StrategyConfigWidget(QWidget):
             self.ls_2_dte.setValue(1)
             self.ls_2_dte.setToolTip("Days to expiration for Long Strangle 2")
             layout.addRow("LS 2 DTE:", self.ls_2_dte)
+            
+            
+            # === Iron Condor settings ===
+            ls_3_label = QLabel("=== Iron Condor  SETTINGS ===")
+            ls_3_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+            layout.addRow(ls_3_label)
+            
+            # Trade Size (number of contracts)
+            self.ic_tb_trade_size = QSpinBox()
+            self.ic_tb_trade_size.setRange(1, 1000)
+            self.ic_tb_trade_size.setSingleStep(1)
+            self.ic_tb_trade_size.setValue(10)
+            self.ic_tb_trade_size.setToolTip("Number of contracts for Iron Condor Time-Based trades")
+            layout.addRow("IC TB Trade Size:", self.ic_tb_trade_size)
+            
+            # Entry Interval (which 5-minute bar to enter, 0-77)
+            self.ic_tb_entry_interval = QSpinBox()
+            self.ic_tb_entry_interval.setRange(0, 77)
+            self.ic_tb_entry_interval.setSingleStep(1)
+            self.ic_tb_entry_interval.setValue(55)
+            self.ic_tb_entry_interval.setToolTip("5-minute bar index for entry (0=market open, 77=near close)")
+            layout.addRow("IC TB Entry Interval:", self.ic_tb_entry_interval)
+
+            # Minimum Short Distance (minimum distance from market for short options)
+            self.ic_tb_min_short_distance = QSpinBox()
+            self.ic_tb_min_short_distance.setRange(0, 10000)
+            self.ic_tb_min_short_distance.setSingleStep(1)
+            self.ic_tb_min_short_distance.setValue(10)
+            self.ic_tb_min_short_distance.setToolTip("Minimum distance (points) from market for short options")
+            layout.addRow("IC TB Min Short Distance:", self.ic_tb_min_short_distance)
+
+            # Maximum Short Distance (maximum distance from market for short options)
+            self.ic_tb_max_short_distance = QSpinBox()
+            self.ic_tb_max_short_distance.setRange(0, 100000)
+            self.ic_tb_max_short_distance.setSingleStep(1)
+            self.ic_tb_max_short_distance.setValue(40)
+            self.ic_tb_max_short_distance.setToolTip("Maximum distance (points) from market for short options")
+            layout.addRow("IC TB Max Short Distance:", self.ic_tb_max_short_distance)
+
+            # Minimum Wing Width (minimum distance between short and long options)
+            self.ic_tb_min_wing_width = QSpinBox()
+            self.ic_tb_min_wing_width.setRange(0, 10000)
+            self.ic_tb_min_wing_width.setSingleStep(1)
+            self.ic_tb_min_wing_width.setValue(10)
+            self.ic_tb_min_wing_width.setToolTip("Minimum wing width (points) between short and long options")
+            layout.addRow("IC TB Min Wing Width:", self.ic_tb_min_wing_width)
+
+            # Maximum Wing Width (maximum distance between short and long options)
+            self.ic_tb_max_wing_width = QSpinBox()
+            self.ic_tb_max_wing_width.setRange(0, 100000)
+            self.ic_tb_max_wing_width.setSingleStep(1)
+            self.ic_tb_max_wing_width.setValue(40)
+            self.ic_tb_max_wing_width.setToolTip("Maximum wing width (points) between short and long options")
+            layout.addRow("IC TB Max Wing Width:", self.ic_tb_max_wing_width)
+
+          
+
+            self.ic_tb_target_win_loss_ratio = QDoubleSpinBox()
+            self.ic_tb_target_win_loss_ratio.setRange(0.0, 10000000.0)
+            self.ic_tb_target_win_loss_ratio.setSingleStep(0.1)
+            self.ic_tb_target_win_loss_ratio.setValue(1.5)
+            self.ic_tb_target_win_loss_ratio.setDecimals(2)
+            self.ic_tb_target_win_loss_ratio.setToolTip("Target win:loss ratio for Iron Condor selection")
+            layout.addRow("IC TB Target Win/Loss Ratio:", self.ic_tb_target_win_loss_ratio)
+
+            
 
         # Add some spacing at the end
         spacer_label = QLabel("")
@@ -717,6 +783,14 @@ class StrategyConfigWidget(QWidget):
             ls_2_range_threshold=self.ls_2_range_threshold.value(),
             ls_2_range_multiplier=self.ls_2_range_multiplier.value(),
             ls_2_dte=self.ls_2_dte.value(),
+            ic_tb_entry_interval=self.ic_tb_entry_interval.value(),
+            ic_tb_min_short_distance=self.ic_tb_min_short_distance.value(),
+            ic_tb_max_short_distance=self.ic_tb_max_short_distance.value(),
+            ic_tb_min_wing_width=self.ic_tb_min_wing_width.value(),
+            ic_tb_max_wing_width=self.ic_tb_max_wing_width.value(),
+            ic_tb_target_win_loss_ratio=self.ic_tb_target_win_loss_ratio.value(),
+            ic_tb_trade_size=self.ic_tb_trade_size.value(),
+            
         )
     
     def set_config(self, config: StrategyConfig):
@@ -791,6 +865,13 @@ class StrategyConfigWidget(QWidget):
            self.ls_2_range_threshold.setValue(config.ls_2_range_threshold)
            self.ls_2_range_multiplier.setValue(config.ls_2_range_multiplier)
            self.ls_2_dte.setValue(config.ls_2_dte)
+           self.ic_tb_entry_interval.setValue(config.ic_tb_entry_interval)
+           self.ic_tb_min_short_distance.setValue(config.ic_tb_min_short_distance)
+           self.ic_tb_max_short_distance.setValue(config.ic_tb_max_short_distance)
+           self.ic_tb_min_wing_width.setValue(config.ic_tb_min_wing_width)
+           self.ic_tb_max_wing_width.setValue(config.ic_tb_max_wing_width)
+           self.ic_tb_target_win_loss_ratio.setValue(config.ic_tb_target_win_loss_ratio)
+           self.ic_tb_trade_size.setValue(config.ic_tb_trade_size)
               
            
               

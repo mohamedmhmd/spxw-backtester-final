@@ -95,6 +95,8 @@ class IronCondorBase:
             return strategy.iron_3_trade_size
         elif trade_type == "Iron Condor 3(b)":
             return strategy.iron_3_trade_size
+        elif trade_type == "Iron Condor Time-Based":
+            return strategy.ic_tb_trade_size
         else:
             raise ValueError(f"Unknown trade type: {trade_type}")
         

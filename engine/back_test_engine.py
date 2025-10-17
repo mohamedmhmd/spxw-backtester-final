@@ -7,6 +7,7 @@ from config.back_test_config import BacktestConfig
 from data.polygon_data_provider import PolygonDataProvider
 from config.strategy_config import StrategyConfig
 from trades.iron_condor_3 import IronCondor3
+from trades.iron_condor_time_based import IronCondorTimeBased
 from trades.long_option_1 import LongOption1
 from trades.long_strangle_1 import LongStrangle1
 from trades.long_strangle_2 import LongStrangle2
@@ -558,29 +559,42 @@ class BacktestEngine:
         
         ls1_found = False
         ls_2_found = False
+        ic_tb_found = False
         checker = OptimizedSignalChecker(spx_ohlc_data, spy_ohlc_data)
         
         for i in range(ls_1_min_bars_needed, len(spx_ohlc_data)):
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
             current_price = spx_ohlc_data.iloc[i]['open']
             
-            ls1trades = await LongStrangle1._find_long_strangle_trades(i,strategy,date,current_price,current_bar_time,
-                                                                            self.data_provider, config, checker, spx_ohlc_data)
-            if ls1trades and not ls1_found:
-               for ls1trade in ls1trades:
-                   trades.append(ls1trade)
-               ls1_found = True 
-               logger.info(f"Entered Long Strangle 1 at {current_bar_time}.")
-               
-            ls2trades = await LongStrangle2._find_long_strangle_trades(i,strategy,date,current_price,current_bar_time,
-                                                                            self.data_provider, config, checker, spx_ohlc_data)
-            if ls2trades and not ls_2_found:
-               for ls2trade in ls2trades:
-                   trades.append(ls2trade)
-               ls_2_found = True 
-               logger.info(f"Entered Long Strangle 2 at {current_bar_time}.")
             
-            if ls1_found and ls_2_found:
+            if not ls1_found:
+               ls1trades = await LongStrangle1._find_long_strangle_trades(i,strategy,date,current_price,current_bar_time,
+                                                                            self.data_provider, config, checker, spx_ohlc_data)
+               if ls1trades:
+                  for ls1trade in ls1trades:
+                      trades.append(ls1trade)
+                  ls1_found = True 
+                  logger.info(f"Entered Long Strangle 1 at {current_bar_time}.")
+               
+            
+            if not ls_2_found:
+               ls2trades = await LongStrangle2._find_long_strangle_trades(i,strategy,date,current_price,current_bar_time,
+                                                                            self.data_provider, config, checker, spx_ohlc_data)
+               if ls2trades:
+                  for ls2trade in ls2trades:
+                      trades.append(ls2trade)
+                  ls_2_found = True 
+                  logger.info(f"Entered Long Strangle 2 at {current_bar_time}.")
+                  
+            if not ic_tb_found:
+               ic_tb_trade = await IronCondorTimeBased.find_trade(i,strategy,date,current_price,current_bar_time,self.data_provider,config, spx_ohlc_data)
+               if ic_tb_trade:
+                  trades.append(ic_tb_trade)
+                  ic_tb_found = True
+                  logger.info(f"Entered time based Iron Condor at {current_bar_time}.")
+            
+            
+            if ls1_found and ls_2_found and ic_tb_found:
                break
            
             
