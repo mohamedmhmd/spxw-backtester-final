@@ -518,7 +518,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         
         # Start artificial progress timer (fires every 8 seconds)
-        self.progress_timer.start(2400)  # 8000 milliseconds = 8 seconds
+        self.progress_timer.start(4800)  
         
         # Create and start worker
         self.backtest_worker = BacktestWorker(

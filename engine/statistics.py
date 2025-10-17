@@ -273,6 +273,9 @@ class Statistics:
         
         ls1a = {t.entry_time: t.pnl for t in trades if t.trade_type == "Long Strangle 1(a)"}
         ls1b = {t.entry_time: t.pnl for t in trades if t.trade_type == "Long Strangle 1(b)"}
+        ls2a = {t.entry_time: t.pnl for t in trades if t.trade_type == "Long Strangle 2(a)"}
+        ls2b = {t.entry_time: t.pnl for t in trades if t.trade_type == "Long Strangle 2(b)"}
+        ictb = {t.entry_time: t.pnl for t in trades if t.trade_type == "Iron Condor Time-Based"}
         trade_18_win_rate = len([t for t in trades if t.pnl > 0])/ len(trades) if trades else 0
         
         # Overall statistics
@@ -338,4 +341,13 @@ class Statistics:
             'ls_1b_trades': len(ls1b),
             'ls_1b_pnl': sum(ls1b.values()),
             'ls_1b_win_rate': sum(1 for pnl in ls1b.values() if pnl > 0) / len(ls1b) if ls1b else 0,
+            'ls_2a_trades': len(ls2a),
+            'ls_2a_pnl': sum(ls2a.values()),
+            'ls_2a_win_rate': sum(1 for pnl in ls2a.values() if pnl > 0) / len(ls2a) if ls2a else 0,
+            'ls_2b_trades': len(ls2b),
+            'ls_2b_pnl': sum(ls2b.values()),
+            'ls_2b_win_rate': sum(1 for pnl in ls2b.values() if pnl > 0) / len(ls2b) if ls2b else 0,
+            'ic_tb_trades': len(ictb),
+            'ic_tb_pnl': sum(ictb.values()),
+            'ic_tb_win_rate': sum(1 for pnl in ictb.values() if pnl > 0) / len(ictb) if ictb else 0,
         }    
