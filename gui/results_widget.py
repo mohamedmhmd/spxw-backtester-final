@@ -126,47 +126,7 @@ class EnhancedTableWidget(QTableWidget):
         """)
 
 
-class LegsDisplayWidget(QWidget):
-    """Custom widget for displaying trade legs in a structured way"""
-    
-    def __init__(self, contracts: Dict):
-        super().__init__()
-        self.setMaximumHeight(120)
-        layout = QVBoxLayout()
-        layout.setSpacing(4)
-        layout.setContentsMargins(4, 4, 4, 4)
-        
-        for leg_type, details in contracts.items():
-            leg_frame = QFrame()
-            leg_frame.setStyleSheet("""
-                QFrame {
-                    background-color: #F8F9FA;
-                    border: 1px solid #E0E0E0;
-                    border-radius: 4px;
-                    padding: 4px;
-                }
-            """)
-            
-            leg_layout = QHBoxLayout()
-            leg_layout.setContentsMargins(6, 3, 6, 3)
-            
-            # Leg type
-            type_label = QLabel(leg_type)
-            type_label.setStyleSheet("font-weight: bold; color: #1976D2; font-size: 11px;")
-            
-            # Details
-            details_text = " | ".join([f"{k}: {v}" for k, v in details.items()])
-            details_label = QLabel(details_text)
-            details_label.setStyleSheet("color: #666; font-size: 11px;")
-            details_label.setWordWrap(True)
-            
-            leg_layout.addWidget(type_label)
-            leg_layout.addWidget(details_label, 1)
-            leg_frame.setLayout(leg_layout)
-            
-            layout.addWidget(leg_frame)
-        
-        self.setLayout(layout)
+
 
 
 class ResultsWidget(QWidget):
