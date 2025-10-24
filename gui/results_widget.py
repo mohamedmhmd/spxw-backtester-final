@@ -858,6 +858,7 @@ class ResultsWidget(QWidget):
                 leg_frame_layout = QVBoxLayout()
                 leg_frame_layout.setContentsMargins(4, 3, 4, 3)
                 leg_frame_layout.setSpacing(2)
+                leg_frame_layout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
                 
                 # Leg name header
                 leg_header = QLabel(leg_name)
@@ -1006,6 +1007,7 @@ class ResultsWidget(QWidget):
             legs_layout = QVBoxLayout()
             legs_layout.setContentsMargins(6, 6, 6, 6)
             legs_layout.setSpacing(4)
+            legs_layout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
             
             fields = ['position', 'entry_price', 'exit_price', 'strike', 'leg_type', 'remaining_position']
             for leg_name, details in trade.contracts.items():
@@ -1181,6 +1183,7 @@ class ResultsWidget(QWidget):
                 leg_frame_layout = QVBoxLayout()
                 leg_frame_layout.setContentsMargins(4, 3, 4, 3)
                 leg_frame_layout.setSpacing(2)
+                leg_frame_layout.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
                 
                 # Leg name header
                 leg_header = QLabel(leg_name)
