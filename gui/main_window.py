@@ -1004,7 +1004,18 @@ class MainWindow(QMainWindow):
         )
         
         # Chart 4: Daily averages
-        pd.DataFrame(chart_data['chart4']).to_csv(
+        chart4_df = pd.DataFrame({
+    'date': chart_data['chart4']['dates'],
+    'avg_implied': chart_data['chart4']['avg_implied'],
+    'avg_realized': chart_data['chart4']['avg_realized'],
+    'trend_implied_slope': chart_data['chart4']['trend_implied']['slope'],
+    'trend_implied_intercept': chart_data['chart4']['trend_implied']['intercept'],
+    'trend_implied_r_squared': chart_data['chart4']['trend_implied']['r_squared'],
+    'trend_realized_slope': chart_data['chart4']['trend_realized']['slope'],
+    'trend_realized_intercept': chart_data['chart4']['trend_realized']['intercept'],
+    'trend_realized_r_squared': chart_data['chart4']['trend_realized']['r_squared']
+})
+        chart4_df.to_csv(
             os.path.join(output_dir, 'chart4_daily_averages.csv'),
             index=False
         )
