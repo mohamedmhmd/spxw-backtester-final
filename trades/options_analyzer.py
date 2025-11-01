@@ -6,9 +6,7 @@ from typing import Dict, List, Optional, Tuple
 import asyncio
 import logging
 from dataclasses import dataclass
-import json
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-from functools import partial
+from concurrent.futures import ThreadPoolExecutor
 from data.polygon_data_provider import PolygonDataProvider
 
 logging.basicConfig(
