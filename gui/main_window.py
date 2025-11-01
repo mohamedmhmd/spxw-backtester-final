@@ -115,6 +115,7 @@ class MainWindow(QMainWindow):
            main_layout.addWidget(self.results_widget, 3)
         else:
             self.results_widget = OptionsChartsWidget()
+            main_layout.addWidget(self.results_widget, 3)
         
         central_widget.setLayout(main_layout)
         
