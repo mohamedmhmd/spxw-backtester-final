@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.13"]   # adjust if you need 3.11, etc.
+        python-version: ["3.13"]   # target Python version
 
     steps:
       - uses: actions/checkout@v4
@@ -25,10 +25,10 @@ jobs:
       - name: Patch missing Python include dir (3.13 ↔︎ 3.14 mismatch)
         shell: bash
         run: |
-          PYVER=$(python3 -c "import sys;print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+          PYVER=3.13
           FRAMEWORK="/Library/Frameworks/Python.framework/Versions"
-          SRC="$FRAMEWORK/${PYVER}/include/python${PYVER}"
-          ALT="$FRAMEWORK/${PYVER}/include/python3.13"
+          SRC="$FRAMEWORK/$PYVER/include/python$PYVER"
+          ALT="$FRAMEWORK/3.14/include/python$PYVER"
           if [[ -d "$SRC" && ! -d "$ALT" ]]; then
             echo "Creating symlink: $ALT -> $SRC/pyconfig.h"
             sudo mkdir -p "$ALT"
