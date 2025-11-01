@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import os
 import pandas as pd
 import logging
 import asyncio
@@ -10,6 +11,7 @@ import json
 import unicodedata 
 
 from engine.statistics import Statistics
+from gui.options_charts_widget import OptionsChartsWidget
 from .back_test_worker import BacktestWorker
 from .strategy_config_widget import StrategyConfigWidget
 from data.mock_data_provider import MockDataProvider
@@ -78,6 +80,7 @@ class MainWindow(QMainWindow):
         self.data_provider = None
         self.backtest_worker = None
         self.last_results = None  # Initialize this to store results
+        self.chart_data = None
         self.connection_worker = None
         logger.info(f"Platform: {platform.system()} {platform.release()}")
         logger.info(f"Python: {sys.version}")
@@ -107,8 +110,11 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(left_panel, 1)
         
         # Right panel - Results
-        self.results_widget = ResultsWidget(self.get_selected_strategy())
-        main_layout.addWidget(self.results_widget, 3)
+        if self.get_selected_strategy() in ['Trades 16', 'Trades 17', 'Trades 18']:
+           self.results_widget = ResultsWidget(self.get_selected_strategy())
+           main_layout.addWidget(self.results_widget, 3)
+        else:
+            self.results_widget = OptionsChartsWidget()
         
         central_widget.setLayout(main_layout)
         
@@ -191,7 +197,7 @@ class MainWindow(QMainWindow):
         strategy_selection_layout = QVBoxLayout()
 
         self.strategy_combo = QComboBox()
-        self.strategy_combo.addItems(["Trades 16", "Trades 17", "Trades 18"])
+        self.strategy_combo.addItems(["Trades 16", "Trades 17", "Trades 18", "Analysis"])
         self.strategy_combo.setCurrentIndex(0)  # Default to Trades 16
         
         self.strategy_combo.currentIndexChanged.connect(self.on_strategy_changed)
@@ -323,7 +329,10 @@ class MainWindow(QMainWindow):
               
               
               # Create new results widget with the selected strategy
-              self.results_widget = ResultsWidget(strategy)
+              if strategy in ['Trades 16', 'Trades 17', 'Trades 18']:
+                 self.results_widget = ResultsWidget(strategy)
+              else:
+                 self.results_widget = OptionsChartsWidget()
               main_layout.addWidget(self.results_widget, 3)  # Keep the 3:1 ratio
             
         
@@ -509,6 +518,7 @@ class MainWindow(QMainWindow):
         
         # Reset results and progress
         self.last_results = None
+        self.chart_data = None
         self.artificial_progress = 0
         
         # Disable buttons
@@ -568,7 +578,7 @@ class MainWindow(QMainWindow):
         self.update_results_btn.setEnabled(True)
         self.stop_backtest_btn.setEnabled(False)
         
-        if results:
+        if results and self.get_selected_strategy() in ['Trades 16', 'Trades 17', 'Trades 18']:
            # Store and display results
            self.last_results = results
            if(self.progress_bar.value() < 80):
@@ -588,6 +598,21 @@ class MainWindow(QMainWindow):
             10000
         )
            logger.info(f"Backtest completed successfully with {total_trades} trades")
+
+        if results and self.get_selected_strategy() not in ['Trades 16', 'Trades 17', 'Trades 18']:
+           # Store and display results
+           self.chart_data = results
+           if(self.progress_bar.value() < 80):
+               self.progress_bar.setValue(80)
+           self.results_widget.update_charts(results)
+           self.progress_bar.setValue(95)
+        
+           self.status_bar.showMessage(
+            f"Analysis completed. Chart data generated.", 
+            10000
+        )
+           logger.info(f"Analysis completed successfully. Chart data generated.")
+
         else:
            self.status_bar.showMessage("Backtest completed (no results)", 5000)
         self.progress_bar.setValue(100)
@@ -892,6 +917,13 @@ class MainWindow(QMainWindow):
                           self.strategy_config_widget.ic_tb_target_win_loss_ratio.setValue(sc['ic_tb_target_win_loss_ratio'])
                           self.strategy_config_widget.ic_tb_trade_size.setValue(sc['ic_tb_trade_size'])
 
+                    elif strategy == 'Analysis':
+                        self.strategy_config_widget.analysis_bar_minutes = sc.get('analysis_bar_minutes')
+                        self.strategy_config_widget.analysis_dte = sc.get('analysis_dte')
+                        self.strategy_config_widget.option_underlying = sc.get('option_underlying')
+                        self.strategy_config_widget.strike_price_intervals = sc.get('strike_price_intervals')
+
+
 
 
                         
@@ -908,6 +940,91 @@ class MainWindow(QMainWindow):
            self.export_results_trades_17()
         elif self.get_selected_strategy() == "Trades 18":
            self.export_results_trades_18() 
+        elif self.get_selected_strategy() == "Analysis":
+           self.export_results_analysis()
+
+    def export_results_analysis(self):
+        """
+        Export all chart data to CSV files.
+        Creates separate CSV files for each chart type.
+        """
+        if not self.chart_data:
+           QMessageBox.information(self, "No Results", "Please run a backtest first")
+           return
+
+        output_dir = QFileDialog.getExistingDirectory(
+        self,  # parent widget
+        "Select Directory to Save Results",  # dialog title
+        os.path.expanduser("~/Desktop")
+    )
+
+        if not output_dir:
+           return
+        
+        # Export raw data
+        raw_file = os.path.join(output_dir, 'raw_analysis_data.csv')
+        self.chart_data['raw_data'].to_csv(raw_file, index=False)
+        logger.info(f"Exported raw data to {raw_file}")
+        
+        # Generate and export chart-specific data
+        chart_data = self.chart_data
+        
+        # Chart 1: Individual day decay curves
+        chart1_df = []
+        for date, data in chart_data['chart1'].items():
+            for i in range(len(data['time_remaining'])):
+                chart1_df.append({
+                    'date': date,
+                    'time_of_day': data['timestamps'][i],
+                    'time_remaining_minutes': data['time_remaining'][i],
+                    'implied_move': data['implied'][i],
+                    'realized_move': data['realized'][i]
+                })
+        pd.DataFrame(chart1_df).to_csv(
+            os.path.join(output_dir, 'chart1_daily_decay_curves.csv'), 
+            index=False
+        )
+        
+        # Chart 2: Average decay curve
+        pd.DataFrame(chart_data['chart2']).to_csv(
+            os.path.join(output_dir, 'chart2_average_decay_curve.csv'),
+            index=False
+        )
+        
+        # Chart 3: Scatter plot data
+        scatter_df = pd.DataFrame({
+            'time_of_day': chart_data['chart3']['time_of_day'],
+            'realized': chart_data['chart3']['realized'],
+            'implied': chart_data['chart3']['implied'],
+            'distance_from_equilibrium': chart_data['chart3']['distance_from_equilibrium']
+        })
+        scatter_df.to_csv(
+            os.path.join(output_dir, 'chart3_scatter_plot.csv'),
+            index=False
+        )
+        
+        # Chart 4: Daily averages
+        pd.DataFrame(chart_data['chart4']).to_csv(
+            os.path.join(output_dir, 'chart4_daily_averages.csv'),
+            index=False
+        )
+        
+        # Chart 5: Time interval data
+        chart5_df = []
+        for time_interval, data in chart_data['chart5'].items():
+            for i in range(len(data['dates'])):
+                chart5_df.append({
+                    'time_interval': time_interval,
+                    'date': data['dates'][i],
+                    'implied_move': data['implied'][i],
+                    'realized_move': data['realized'][i]
+                })
+        pd.DataFrame(chart5_df).to_csv(
+            os.path.join(output_dir, 'chart5_time_intervals.csv'),
+            index=False
+        )
+        
+        logger.info(f"All CSV files exported to {output_dir}")
     
     def export_results_trades_16(self):
         """Export backtest results to Excel file with three tabs using XlsxWriter"""

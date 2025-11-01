@@ -36,12 +36,19 @@ class BacktestWorker(QThread):
             asyncio.set_event_loop(loop)
             
             # Run backtest
-            engine = BacktestEngine(self.data_provider, self.selected_strategy)
-            results = loop.run_until_complete(
+            if self.selected_strategy != 'Analysis':
+               engine = BacktestEngine(self.data_provider, self.selected_strategy)
+               results = loop.run_until_complete(
                 engine.run_backtest(self.config, self.strategy)
-            )
+               )
             
-            self.finished.emit(results)
+               self.finished.emit(results)
+            else:
+               engine = BacktestEngine(self.data_provider, self.selected_strategy)
+               analysis_results = loop.run_until_complete(
+                 engine.run_analysis(self.config, self.strategy)
+               )
+               self.finished.emit(analysis_results)
             
         except Exception as e:
             self.error.emit(str(e))

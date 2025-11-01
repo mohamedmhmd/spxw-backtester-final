@@ -631,6 +631,35 @@ class StrategyConfigWidget(QWidget):
             layout.addRow("IC TB Target Win/Loss Ratio:", self.ic_tb_target_win_loss_ratio)
 
             
+        elif self.selected_strategy == "Analysis":
+            self.analysis_bar_minutes = QSpinBox()
+            self.analysis_bar_minutes.setRange(1, 60)
+            self.analysis_bar_minutes.setSingleStep(1)
+            self.analysis_bar_minutes.setValue(5)
+            self.analysis_bar_minutes.setToolTip("Bar duration in minutes for analysis")
+            layout.addRow("Analysis Bar Minutes:", self.analysis_bar_minutes)
+
+            self.analysis_dte = QSpinBox()
+            self.analysis_dte.setRange(0, 365)
+            self.analysis_dte.setSingleStep(1)
+            self.analysis_dte.setValue(0)
+            self.analysis_dte.setToolTip("Days to expiration for analysis")
+            layout.addRow("Analysis DTE:", self.analysis_dte)
+
+            self.option_underlying = QLineEdit()
+            self.option_underlying.setText("I:SPX")
+            self.option_underlying.setToolTip("Underlying symbol for option analysis")
+            layout.addRow("Option Underlying:", self.option_underlying)
+
+            self.strike_price_intervals = QDoubleSpinBox()
+            self.strike_price_intervals.setRange(0.1, 1000.0)
+            self.strike_price_intervals.setSingleStep(0.1)
+            self.strike_price_intervals.setValue(5.0)
+            self.strike_price_intervals.setToolTip("Strike price intervals for option analysis")
+            layout.addRow("Strike Price Intervals:", self.strike_price_intervals)
+
+
+
 
         # Add some spacing at the end
         spacer_label = QLabel("")
@@ -792,6 +821,13 @@ class StrategyConfigWidget(QWidget):
             ic_tb_trade_size=self.ic_tb_trade_size.value(),
             
         )
+        elif self.selected_strategy == "Analysis":
+            return StrategyConfig(
+                analysis_bar_minutes=self.analysis_bar_minutes.value(),
+                analysis_dte=self.analysis_dte.value(),
+                option_underlying=self.option_underlying.text(),
+                strike_price_intervals=self.strike_price_intervals.value(),
+            )
     
     def set_config(self, config: StrategyConfig):
         """Set widget values from a strategy configuration."""
@@ -872,6 +908,12 @@ class StrategyConfigWidget(QWidget):
            self.ic_tb_max_wing_width.setValue(config.ic_tb_max_wing_width)
            self.ic_tb_target_win_loss_ratio.setValue(config.ic_tb_target_win_loss_ratio)
            self.ic_tb_trade_size.setValue(config.ic_tb_trade_size)
+
+        elif self.selected_strategy == "Analysis":
+           self.analysis_bar_minutes.setValue(config.analysis_bar_minutes)
+           self.analysis_dte.setValue(config.analysis_dte)
+           self.option_underlying.setText(config.option_underlying)
+           self.strike_price_intervals.setValue(config.strike_price_intervals)
               
            
               

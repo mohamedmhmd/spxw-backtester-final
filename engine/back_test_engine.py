@@ -11,6 +11,7 @@ from trades.iron_condor_time_based import IronCondorTimeBased
 from trades.long_option_1 import LongOption1
 from trades.long_strangle_1 import LongStrangle1
 from trades.long_strangle_2 import LongStrangle2
+from trades.options_analyzer import AnalysisConfig, OptionsAnalyzer
 from trades.signal_checker import OptimizedSignalChecker
 from trades.straddle2 import Straddle2
 from trades.straddle3 import Straddle3
@@ -44,6 +45,26 @@ class BacktestEngine:
         self.open_straddles: List[Trade] = []  # Track open straddles for intraday management
         self.total_capital_used: float = 0.0
         self.selected_strategy = selected_strategy
+        self.chart_data: Dict[str, Any] = {}
+
+    async def run_analysis(self, config: BacktestConfig, strategy: StrategyConfig) -> Dict[str, Any]:
+          self.chart_data = {}
+          analysis_config = AnalysisConfig(
+              start_date=config.start_date,
+              end_date=config.end_date,
+              bar_minutes=strategy.analysis_bar_minutes,
+              dte =strategy.analysis_dte,
+              underlying=strategy.option_underlying,
+              strike_interval=strategy.strike_price_intervals)
+              
+          option_analyzer = OptionsAnalyzer(self.data_provider, analysis_config)
+          await option_analyzer.fetch_all_data()
+          await option_analyzer.calculate_implied_moves()
+          self.chart_data = option_analyzer.generate_chart_data()
+          stats = option_analyzer.get_summary_statistics()
+          self.chart_data['statistics'] = stats
+          return self.chart_data
+          
         
     async def run_backtest(self, config: BacktestConfig, strategy: StrategyConfig) -> Dict[str, Any]:
         """Run complete backtest with parallel daily strategy execution"""

@@ -99,6 +99,12 @@ class StrategyConfig:
     ic_tb_max_wing_width: int = 40  # Maximum distance between short and long options
     ic_tb_target_win_loss_ratio: float = 1.5  # Target win:loss ratio
     ic_tb_trade_size: int = 10  # Number of contracts per trade
+
+    #Analysis parameters
+    analysis_bar_minutes: int = 5
+    analysis_dte: int = 0
+    option_underlying: str = "I:SPX"
+    strike_price_intervals: int = 5
     
     
     
@@ -187,7 +193,12 @@ class StrategyConfig:
             'ic_tb_min_wing_width': self.ic_tb_min_wing_width,  # Minimum distance between short and long options
             'ic_tb_max_wing_width': self.ic_tb_max_wing_width,  # Maximum distance between short and long options
             'ic_tb_target_win_loss_ratio': self.ic_tb_target_win_loss_ratio,  # Target win:loss ratio
-            'ic_tb_trade_size': self.ic_tb_trade_size  # Number of contracts per trade
+            'ic_tb_trade_size': self.ic_tb_trade_size,  # Number of contracts per trade
+            #Analysis parameters
+            'analysis_bar_minutes': self.analysis_bar_minutes,
+            'analysis_dte': self.analysis_dte,
+            'option_underlying': self.option_underlying,
+            'strike_price_intervals': self.strike_price_intervals
             
             
 
