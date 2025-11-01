@@ -962,7 +962,7 @@ class MainWindow(QMainWindow):
            return
         
         # Export raw data
-        raw_file = os.path.join(output_dir, 'raw_analysis_data.csv')
+        raw_file = os.path.join(output_dir, f'raw_analysis_data_{datetime.now().strftime('%Y%m%d_%H%M')}.csv')
         self.chart_data['raw_data'].to_csv(raw_file, index=False)
         logger.info(f"Exported raw data to {raw_file}")
         
@@ -981,13 +981,13 @@ class MainWindow(QMainWindow):
                     'realized_move': data['realized'][i]
                 })
         pd.DataFrame(chart1_df).to_csv(
-            os.path.join(output_dir, 'chart1_daily_decay_curves.csv'), 
+            os.path.join(output_dir, f'chart1_daily_decay_curves_{datetime.now().strftime('%Y%m%d_%H%M')}.csv'), 
             index=False
         )
         
         # Chart 2: Average decay curve
         pd.DataFrame(chart_data['chart2']).to_csv(
-            os.path.join(output_dir, 'chart2_average_decay_curve.csv'),
+            os.path.join(output_dir, f'chart2_average_decay_curve_{datetime.now().strftime('%Y%m%d_%H%M')}.csv'),
             index=False
         )
         
@@ -999,7 +999,7 @@ class MainWindow(QMainWindow):
             'distance_from_equilibrium': chart_data['chart3']['distance_from_equilibrium']
         })
         scatter_df.to_csv(
-            os.path.join(output_dir, 'chart3_scatter_plot.csv'),
+            os.path.join(output_dir, f'chart3_scatter_plot_{datetime.now().strftime('%Y%m%d_%H%M')}.csv'),
             index=False
         )
         
@@ -1016,7 +1016,7 @@ class MainWindow(QMainWindow):
     'trend_realized_r_squared': chart_data['chart4']['trend_realized']['r_squared']
 })
         chart4_df.to_csv(
-            os.path.join(output_dir, 'chart4_daily_averages.csv'),
+            os.path.join(output_dir, f'chart4_daily_averages_{datetime.now().strftime('%Y%m%d_%H%M')}.csv'),
             index=False
         )
         
@@ -1031,7 +1031,7 @@ class MainWindow(QMainWindow):
                     'realized_move': data['realized'][i]
                 })
         pd.DataFrame(chart5_df).to_csv(
-            os.path.join(output_dir, 'chart5_time_intervals.csv'),
+            os.path.join(output_dir, f'chart5_time_intervals_{datetime.now().strftime('%Y%m%d_%H%M')}.csv'),
             index=False
         )
         
