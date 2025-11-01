@@ -21,18 +21,29 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      # --- 🔧 Fix header mismatch between Python 3.13 and macOS 3.14 framework ---
-      - name: Patch missing Python include dir (3.13 ↔︎ 3.14 mismatch)
+      # --- 🔧 Fix missing Python headers and config for py2app (Darwin) ---
+      - name: Patch missing Python headers and config (Darwin)
         shell: bash
         run: |
           PYVER=3.13
           FRAMEWORK="/Library/Frameworks/Python.framework/Versions"
-          SRC="$FRAMEWORK/$PYVER/include/python$PYVER"
-          ALT="$FRAMEWORK/3.14/include/python$PYVER"
-          if [[ -d "$SRC" && ! -d "$ALT" ]]; then
-            echo "Creating symlink: $ALT -> $SRC/pyconfig.h"
-            sudo mkdir -p "$ALT"
-            sudo ln -s "$SRC/pyconfig.h" "$ALT/pyconfig.h"
+
+          # Patch pyconfig.h
+          SRC_INCLUDE="$FRAMEWORK/3.14/include/python$PYVER/pyconfig.h"
+          ALT_INCLUDE="$FRAMEWORK/3.14/include/python3.13/pyconfig.h"
+          if [[ -f "$SRC_INCLUDE" && ! -f "$ALT_INCLUDE" ]]; then
+            echo "Creating symlink for pyconfig.h: $ALT_INCLUDE -> $SRC_INCLUDE"
+            sudo mkdir -p "$(dirname "$ALT_INCLUDE")"
+            sudo ln -s "$SRC_INCLUDE" "$ALT_INCLUDE"
+          fi
+
+          # Patch config-3.13-darwin
+          SRC_CONFIG="$FRAMEWORK/3.14/lib/python$PYVER/config-$PYVER-darwin"
+          ALT_CONFIG="$FRAMEWORK/3.14/lib/python3.13/config-3.13-darwin"
+          if [[ -d "$SRC_CONFIG" && ! -d "$ALT_CONFIG" ]]; then
+            echo "Creating symlink for config dir: $ALT_CONFIG -> $SRC_CONFIG"
+            sudo mkdir -p "$(dirname "$ALT_CONFIG")"
+            sudo ln -s "$SRC_CONFIG" "$ALT_CONFIG"
           fi
 
       - name: Install dependencies
