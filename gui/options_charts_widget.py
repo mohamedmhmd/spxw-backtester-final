@@ -4,6 +4,7 @@ A PyQt6-based GUI for displaying the 5 chart types from options analysis.
 """
 
 from datetime import datetime
+import os
 from typing import Dict, List, Optional, Any
 import logging
 import numpy as np
@@ -1260,9 +1261,19 @@ class OptionsChartsWidget(QWidget):
             ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10,
                    verticalalignment='top',
                    bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+            
+        # Enable autoscaling for zoom to work properly
+        ax.autoscale(enable=True, axis='both', tight=False)
+        ax.relim()
+        ax.autoscale_view(True, True, True)
+
+        # Set margins for better zoom experience
+        ax.margins(x=0.02, y=0.05)    
         
-        self.daily_avg_figure.tight_layout()
-        self.daily_avg_canvas.draw()
+        # Use constrained layout instead of tight_layout for better zoom
+        self.daily_avg_figure.set_constrained_layout(True)
+        # Use draw_idle for better interactive updates
+        self.daily_avg_canvas.draw_idle()
     
     
     
@@ -1275,50 +1286,151 @@ class OptionsChartsWidget(QWidget):
     def export_charts(self):
         """Export all charts to files"""
         directory = QFileDialog.getExistingDirectory(
-            self, "Select Export Directory", ""
-        )
-        
+        self, "Select Export Directory", ""
+      )
+    
         if directory:
-            try:
-                # Export each chart
-                import os
-                
-                # Chart 1
-                self.daily_decay_figure.savefig(
-                    os.path.join(directory, 'chart1_daily_decay.png'),
+           try:
+            
+              # Chart 1: Daily Decay - Export current view or all as grid
+              if hasattr(self, 'daily_plots') and len(self.daily_plots) > 0:
+                # Option 1: Export current view
+                current_date, current_canvas = self.daily_plots[self.current_day_index]
+                current_canvas.figure.savefig(
+                    os.path.join(directory, f'chart1_daily_decay_current_{current_date}.png'),
                     dpi=150, bbox_inches='tight'
                 )
                 
-                # Chart 2
+                # Option 2: Create and export grid of all daily plots
+                grid_figure = Figure(figsize=(16, 4 * ((len(self.daily_plots) + 3) // 4)))
+                cols = 4
+                rows = (len(self.daily_plots) + cols - 1) // cols
+                gs = GridSpec(rows, cols, figure=grid_figure, hspace=0.4, wspace=0.3)
+                
+                grid_figure.suptitle('All Daily Option Decay Curves', fontsize=16, fontweight='bold')
+                
+                for idx, (date_str, _) in enumerate(self.daily_plots):
+                    if date_str in self.chart_data.get('chart1', {}):
+                        row = idx // cols
+                        col = idx % cols
+                        ax = grid_figure.add_subplot(gs[row, col])
+                        
+                        day_data = self.chart_data['chart1'][date_str]
+                        time_remaining = day_data['time_remaining']
+                        implied = day_data['implied']
+                        realized = day_data['realized']
+                        
+                        ax.plot(time_remaining, implied, 'b-', label='Implied', linewidth=1.5, marker='o', markersize=2)
+                        ax.plot(time_remaining, realized, 'r-', label='Realized', linewidth=1.5, marker='s', markersize=2)
+                        ax.set_title(date_str, fontsize=10)
+                        ax.set_xlabel('Min to Close', fontsize=8)
+                        ax.set_ylabel('Move ($)', fontsize=8)
+                        ax.grid(True, alpha=0.3)
+                        ax.invert_xaxis()
+                        if idx == 0:
+                            ax.legend(fontsize=7)
+                
+              grid_figure.savefig(
+                    os.path.join(directory, 'chart1_daily_decay_all.png'),
+                    dpi=150, bbox_inches='tight'
+                )
+            
+            # Chart 2: Average Decay
+              if hasattr(self, 'avg_decay_figure'):
                 self.avg_decay_figure.savefig(
                     os.path.join(directory, 'chart2_avg_decay.png'),
                     dpi=150, bbox_inches='tight'
                 )
-                
-                # Chart 3
+            
+            # Chart 3: Scatter
+              if hasattr(self, 'scatter_figure'):
                 self.scatter_figure.savefig(
                     os.path.join(directory, 'chart3_scatter.png'),
                     dpi=150, bbox_inches='tight'
                 )
-                
-                # Chart 4
+            
+            # Chart 4: Daily Averages
+              if hasattr(self, 'daily_avg_figure'):
                 self.daily_avg_figure.savefig(
                     os.path.join(directory, 'chart4_daily_avg.png'),
                     dpi=150, bbox_inches='tight'
                 )
+            
+            # Chart 5: Time Intervals - Export current view and/or grid
+              if hasattr(self, 'interval_plots') and len(self.interval_plots) > 0:
+               # Export current interval view
+               try:
+                  current_interval, current_canvas = self.interval_plots[self.current_interval_index]
+        
+                  # Check if current_canvas is valid and has a figure
+                  if current_canvas and hasattr(current_canvas, 'figure') and current_canvas.figure:
+                    current_canvas.figure.savefig(
+                os.path.join(directory, f'chart5_time_interval_current_{current_interval}.png'),
+                dpi=150, bbox_inches='tight'
+            )
+                  else:
+                     logger.warning(f"Invalid canvas or figure for interval {current_interval}")
+            # Alternative: Try to recreate the figure if canvas is invalid
+                     if hasattr(self, '_time_intervals_data') and current_interval in self._time_intervals_data:
+                # Create a new figure for this interval
+                        temp_figure = Figure(figsize=(10, 6))
+                        ax = temp_figure.add_subplot(111)
                 
-                # Chart 5
-                self.time_intervals_figure.savefig(
-                    os.path.join(directory, 'chart5_time_intervals.png'),
+                        interval_data = self._time_intervals_data[current_interval]
+                        dates = pd.to_datetime(interval_data['dates'])
+                        implied = interval_data['implied']
+                        realized = interval_data['realized']
+                
+                        ax.plot(dates, implied, 'b-', label='Implied', linewidth=2, marker='o', markersize=4)
+                        ax.plot(dates, realized, 'r-', label='Realized', linewidth=2, marker='s', markersize=4)
+                        ax.set_title(f'Time Interval: {current_interval}', fontsize=14, fontweight='bold')
+                        ax.set_xlabel('Date', fontsize=12)
+                        ax.set_ylabel('Move ($)', fontsize=12)
+                        ax.grid(True, alpha=0.3)
+                        ax.legend()
+                        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+                        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+                
+                        temp_figure.savefig(
+                    os.path.join(directory, f'chart5_time_interval_current_{current_interval}.png'),
                     dpi=150, bbox_inches='tight'
                 )
+               except Exception as e:
+                      logger.error(f"Error exporting current interval chart: {str(e)}")
+            # Create a summary text file
+              summary_file = os.path.join(directory, 'export_summary.txt')
+              with open(summary_file, 'w') as f:
+                f.write("Options Charts Export Summary\n")
+                f.write("=" * 40 + "\n")
+                f.write(f"Export Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
                 
-                QMessageBox.information(
-                    self, "Success",
-                    f"Charts exported successfully to {directory}"
-                )
-            except Exception as e:
-                QMessageBox.critical(
-                    self, "Error",
-                    f"Failed to export charts: {str(e)}"
-                )
+                f.write("Files Exported:\n")
+                f.write("- chart1_daily_decay_current_[date].png - Current selected day\n")
+                f.write("- chart1_daily_decay_all.png - Grid of all daily decay curves\n")
+                f.write("- chart2_avg_decay.png - Average decay curve\n")
+                f.write("- chart3_scatter.png - Scatter plot\n")
+                f.write("- chart4_daily_avg.png - Daily averages timeline\n")
+                f.write("- chart5_time_interval_current_[interval].png - Current selected interval\n")
+                f.write("- chart5_time_intervals_all.png - Grid of all time intervals\n")
+                
+                if hasattr(self, 'stats') and self.stats:
+                    f.write("\nStatistics:\n")
+                    f.write("-" * 40 + "\n")
+                    for key, value in self.stats.items():
+                        f.write(f"{key}: {value}\n")
+            
+              QMessageBox.information(
+                self, "Success",
+                f"Charts exported successfully to {directory}\n\n"
+                f"Exported:\n"
+                f"• Current daily decay view + grid of all days\n"
+                f"• Current time interval view + grid of all intervals\n"
+                f"• All other charts\n"
+                f"• Summary text file"
+            )
+            
+           except Exception as e:
+            QMessageBox.critical(
+                self, "Error",
+                f"Failed to export charts: {str(e)}"
+            )
