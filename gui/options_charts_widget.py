@@ -266,37 +266,213 @@ class OptionsChartsWidget(QWidget):
         if self.chart_data:
             self.update_charts(self.chart_data, self.stats)
     
+    # Replace the existing _create_daily_decay_widget method with this one:
+
     def _create_daily_decay_widget(self) -> QWidget:
-        """Create widget for Chart 1: Daily Decay Curves"""
+        """Create widget for Chart 1: Daily Decay Curves with individual scrollable plots"""
         widget = QWidget()
         layout = QVBoxLayout()
-        
+    
+        # Title
+        title = QLabel("Daily Option Decay Curves")
+        title.setStyleSheet("QLabel { font-size: 16pt; font-weight: bold; margin: 10px; }")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+    
         # Description
         desc = QLabel(
-            "Individual decay curves for each trading day showing how implied "
-            "and realized moves change throughout the day."
-        )
+        "Individual daily curves showing how implied and realized option values "
+        "decay throughout each trading day. Scroll through each day's plot."
+    )
         desc.setWordWrap(True)
         desc.setStyleSheet("QLabel { color: #666666; margin: 10px; }")
         layout.addWidget(desc)
-        
-        # Create matplotlib figure with scroll area for multiple charts
-        scroll_area = QScrollArea()
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout()
-        
-        self.daily_decay_figure = Figure(figsize=(16, 40))  # Tall figure for scrolling
-        self.daily_decay_canvas = FigureCanvas(self.daily_decay_figure)
-        
-        scroll_layout.addWidget(self.daily_decay_canvas)
-        scroll_content.setLayout(scroll_layout)
-        scroll_area.setWidget(scroll_content)
-        scroll_area.setWidgetResizable(True)
-        
-        layout.addWidget(scroll_area)
+    
+        # Navigation controls
+        nav_layout = QHBoxLayout()
+    
+        self.prev_day_btn = QPushButton("← Previous Day")
+        self.prev_day_btn.clicked.connect(self._show_previous_day)
+        nav_layout.addWidget(self.prev_day_btn)
+    
+        self.day_label = QLabel("Day 1 of 1")
+        self.day_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.day_label.setStyleSheet("QLabel { font-weight: bold; font-size: 11pt; }")
+        nav_layout.addWidget(self.day_label)
+    
+        self.next_day_btn = QPushButton("Next Day →")
+        self.next_day_btn.clicked.connect(self._show_next_day)
+        nav_layout.addWidget(self.next_day_btn)
+    
+        # Add date selector dropdown
+        nav_layout.addSpacing(20)
+        nav_layout.addWidget(QLabel("Jump to:"))
+        self.date_selector = QComboBox()
+        self.date_selector.currentIndexChanged.connect(self._jump_to_day)
+        nav_layout.addWidget(self.date_selector)
+    
+        nav_layout.addStretch()
+        layout.addLayout(nav_layout)
+    
+        # Stack widget to hold individual day plots
+        self.daily_plots_stack = QStackedWidget()
+        layout.addWidget(self.daily_plots_stack)
+    
+        # Store references
+        self.daily_plots = []  # List of (date, canvas) tuples
+        self.current_day_index = 0
+    
         widget.setLayout(layout)
-        
         return widget
+
+    # Add these new methods to handle navigation:
+
+    def _show_previous_day(self):
+        """Show the previous day's plot"""
+        if self.current_day_index > 0:
+           self.current_day_index -= 1
+           self.daily_plots_stack.setCurrentIndex(self.current_day_index)
+           self._update_day_navigation()
+
+    def _show_next_day(self):
+       """Show the next day's plot"""
+       if self.current_day_index < len(self.daily_plots) - 1:
+          self.current_day_index += 1
+          self.daily_plots_stack.setCurrentIndex(self.current_day_index)
+          self._update_day_navigation()
+
+    def _jump_to_day(self, index):
+       """Jump to a specific day from dropdown"""
+       if index >= 0 and index < len(self.daily_plots):
+          self.current_day_index = index
+          self.daily_plots_stack.setCurrentIndex(self.current_day_index)
+          self._update_day_navigation()
+
+    def _update_day_navigation(self):
+        """Update navigation buttons and label"""
+        total_days = len(self.daily_plots)
+        if total_days == 0:
+           self.day_label.setText("No data")
+           self.prev_day_btn.setEnabled(False)
+           self.next_day_btn.setEnabled(False)
+           return
+    
+        # Update label
+        current_date = self.daily_plots[self.current_day_index][0] if self.daily_plots else ""
+        self.day_label.setText(f"Day {self.current_day_index + 1} of {total_days}: {current_date}")
+    
+        # Update button states
+        self.prev_day_btn.setEnabled(self.current_day_index > 0)
+        self.next_day_btn.setEnabled(self.current_day_index < total_days - 1)
+
+# Replace the existing _plot_daily_decay_curves method with this one:
+
+    def _plot_daily_decay_curves(self, data: Dict):
+       """Plot Chart 1: Daily Decay Curves as individual widgets"""
+    
+       # Clear existing plots
+       while self.daily_plots_stack.count() > 0:
+             widget = self.daily_plots_stack.widget(0)
+             self.daily_plots_stack.removeWidget(widget)
+             widget.deleteLater()
+    
+       self.daily_plots.clear()
+       self.date_selector.clear()
+     
+            # Create individual plot for each day
+       for date_str, day_data in data.items():
+                 # Create figure and canvas for this day
+                 figure = Figure(figsize=(8, 4))
+                 canvas = FigureCanvas(figure)
+        
+                 # Create container widget
+                 day_widget = QWidget()
+                 day_layout = QVBoxLayout()
+        
+                 # Add toolbar
+                 toolbar = NavigationToolbar(canvas, day_widget)
+                 day_layout.addWidget(toolbar)
+                 day_layout.addWidget(canvas)
+        
+                  # Plot the data
+                 ax = figure.add_subplot(111)
+        
+                 time_remaining = day_data['time_remaining']
+                 implied = day_data['implied']
+                 realized = day_data['realized']
+        
+                 # Plot lines with markers
+                 ax.plot(time_remaining, implied, 'b-', label='Implied', 
+               linewidth=2, marker='o', markersize=4, alpha=0.9)
+                 ax.plot(time_remaining, realized, 'r-', label='Realized', 
+               linewidth=2, marker='s', markersize=4, alpha=0.9)
+        
+        # Add shaded area between curves
+                 ax.fill_between(time_remaining, implied, realized, 
+                       where=(np.array(implied) >= np.array(realized)), 
+                       interpolate=True, alpha=0.2, color='blue',
+                       label='Implied > Realized')
+                 ax.fill_between(time_remaining, implied, realized, 
+                       where=(np.array(implied) < np.array(realized)), 
+                       interpolate=True, alpha=0.2, color='red',
+                       label='Realized > Implied')
+        
+                 # Calculate and display statistics for this day
+                 avg_implied = np.mean(implied)
+                 avg_realized = np.mean(realized)
+                 ratio = avg_implied / avg_realized if avg_realized != 0 else 0
+        
+                 # Add text box with statistics
+                 stats_text = (f'Date: {date_str}\n'
+                     f'Avg Implied: ${avg_implied:.2f}\n'
+                     f'Avg Realized: ${avg_realized:.2f}\n'
+                     f'Ratio: {ratio:.3f}')
+                 ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, 
+               fontsize=10, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+        
+                 # Styling
+                 ax.set_title(f'Option Decay Curve - {date_str}', 
+                    fontsize=14, fontweight='bold', pad=20)
+                 ax.set_xlabel('Minutes to Close', fontsize=12)
+                 ax.set_ylabel('Option Move ($)', fontsize=12)
+                 ax.grid(True, alpha=0.3, linestyle='--')
+                 ax.legend(loc='upper right', fontsize=10)
+                 ax.invert_xaxis()  # Show time counting down
+        
+                 # Add zero line
+                 ax.axhline(y=0, color='gray', linestyle='-', alpha=0.3, linewidth=0.5)
+        
+                 # Set y-axis to start from 0 if all values are positive
+                 if min(min(implied), min(realized)) >= 0:
+                    ax.set_ylim(bottom=0)
+        
+                 figure.tight_layout()
+                 canvas.draw()
+        
+                 day_widget.setLayout(day_layout)
+        
+                 # Add to stack widget and lists
+                 self.daily_plots_stack.addWidget(day_widget)
+                 self.daily_plots.append((date_str, canvas))
+                 self.date_selector.addItem(date_str)
+    
+    # Reset to first day
+       self.current_day_index = 0
+       if len(self.daily_plots) > 0:
+          self.daily_plots_stack.setCurrentIndex(0)
+    
+       self._update_day_navigation()
+
+    # Optional: Add keyboard shortcuts for navigation
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts for navigation"""
+        if hasattr(self, 'daily_plots_stack'):
+           if event.key() == Qt.Key.Key_Left:
+              self._show_previous_day()
+           elif event.key() == Qt.Key.Key_Right:
+              self._show_next_day()
+        super().keyPressEvent(event)
     
     def _create_avg_decay_widget(self) -> QWidget:
         """Create widget for Chart 2: Average Decay Curve"""
@@ -501,67 +677,7 @@ class OptionsChartsWidget(QWidget):
         if 'chart5' in chart_data:
             self._plot_time_intervals(chart_data['chart5'])
     
-    def _plot_daily_decay_curves(self, data: Dict):
-        """Plot Chart 1: Daily Decay Curves"""
-        self.daily_decay_figure.clear()
-        
-        num_days = len(data)
-        cols = 4  # 4 columns for better visibility
-        rows = (num_days + cols - 1) // cols
-        
-        # Create grid spec for better layout control
-        gs = GridSpec(rows, cols, figure=self.daily_decay_figure, 
-                     hspace=0.4, wspace=0.3)
-        
-        self.daily_decay_figure.suptitle(
-            'Daily Option Decay Curves - Implied vs Realized Movement',
-            fontsize=16, fontweight='bold', y=0.99
-        )
-        
-        # Plot each day
-        for idx, (date_str, day_data) in enumerate(data.items()):
-            row = idx // cols
-            col = idx % cols
-            ax = self.daily_decay_figure.add_subplot(gs[row, col])
-            
-            time_remaining = day_data['time_remaining']
-            implied = day_data['implied']
-            realized = day_data['realized']
-            
-            # Plot lines with markers
-            ax.plot(time_remaining, implied, 'b-', label='Implied', 
-                   linewidth=1.5, marker='o', markersize=2, alpha=0.8)
-            ax.plot(time_remaining, realized, 'r-', label='Realized', 
-                   linewidth=1.5, marker='s', markersize=2, alpha=0.8)
-            
-            # Styling
-            ax.set_title(date_str, fontsize=10, fontweight='bold')
-            ax.set_xlabel('Min to Close', fontsize=8)
-            ax.set_ylabel('Move ($)', fontsize=8)
-            ax.tick_params(labelsize=7)
-            ax.grid(True, alpha=0.3, linestyle='--')
-            ax.invert_xaxis()
-            
-            # Add legend only to first subplot
-            if idx == 0:
-                ax.legend(fontsize=8, loc='upper right', framealpha=0.9)
-            
-            # Add shaded area between curves
-            ax.fill_between(time_remaining, implied, realized, 
-                          where=(np.array(implied) >= np.array(realized)),
-                          alpha=0.1, color='blue')
-            ax.fill_between(time_remaining, implied, realized,
-                          where=(np.array(implied) < np.array(realized)),
-                          alpha=0.1, color='red')
-        
-        # Hide unused subplots
-        for idx in range(num_days, rows * cols):
-            row = idx // cols
-            col = idx % cols
-            ax = self.daily_decay_figure.add_subplot(gs[row, col])
-            ax.axis('off')
-        
-        self.daily_decay_canvas.draw()
+    
     
     def _plot_avg_decay_curve(self, data: Dict):
         """Plot Chart 2: Average Decay Curve"""
