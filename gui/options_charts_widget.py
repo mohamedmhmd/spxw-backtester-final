@@ -606,44 +606,360 @@ class OptionsChartsWidget(QWidget):
         widget.setLayout(layout)
         return widget
     
+    # Replace the existing _create_time_intervals_widget method with this one:
+
     def _create_time_intervals_widget(self) -> QWidget:
-        """Create widget for Chart 5: Time Intervals Analysis"""
+        """Create widget for Chart 5: Time Intervals Analysis with individual scrollable plots"""
         widget = QWidget()
         layout = QVBoxLayout()
-        
+    
+        # Title
+        title = QLabel("Time Intervals Analysis")
+        title.setStyleSheet("QLabel { font-size: 16pt; font-weight: bold; margin: 10px; }")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+    
         # Description
         desc = QLabel(
-            "Separate charts for each time interval showing implied and realized "
-            "moves across all trading days."
-        )
+        "Individual charts for each time interval showing implied and realized "
+        "moves across all trading days. Navigate through different time intervals."
+    )
         desc.setWordWrap(True)
         desc.setStyleSheet("QLabel { color: #666666; margin: 10px; }")
         layout.addWidget(desc)
-        
-        # Time interval selector
-        selector_layout = QHBoxLayout()
-        selector_layout.addWidget(QLabel("Select Time Interval:"))
-        
-        self.time_interval_combo = QComboBox()
-        self.time_interval_combo.currentTextChanged.connect(self._update_time_interval_plot)
-        selector_layout.addWidget(self.time_interval_combo)
-        
-        selector_layout.addStretch()
-        layout.addLayout(selector_layout)
-        
-        # Create matplotlib figure
-        self.time_intervals_figure = Figure(figsize=(16, 24))  # Large for grid
-        self.time_intervals_canvas = FigureCanvas(self.time_intervals_figure)
-        
-        # Scroll area for multiple charts
-        scroll_area = QScrollArea()
-        scroll_area.setWidget(self.time_intervals_canvas)
-        scroll_area.setWidgetResizable(True)
-        
-        layout.addWidget(scroll_area)
-        
+    
+        # Navigation controls
+        nav_layout = QHBoxLayout()
+    
+        self.prev_interval_btn = QPushButton("← Previous Interval")
+        self.prev_interval_btn.clicked.connect(self._show_previous_interval)
+        nav_layout.addWidget(self.prev_interval_btn)
+    
+        self.interval_label = QLabel("Interval 1 of 1")
+        self.interval_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.interval_label.setStyleSheet("QLabel { font-weight: bold; font-size: 11pt; }")
+        nav_layout.addWidget(self.interval_label)
+    
+        self.next_interval_btn = QPushButton("Next Interval →")
+        self.next_interval_btn.clicked.connect(self._show_next_interval)
+        nav_layout.addWidget(self.next_interval_btn)
+    
+        # Add interval selector dropdown
+        nav_layout.addSpacing(20)
+        nav_layout.addWidget(QLabel("Jump to:"))
+        self.interval_selector = QComboBox()
+        self.interval_selector.currentIndexChanged.connect(self._jump_to_interval)
+        nav_layout.addWidget(self.interval_selector)
+    
+        # Add view all button
+        #nav_layout.addSpacing(20)
+        #self.view_all_intervals_btn = QPushButton("View All (Grid)")
+        #self.view_all_intervals_btn.setCheckable(True)
+        #self.view_all_intervals_btn.clicked.connect(self._toggle_view_all_intervals)
+        #nav_layout.addWidget(self.view_all_intervals_btn)
+    
+        nav_layout.addStretch()
+        layout.addLayout(nav_layout)
+    
+        # Stack widget to hold individual interval plots
+        self.interval_plots_stack = QStackedWidget()
+        layout.addWidget(self.interval_plots_stack)
+    
+        # Store references
+        self.interval_plots = []  # List of (interval_name, canvas) tuples
+        self.current_interval_index = 0
+        self.grid_view_widget = None  # Will hold the "all intervals" grid view
+    
         widget.setLayout(layout)
         return widget
+
+# Add these new methods to handle navigation:
+
+    def _show_previous_interval(self):
+        """Show the previous interval's plot"""
+        if self.current_interval_index > 0:
+           self.current_interval_index -= 1
+           self.interval_plots_stack.setCurrentIndex(self.current_interval_index)
+           self._update_interval_navigation()
+
+    def _show_next_interval(self):
+        """Show the next interval's plot"""
+        if self.current_interval_index < len(self.interval_plots) - 1:
+           self.current_interval_index += 1
+           self.interval_plots_stack.setCurrentIndex(self.current_interval_index)
+           self._update_interval_navigation()
+
+    def _jump_to_interval(self, index):
+        """Jump to a specific interval from dropdown"""
+        if index >= 0 and index < len(self.interval_plots):
+           self.current_interval_index = index
+           self.interval_plots_stack.setCurrentIndex(self.current_interval_index)
+           self._update_interval_navigation()
+
+    def _toggle_view_all_intervals(self, checked):
+        """Toggle between individual view and grid view of all intervals"""
+        if checked and self.grid_view_widget:
+           # Show grid view
+           grid_index = self.interval_plots_stack.indexOf(self.grid_view_widget)
+           if grid_index >= 0:
+              self.interval_plots_stack.setCurrentIndex(grid_index)
+              self.prev_interval_btn.setEnabled(False)
+              self.next_interval_btn.setEnabled(False)
+              self.interval_selector.setEnabled(False)
+              self.interval_label.setText("All Intervals (Grid View)")
+           else:
+              # Show individual view
+              self.interval_plots_stack.setCurrentIndex(self.current_interval_index)
+              self._update_interval_navigation()
+              self.interval_selector.setEnabled(True)
+
+    def _update_interval_navigation(self):
+        """Update navigation buttons and label"""
+        total_intervals = len(self.interval_plots)
+        if total_intervals == 0:
+           self.interval_label.setText("No data")
+           self.prev_interval_btn.setEnabled(False)
+           self.next_interval_btn.setEnabled(False)
+           return
+    
+        # Update label
+        current_interval = self.interval_plots[self.current_interval_index][0] if self.interval_plots else ""
+        self.interval_label.setText(f"Interval {self.current_interval_index + 1} of {total_intervals}: {current_interval}")
+    
+        # Update button states
+        self.prev_interval_btn.setEnabled(self.current_interval_index > 0)
+        self.next_interval_btn.setEnabled(self.current_interval_index < total_intervals - 1)
+
+# Replace the existing _plot_time_intervals method with this one:
+
+    def _plot_time_intervals(self, data: Dict):
+       """Plot Chart 5: Time Intervals as individual widgets"""
+       self._time_intervals_data = data
+    
+       # Clear existing plots
+       while self.interval_plots_stack.count() > 0:
+          widget = self.interval_plots_stack.widget(0)
+          self.interval_plots_stack.removeWidget(widget)
+          widget.deleteLater()
+    
+       self.interval_plots.clear()
+       self.interval_selector.clear()
+       self.grid_view_widget = None
+    
+       # Create individual plot for each interval
+       for interval_name, interval_data in data.items():
+           # Create figure and canvas for this interval
+           figure = Figure(figsize=(8, 4))
+           canvas = FigureCanvas(figure)
+        
+           # Create container widget
+           interval_widget = QWidget()
+           interval_layout = QVBoxLayout()
+        
+           # Add toolbar
+           toolbar = NavigationToolbar(canvas, interval_widget)
+           interval_layout.addWidget(toolbar)
+           interval_layout.addWidget(canvas)
+        
+           # Plot the data
+           ax = figure.add_subplot(111)
+        
+           dates = pd.to_datetime(interval_data['dates'])
+           implied = interval_data['implied']
+           realized = interval_data['realized']
+        
+           # Plot with interactive markers
+           line1 = ax.plot(dates, implied, 'b-', label='Implied',
+                       linewidth=2, marker='o', markersize=5, alpha=0.9)
+           line2 = ax.plot(dates, realized, 'r-', label='Realized',
+                       linewidth=2, marker='s', markersize=5, alpha=0.9)
+        
+           # Add fill between curves
+           ax.fill_between(dates, implied, realized,
+                       where=(np.array(implied) >= np.array(realized)),
+                       interpolate=True, alpha=0.2, color='blue',
+                       label='Implied > Realized')
+           ax.fill_between(dates, implied, realized,
+                       where=(np.array(implied) < np.array(realized)),
+                       interpolate=True, alpha=0.2, color='red',
+                       label='Realized > Implied')
+        
+        # Add trend lines
+           if len(dates) > 1:
+              x_numeric = np.arange(len(dates))
+              z_implied = np.polyfit(x_numeric, implied, 1)
+              z_realized = np.polyfit(x_numeric, realized, 1)
+              p_implied = np.poly1d(z_implied)
+              p_realized = np.poly1d(z_realized)
+            
+              ax.plot(dates, p_implied(x_numeric), 'b--', alpha=0.5,
+                   label=f'Implied Trend (slope: {z_implied[0]:.3f})', linewidth=1)
+              ax.plot(dates, p_realized(x_numeric), 'r--', alpha=0.5,
+                   label=f'Realized Trend (slope: {z_realized[0]:.3f})', linewidth=1)
+        
+           # Calculate statistics
+           avg_implied = np.mean(implied)
+           avg_realized = np.mean(realized)
+           ratio = avg_implied / avg_realized if avg_realized != 0 else 0
+           correlation = np.corrcoef(implied, realized)[0, 1] if len(implied) > 1 else 0
+        
+           # Add statistics box
+           stats_text = (f'Time Interval: {interval_name}\n'
+                     f'Avg Implied: ${avg_implied:.2f}\n'
+                     f'Avg Realized: ${avg_realized:.2f}\n'
+                     f'Ratio: {ratio:.3f}\n'
+                     f'Correlation: {correlation:.3f}')
+           ax.text(0.02, 0.98, stats_text, transform=ax.transAxes,
+               fontsize=10, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+        
+           # Interactive hover (if mplcursors is available)
+           try:
+              cursor = mplcursors.cursor([line1[0], line2[0]], hover=True)
+            
+              @cursor.connect("add")
+              def on_hover(sel):
+                idx = sel.index
+                date_str = dates[idx].strftime('%Y-%m-%d')
+                if sel.artist == line1[0]:
+                    label = "Implied"
+                    value = implied[idx]
+                else:
+                    label = "Realized"
+                    value = realized[idx]
+                
+                sel.annotation.set_text(
+                    f"{label}\n"
+                    f"Date: {date_str}\n"
+                    f"Move: ${value:.2f}"
+                )
+                sel.annotation.get_bbox_patch().set(fc="yellow", alpha=0.95)
+           except:
+            pass  # mplcursors not available
+        
+           # Styling
+           ax.set_title(f'Option Movement Analysis - {interval_name}',
+                    fontsize=14, fontweight='bold', pad=20)
+           ax.set_xlabel('Trading Date', fontsize=12)
+           ax.set_ylabel('Average Move ($)', fontsize=12)
+           ax.legend(loc='upper left', fontsize=9, ncol=2)
+           ax.grid(True, alpha=0.3, linestyle='--')
+        
+        # Format x-axis
+           ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+           ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=max(1, len(dates)//10)))
+           plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        
+           # Add zero line
+           ax.axhline(y=0, color='gray', linestyle='-', alpha=0.3, linewidth=0.5)
+        
+           figure.tight_layout()
+           canvas.draw()
+        
+           interval_widget.setLayout(interval_layout)
+        
+        # Add to stack widget and lists
+           self.interval_plots_stack.addWidget(interval_widget)
+           self.interval_plots.append((interval_name, canvas))
+           self.interval_selector.addItem(interval_name)
+    
+      # Create grid view widget (all intervals in one view)
+       self._create_grid_view_widget(data)
+    
+    # Reset to first interval
+       self.current_interval_index = 0
+       if len(self.interval_plots) > 0:
+          self.interval_plots_stack.setCurrentIndex(0)
+    
+       self._update_interval_navigation()
+
+    def _create_grid_view_widget(self, data: Dict):
+        """Create a widget showing all intervals in a grid"""
+        # Create figure and canvas for grid view
+        figure = Figure(figsize=(16, 24))
+        canvas = FigureCanvas(figure)
+    
+        # Create container widget with scroll area
+        grid_widget = QWidget()
+        grid_layout = QVBoxLayout()
+    
+        # Add scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(canvas)
+        scroll_area.setWidgetResizable(True)
+        grid_layout.addWidget(scroll_area)
+    
+        # Plot all intervals in grid
+        num_intervals = len(data)
+        cols = 4
+        rows = (num_intervals + cols - 1) // cols
+    
+        gs = GridSpec(rows, cols, figure=figure, hspace=0.4, wspace=0.3)
+    
+        figure.suptitle('All Time Intervals - Implied vs Realized Movement',
+                   fontsize=16, fontweight='bold', y=0.99)
+    
+        for idx, (interval_name, interval_data) in enumerate(data.items()):
+            row = idx // cols
+            col = idx % cols
+            ax = figure.add_subplot(gs[row, col])
+        
+            dates = pd.to_datetime(interval_data['dates'])
+            implied = interval_data['implied']
+            realized = interval_data['realized']
+        
+            # Simplified plot for grid view
+            ax.plot(dates, implied, 'b-', label='Implied',
+               linewidth=1, marker='o', markersize=2, alpha=0.8)
+            ax.plot(dates, realized, 'r-', label='Realized',
+               linewidth=1, marker='s', markersize=2, alpha=0.8)
+        
+        # Add trend lines
+            if len(dates) > 1:
+               x_numeric = np.arange(len(dates))
+               z_implied = np.polyfit(x_numeric, implied, 1)
+               z_realized = np.polyfit(x_numeric, realized, 1)
+               ax.plot(dates, np.poly1d(z_implied)(x_numeric),
+                   'b--', alpha=0.4, linewidth=0.8)
+               ax.plot(dates, np.poly1d(z_realized)(x_numeric),
+                   'r--', alpha=0.4, linewidth=0.8)
+        
+        # Styling
+            ax.set_title(f'{interval_name}', fontsize=10, fontweight='bold')
+            ax.set_xlabel('', fontsize=7)
+            ax.set_ylabel('Move ($)', fontsize=7)
+            ax.tick_params(labelsize=6)
+            ax.grid(True, alpha=0.3, linestyle='--')
+        
+        # Format dates
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, len(dates)//3)))
+            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        
+            # Legend only on first
+            if idx == 0:
+               ax.legend(fontsize=7, loc='upper right')
+    
+    # Hide unused subplots
+        for idx in range(num_intervals, rows * cols):
+            row = idx // cols
+            col = idx % cols
+            ax = figure.add_subplot(gs[row, col])
+            ax.axis('off')
+    
+        figure.tight_layout()
+        canvas.draw()
+    
+        grid_widget.setLayout(grid_layout)
+    
+        # Add to stack widget
+        self.interval_plots_stack.addWidget(grid_widget)
+        self.grid_view_widget = grid_widget
+
+# Remove or replace the old _update_time_interval_plot method since it's no longer needed
+    def _update_time_interval_plot(self):
+        """Legacy method - no longer needed with new implementation"""
+        pass
     
     def update_charts(self, chart_data: Dict):
         """Update all charts with new data"""
@@ -948,167 +1264,7 @@ class OptionsChartsWidget(QWidget):
         self.daily_avg_figure.tight_layout()
         self.daily_avg_canvas.draw()
     
-    def _plot_time_intervals(self, data: Dict):
-        """Plot Chart 5: Time Intervals Analysis"""
-        self._time_intervals_data = data
-        
-        # Populate combo box with time intervals
-        self.time_interval_combo.clear()
-        self.time_interval_combo.addItem("All Intervals")
-        self.time_interval_combo.addItems(list(data.keys()))
-        
-        self._update_time_interval_plot()
     
-    def _update_time_interval_plot(self):
-        """Update the time intervals plot"""
-        if not hasattr(self, '_time_intervals_data'):
-            return
-        
-        data = self._time_intervals_data
-        self.time_intervals_figure.clear()
-        
-        selected = self.time_interval_combo.currentText()
-        
-        if selected == "All Intervals" or selected == "":
-            # Plot all intervals in a grid
-            num_intervals = len(data)
-            cols = 4
-            rows = (num_intervals + cols - 1) // cols
-            
-            gs = GridSpec(rows, cols, figure=self.time_intervals_figure,
-                         hspace=0.4, wspace=0.3)
-            
-            self.time_intervals_figure.suptitle(
-                'Implied vs Realized by Time Interval Across All Trading Days',
-                fontsize=16, fontweight='bold', y=0.99
-            )
-            
-            for idx, (time_interval, interval_data) in enumerate(data.items()):
-                row = idx // cols
-                col = idx % cols
-                ax = self.time_intervals_figure.add_subplot(gs[row, col])
-                
-                dates = pd.to_datetime(interval_data['dates'])
-                implied = interval_data['implied']
-                realized = interval_data['realized']
-                
-                # Plot with smaller markers for clarity
-                ax.plot(dates, implied, 'b-', label='Implied',
-                       linewidth=1, marker='o', markersize=2, alpha=0.8)
-                ax.plot(dates, realized, 'r-', label='Realized',
-                       linewidth=1, marker='s', markersize=2, alpha=0.8)
-                
-                # Add trend lines
-                if len(dates) > 1:
-                    x_numeric = np.arange(len(dates))
-                    z_implied = np.polyfit(x_numeric, implied, 1)
-                    z_realized = np.polyfit(x_numeric, realized, 1)
-                    ax.plot(dates, np.poly1d(z_implied)(x_numeric),
-                           'b--', alpha=0.4, linewidth=0.8)
-                    ax.plot(dates, np.poly1d(z_realized)(x_numeric),
-                           'r--', alpha=0.4, linewidth=0.8)
-                
-                # Styling
-                ax.set_title(f'{time_interval}', fontsize=10, fontweight='bold')
-                ax.set_xlabel('', fontsize=7)
-                ax.set_ylabel('Move ($)', fontsize=7)
-                ax.tick_params(labelsize=6)
-                ax.grid(True, alpha=0.3, linestyle='--')
-                
-                # Format dates
-                ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-                ax.xaxis.set_major_locator(
-                    mdates.DayLocator(interval=max(1, len(dates)//3))
-                )
-                plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
-                
-                # Legend only on first
-                if idx == 0:
-                    ax.legend(fontsize=7, loc='upper right')
-            
-            # Hide unused subplots
-            for idx in range(num_intervals, rows * cols):
-                row = idx // cols
-                col = idx % cols
-                ax = self.time_intervals_figure.add_subplot(gs[row, col])
-                ax.axis('off')
-        
-        else:
-            # Plot single selected interval with more detail
-            if selected in data:
-                ax = self.time_intervals_figure.add_subplot(111)
-                interval_data = data[selected]
-                
-                dates = pd.to_datetime(interval_data['dates'])
-                implied = interval_data['implied']
-                realized = interval_data['realized']
-                
-                # Plot with larger markers
-                line1 = ax.plot(dates, implied, 'b-', label='Implied',
-                               linewidth=2, marker='o', markersize=6, alpha=0.9)
-                line2 = ax.plot(dates, realized, 'r-', label='Realized',
-                               linewidth=2, marker='s', markersize=6, alpha=0.9)
-                
-                # Add fill between
-                ax.fill_between(dates, implied, realized,
-                              where=(np.array(implied) >= np.array(realized)),
-                              alpha=0.2, color='blue')
-                ax.fill_between(dates, implied, realized,
-                              where=(np.array(implied) < np.array(realized)),
-                              alpha=0.2, color='red')
-                
-                # Interactive hover
-                cursor = mplcursors.cursor([line1[0], line2[0]], hover=True)
-                
-                @cursor.connect("add")
-                def on_hover(sel):
-                    idx = sel.index
-                    date_str = dates[idx].strftime('%Y-%m-%d')
-                    if sel.artist == line1[0]:
-                        label = "Implied"
-                        value = implied[idx]
-                    else:
-                        label = "Realized"
-                        value = realized[idx]
-                    
-                    sel.annotation.set_text(
-                        f"{label}\n"
-                        f"Date: {date_str}\n"
-                        f"Move: ${value:.2f}"
-                    )
-                    sel.annotation.get_bbox_patch().set(fc="white", alpha=0.95)
-                
-                # Styling
-                ax.set_title(f'Implied vs Realized at {selected}',
-                           fontsize=14, fontweight='bold', pad=20)
-                ax.set_xlabel('Trading Date', fontsize=12)
-                ax.set_ylabel('Move ($)', fontsize=12)
-                ax.legend(loc='upper left', fontsize=10)
-                ax.grid(True, alpha=0.3, linestyle='--')
-                
-                # Format x-axis
-                ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-                ax.xaxis.set_major_locator(
-                    mdates.WeekdayLocator(interval=max(1, len(dates)//10))
-                )
-                plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
-                
-                # Add statistics
-                if len(implied) > 0:
-                    avg_impl = np.mean(implied)
-                    avg_real = np.mean(realized)
-                    std_impl = np.std(implied)
-                    std_real = np.std(realized)
-                    
-                    stats_text = (f'Avg Implied: ${avg_impl:.2f} (σ={std_impl:.2f})\n'
-                                f'Avg Realized: ${avg_real:.2f} (σ={std_real:.2f})')
-                    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes,
-                           fontsize=10, verticalalignment='top',
-                           bbox=dict(boxstyle='round', facecolor='lightgray',
-                                   alpha=0.8))
-        
-        self.time_intervals_figure.tight_layout()
-        self.time_intervals_canvas.draw()
     
     def refresh_charts(self):
         """Refresh all charts with current data"""
