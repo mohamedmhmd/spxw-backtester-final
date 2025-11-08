@@ -1085,92 +1085,121 @@ class OptionsChartsWidget(QWidget):
         self.avg_decay_figure.tight_layout()
         self.avg_decay_canvas.draw()
     
+    """
+Fixed version of the _plot_scatter method from options_charts_widget.py
+This fixes the issue where data is compressed in the upper quadrant of the chart.
+"""
+
     def _plot_scatter(self, data: Dict):
         """Plot Chart 3: Scatter Plot"""
         self._scatter_data = data  # Store for updates
         self._update_scatter_plot()
-    
+
     def _update_scatter_plot(self):
         """Update the scatter plot based on current settings"""
         if not hasattr(self, '_scatter_data'):
-            return
-        
+           return
+    
         data = self._scatter_data
         self.scatter_figure.clear()
         ax = self.scatter_figure.add_subplot(111)
-        
+    
         realized = data['realized']
         implied = data['implied']
         time_labels = data['time_of_day']
         distances = data['distance_from_equilibrium']
-        
+    
         # Create scatter with color gradient
         colors = range(len(realized))
         scatter = ax.scatter(realized, implied, c=colors, cmap='viridis',
-                           s=80, alpha=0.7, edgecolors='black', linewidth=0.5)
-        
-        # Add equilibrium line
-        min_val = min(min(realized), min(implied)) * 0.9
-        max_val = max(max(realized), max(implied)) * 1.1
-        ax.plot([min_val, max_val], [min_val, max_val], 'k--', alpha=0.5,
-               label='Equilibrium Line (Implied = Realized)', linewidth=2)
-        
+                       s=80, alpha=0.7, edgecolors='black', linewidth=0.5)
+    
+    # Calculate proper axis limits
+    # Find the min and max values across both datasets
+        all_values = list(realized) + list(implied)
+        data_min = min(all_values)
+        data_max = max(all_values)
+    
+        # Add some padding (10% on each side)
+        padding = (data_max - data_min) * 0.1
+    
+        # If data is all positive and doesn't go near zero, don't force zero
+        # But if data includes values near zero, include zero for reference
+        if data_min > 5:  # If minimum value is well above zero
+           axis_min = data_min - padding
+        else:
+           axis_min = min(0, data_min - padding)  # Include zero if data is near it
+    
+        axis_max = data_max + padding
+    
+        # Set axis limits explicitly
+        ax.set_xlim(axis_min, axis_max)
+        ax.set_ylim(axis_min, axis_max)
+    
+        # Add equilibrium line across the full axis range
+        ax.plot([axis_min, axis_max], [axis_min, axis_max], 'k--', alpha=0.5,
+           label='Equilibrium Line (Implied = Realized)', linewidth=2)
+    
         # Add labels if checked
         if self.show_labels_check.isChecked():
-            for i, txt in enumerate(time_labels):
-                ax.annotate(txt, (realized[i], implied[i]),
-                          xytext=(3, 3), textcoords='offset points',
-                          fontsize=7, alpha=0.7)
+           for i, txt in enumerate(time_labels):
+               ax.annotate(txt, (realized[i], implied[i]),
+                      xytext=(3, 3), textcoords='offset points',
+                      fontsize=7, alpha=0.7)
         else:
-            # Only label outliers
+            # Only label outliers (top 5 by distance from equilibrium)
             sorted_indices = np.argsort(np.abs(distances))[-5:]
             for idx in sorted_indices:
                 ax.annotate(time_labels[idx],
-                          xy=(realized[idx], implied[idx]),
-                          xytext=(5, 5), textcoords='offset points',
-                          fontsize=8, alpha=0.8, fontweight='bold')
-        
+                      xy=(realized[idx], implied[idx]),
+                      xytext=(5, 5), textcoords='offset points',
+                      fontsize=8, alpha=0.8, fontweight='bold')
+    
         # Interactive hover
         cursor = mplcursors.cursor(scatter, hover=True)
-        
+    
         @cursor.connect("add")
         def on_hover(sel):
             idx = sel.index
             sel.annotation.set_text(
-                f"Time: {time_labels[idx]}\n"
-                f"Realized: ${realized[idx]:.2f}\n"
-                f"Implied: ${implied[idx]:.2f}\n"
-                f"Distance: ${distances[idx]:.2f}"
-            )
+            f"Time: {time_labels[idx]}\n"
+            f"Realized: ${realized[idx]:.2f}\n"
+            f"Implied: ${implied[idx]:.2f}\n"
+            f"Distance: ${distances[idx]:.2f}"
+        )
             sel.annotation.get_bbox_patch().set(fc="yellow", alpha=0.95)
-        
+    
         # Styling
         ax.set_title('Implied vs Realized Movement by Time of Day',
-                    fontsize=14, fontweight='bold', pad=20)
+                fontsize=14, fontweight='bold', pad=20)
         ax.set_xlabel('Average Realized Move ($)', fontsize=12)
         ax.set_ylabel('Average Implied Move ($)', fontsize=12)
         ax.grid(True, alpha=0.3, linestyle='--')
         ax.legend(loc='upper left', fontsize=10)
-        
+    
         # Add colorbar
         cbar = plt.colorbar(scatter, ax=ax)
         cbar.set_label('Time of Day (Earlier → Later)', fontsize=10)
-        
+    
         # Update distance label
         avg_distance = np.mean(np.abs(distances))
         self.distance_label.setText(f"Average Distance from Equilibrium: ${avg_distance:.2f}")
-        
-        # Add zones
-        ax.axhline(y=0, color='gray', linestyle='-', alpha=0.3, linewidth=0.5)
-        ax.axvline(x=0, color='gray', linestyle='-', alpha=0.3, linewidth=0.5)
-        
+    
+        # Add reference lines at zero (if they're within the visible range)
+        if axis_min <= 0 <= axis_max:
+           ax.axhline(y=0, color='gray', linestyle='-', alpha=0.3, linewidth=0.5)
+           ax.axvline(x=0, color='gray', linestyle='-', alpha=0.3, linewidth=0.5)
+    
+        # Force square aspect ratio to ensure the equilibrium line appears at 45 degrees
+        ax.set_aspect('equal', adjustable='box')
+    
         self.scatter_figure.tight_layout()
         self.scatter_canvas.draw()
     
     def _plot_daily_averages(self, data: Dict):
-        """Plot Chart 4: Daily Averages Timeline"""
-        self._daily_avg_data = data  # Store for updates
-        self._update_daily_avg_plot()
+            """Plot Chart 4: Daily Averages Timeline"""
+            self._daily_avg_data = data  # Store for updates
+            self._update_daily_avg_plot()
     
     def _update_daily_avg_plot(self):
         """Update the daily averages plot based on current settings"""
