@@ -820,7 +820,7 @@ class OptionsChartsWidget(QWidget):
             
               @cursor.connect("add")
               def on_hover(sel):
-                idx = sel.index
+                idx = int(round(sel.target.index)) if hasattr(sel.target, 'index') else 0
                 date_str = dates[idx].strftime('%Y-%m-%d')
                 if sel.artist == line1[0]:
                     label = "Implied"
@@ -1047,7 +1047,7 @@ class OptionsChartsWidget(QWidget):
         
         @cursor.connect("add")
         def on_hover(sel):
-            idx = sel.index
+            idx = int(round(sel.target.index)) if hasattr(sel.target, 'index') else 0
             if sel.artist == line1[0]:
                 label = "Implied"
                 value = avg_implied[idx]
@@ -1160,7 +1160,7 @@ This fixes the issue where data is compressed in the upper quadrant of the chart
     
         @cursor.connect("add")
         def on_hover(sel):
-            idx = sel.index
+            idx = int(round(sel.target.index)) if hasattr(sel.target, 'index') else 0
             sel.annotation.set_text(
             f"Time: {time_labels[idx]}\n"
             f"Realized: ${realized[idx]:.2f}\n"
@@ -1249,7 +1249,7 @@ This fixes the issue where data is compressed in the upper quadrant of the chart
         
         @cursor.connect("add")
         def on_hover(sel):
-            idx = sel.index
+            idx = int(round(sel.target.index)) if hasattr(sel.target, 'index') else 0
             date_str = dates[idx].strftime('%Y-%m-%d')
             if sel.artist == line1[0]:
                 label = "Implied"
@@ -1326,7 +1326,7 @@ This fixes the issue where data is compressed in the upper quadrant of the chart
                 # Option 1: Export current view
                 current_date, current_canvas = self.daily_plots[self.current_day_index]
                 current_canvas.figure.savefig(
-                    os.path.join(directory, f'chart1_daily_decay_current_{current_date}.png'),
+                    os.path.join(directory, f'chart1_daily_decay_current_{datetime.now().strftime('%Y%m%d_%H%M')}.png'),
                     dpi=150, bbox_inches='tight'
                 )
                 
@@ -1367,21 +1367,21 @@ This fixes the issue where data is compressed in the upper quadrant of the chart
             # Chart 2: Average Decay
               if hasattr(self, 'avg_decay_figure'):
                 self.avg_decay_figure.savefig(
-                    os.path.join(directory, 'chart2_avg_decay.png'),
+                    os.path.join(directory, f'chart2_avg_decay_{datetime.now().strftime('%Y%m%d_%H%M')}.png'),
                     dpi=150, bbox_inches='tight'
                 )
             
             # Chart 3: Scatter
               if hasattr(self, 'scatter_figure'):
                 self.scatter_figure.savefig(
-                    os.path.join(directory, 'chart3_scatter.png'),
+                    os.path.join(directory, f'chart3_scatter_{datetime.now().strftime('%Y%m%d_%H%M')}.png'),
                     dpi=150, bbox_inches='tight'
                 )
             
             # Chart 4: Daily Averages
               if hasattr(self, 'daily_avg_figure'):
                 self.daily_avg_figure.savefig(
-                    os.path.join(directory, 'chart4_daily_avg.png'),
+                    os.path.join(directory, f'chart4_daily_avg_{datetime.now().strftime('%Y%m%d_%H%M')}.png'),
                     dpi=150, bbox_inches='tight'
                 )
             
@@ -1394,7 +1394,7 @@ This fixes the issue where data is compressed in the upper quadrant of the chart
                   # Check if current_canvas is valid and has a figure
                   if current_canvas and hasattr(current_canvas, 'figure') and current_canvas.figure:
                     current_canvas.figure.savefig(
-                os.path.join(directory, f'chart5_time_interval_current_{current_interval}.png'),
+                os.path.join(directory, f'chart5_time_interval_current_{current_interval}_{datetime.now().strftime('%Y%m%d_%H%M')}.png'),
                 dpi=150, bbox_inches='tight'
             )
                   else:
@@ -1421,7 +1421,7 @@ This fixes the issue where data is compressed in the upper quadrant of the chart
                         plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
                 
                         temp_figure.savefig(
-                    os.path.join(directory, f'chart5_time_interval_current_{current_interval}.png'),
+                    os.path.join(directory, f'chart5_time_interval_current_{current_interval}_{datetime.now().strftime('%Y%m%d_%H%M')}.png'),
                     dpi=150, bbox_inches='tight'
                 )
                except Exception as e:
