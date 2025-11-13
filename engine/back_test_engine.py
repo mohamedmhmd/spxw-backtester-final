@@ -247,22 +247,6 @@ class BacktestEngine:
         for i in range(iron_1_min_bars_needed, len(spx_ohlc_data)):
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
             current_price = spx_ohlc_data.iloc[i]['open']
-            
-            if not cs1a_found:
-                cs1a_trade = await CreditSpread1._find_credit_spread_trade(i,strategy,date,current_price,current_bar_time,
-                                                                            self.data_provider, config, checker, spx_ohlc_data,'a')
-                if cs1a_trade:
-                   trades.append(cs1a_trade)
-                   cs1a_found = True 
-                   logger.info(f"Entered Credit Spread 1(a) at {current_bar_time}.")
-                   
-            if not cs1b_found:
-                cs1b_trade = await CreditSpread1._find_credit_spread_trade(i,strategy,date,current_price,current_bar_time,
-                                                                            self.data_provider, config, checker, spx_ohlc_data,'b')
-                if cs1b_trade:
-                   trades.append(cs1b_trade)
-                   cs1b_found = True 
-                   logger.info(f"Entered Credit Spread 1(b) at {current_bar_time}.")
                 
             
             if not Straddle1.Straddle1_exited and len(open_straddles) > 0:
