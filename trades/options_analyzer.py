@@ -263,7 +263,9 @@ class OptionsAnalyzer:
                 # Check if we're within 1 point of a strike
                 if abs(spx_price - atm_strike) <= 1.0:
                     # Use simple ATM straddle calculation
-                    return await self._calculate_atm_straddle(date, timestamp, atm_strike, spx_price)
+                    straddle_value = await self._calculate_atm_straddle(date, timestamp, atm_strike, spx_price)
+                    intrinsic = max(0, spx_price - atm_strike)
+                    return straddle_value - intrinsic
                 else:
                     # Use linear interpolation between strikes
                     return await self._calculate_interpolated_straddle(date, timestamp, spx_price)
@@ -303,8 +305,8 @@ class OptionsAnalyzer:
             # Calculate intrinsic value
             intrinsic = max(0, spx_price - strike)  # For the call if ITM
             
-            # Implied move = (Call Mid + Put Mid) - Intrinsic Value
-            implied_move = (call_mid + put_mid) - intrinsic
+            # Implied move = (Call Mid + Put Mid)
+            implied_move = (call_mid + put_mid)
             
             return implied_move
         else:
