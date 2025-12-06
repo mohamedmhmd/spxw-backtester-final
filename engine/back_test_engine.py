@@ -567,7 +567,7 @@ class BacktestEngine:
         ic_tb_found = False
         checker = OptimizedSignalChecker(spx_ohlc_data, spy_ohlc_data)
         
-        for i in range(ls_1_min_bars_needed, len(spx_ohlc_data)):
+        for i in range(min(ls_1_min_bars_needed, strategy.ic_tb_entry_interval), len(spx_ohlc_data)):
             current_bar_time = spx_ohlc_data.iloc[i]['timestamp']
             current_price = spx_ohlc_data.iloc[i]['open']
             
