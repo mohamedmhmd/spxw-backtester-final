@@ -295,6 +295,8 @@ class OptionsAnalyzer:
             put_quote = quotes[put_contract]
             
             # Calculate midpoints
+            #if(timestamp == pd.Timestamp('2025-06-23 09:30:00-0400',tz='America/New_York')):
+                #a = 1
             call_mid = (call_quote['bid'] + call_quote['ask']) / 2
             put_mid = (put_quote['bid'] + put_quote['ask']) / 2
             
@@ -346,7 +348,7 @@ class OptionsAnalyzer:
         Example: O:SPX240115C5900000 for Jan 15, 2024, 5900 Call
         """
         exp_str = expiration.strftime('%y%m%d')
-        return f"O:SPXW{exp_str}C{int(strike*1000):08d}"
+        return f"O:SPXW{exp_str}{option_type}{int(strike*1000):08d}"
     
     def generate_chart_data(self) -> Dict:
         """
