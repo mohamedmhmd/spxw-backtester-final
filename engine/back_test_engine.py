@@ -124,15 +124,10 @@ class BacktestEngine:
         # Build equity curve sequentially (since it depends on cumulative P&L)
         self.trades = all_trades
         self.daily_pnl = daily_pnl_dict
-        self._build_equity_curve(self.total_capital_used, trading_dates)
+        self._build_equity_curve(config.initial_portfolio_size, trading_dates)
         
         # Calculate statistics
-        stats = Statistics._calculate_statistics(
-            self.trades, 
-            self.equity_curve, 
-            self.daily_pnl, 
-            self.selected_strategy
-        )
+        stats = Statistics._calculate_statistics(self.trades, self.equity_curve, self.daily_pnl, self.selected_strategy, config)
         
         logger.info(f"Backtest completed: {len(self.trades)} total trades.")
         total_time = time_module.time() - start_time

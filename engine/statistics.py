@@ -6,15 +6,15 @@ from config.back_test_config import BacktestConfig
 
 class Statistics:
     
-    def _calculate_statistics(trades, equity_curve, daily_pnl, selected_strategy) -> Dict[str, Any]:
+    def _calculate_statistics(trades, equity_curve, daily_pnl, selected_strategy, config: BacktestConfig) -> Dict[str, Any]:
         if selected_strategy == "Trades 16":
-            return Statistics._calculate_statistics_16(trades, equity_curve, daily_pnl)
+            return Statistics._calculate_statistics_16(trades, equity_curve, daily_pnl, config)
         elif selected_strategy == "Trades 17":
-            return Statistics._calculate_statistics_17(trades, equity_curve, daily_pnl)
+            return Statistics._calculate_statistics_17(trades, equity_curve, daily_pnl, config)
         elif selected_strategy == "Trades 18":
-            return Statistics._calculate_statistics_18(trades, equity_curve, daily_pnl)
+            return Statistics._calculate_statistics_18(trades, equity_curve, daily_pnl, config)
     
-    def _calculate_statistics_16(trades, equity_curve, daily_pnl) -> Dict[str, Any]:
+    def _calculate_statistics_16(trades, equity_curve, daily_pnl, config: BacktestConfig) -> Dict[str, Any]:
         """Calculate comprehensive backtest statistics"""
         if not trades:
             return {
@@ -76,19 +76,23 @@ class Statistics:
             max_drawdown = 0
         
         # Sharpe ratio (using capital used instead of initial capital)
-        if len(daily_pnl) > 1 and total_capital_used > 0:
+        initial_portfolio = config.initial_portfolio_size
+        risk_free_rate = config.risk_free_rate
+        if len(daily_pnl) > 1 and initial_portfolio > 0:
             daily_returns = list(daily_pnl.values())
-            daily_returns_pct = [r / total_capital_used for r in daily_returns]  # USE total_capital_used
-            if np.std(daily_returns_pct) > 0:
-                sharpe_ratio = np.sqrt(252) * np.mean(daily_returns_pct) / np.std(daily_returns_pct)
-            else:
-                sharpe_ratio = 0
+            # Fixed:
+            daily_risk_free = risk_free_rate / 252
+
+            daily_returns_pct = [r / initial_portfolio for r in daily_returns]
+            excess_returns = [r - daily_risk_free for r in daily_returns_pct]
+            if np.std(excess_returns) > 0:
+               sharpe_ratio = np.sqrt(252) * np.mean(excess_returns) / np.std(excess_returns)
         else:
             sharpe_ratio = 0
         
         # Total return based on capital used
-        if total_capital_used > 0:
-            return_pct = (total_pnl / total_capital_used)  # Return on capital used
+        if initial_portfolio> 0:
+            return_pct = (total_pnl / initial_portfolio)  # Return on capital used
         else:
             return_pct = 0
         
@@ -106,7 +110,7 @@ class Statistics:
             'max_drawdown': max_drawdown,
             'sharpe_ratio': sharpe_ratio,
             'return_pct': return_pct,
-            'total_capital_used': total_capital_used, 
+            'total_capital_used': initial_portfolio, 
             'avg_trade_pnl': total_pnl / len(trades) if trades else 0,
             'best_trade': max(trades, key=lambda t: t.pnl).pnl if trades else 0,
             'worst_trade': min(trades, key=lambda t: t.pnl).pnl if trades else 0,
@@ -131,7 +135,7 @@ class Statistics:
         }
         
         
-    def _calculate_statistics_17(trades, equity_curve, daily_pnl) -> Dict[str, Any]:
+    def _calculate_statistics_17(trades, equity_curve, daily_pnl, config: BacktestConfig) -> Dict[str, Any]:
         """Calculate comprehensive backtest statistics"""
         if not trades:
             return {
@@ -187,20 +191,23 @@ class Statistics:
         else:
             max_drawdown = 0
         
-        # Sharpe ratio (using capital used instead of initial capital)
+        initial_portfolio = config.initial_portfolio_size
+        risk_free_rate = config.risk_free_rate
         if len(daily_pnl) > 1 and total_capital_used > 0:
             daily_returns = list(daily_pnl.values())
-            daily_returns_pct = [r / total_capital_used for r in daily_returns]  # USE total_capital_used
-            if np.std(daily_returns_pct) > 0:
-                sharpe_ratio = np.sqrt(252) * np.mean(daily_returns_pct) / np.std(daily_returns_pct)
-            else:
-                sharpe_ratio = 0
+            # Fixed:
+            daily_risk_free = risk_free_rate / 252
+
+            daily_returns_pct = [r / initial_portfolio for r in daily_returns]
+            excess_returns = [r - daily_risk_free for r in daily_returns_pct]
+            if np.std(excess_returns) > 0:
+               sharpe_ratio = np.sqrt(252) * np.mean(excess_returns) / np.std(excess_returns)
         else:
             sharpe_ratio = 0
         
         # Total return based on capital used
-        if total_capital_used > 0:
-            return_pct = (total_pnl / total_capital_used)  # Return on capital used
+        if initial_portfolio > 0:
+            return_pct = (total_pnl / initial_portfolio)  # Return on capital used
         else:
             return_pct = 0
         
@@ -217,7 +224,7 @@ class Statistics:
             'max_drawdown': max_drawdown,
             'sharpe_ratio': sharpe_ratio,
             'return_pct': return_pct,
-            'total_capital_used': total_capital_used, 
+            'total_capital_used': initial_portfolio, 
             'avg_trade_pnl': total_pnl / len(trades) if trades else 0,
             'best_trade': max(trades, key=lambda t: t.pnl).pnl if trades else 0,
             'worst_trade': min(trades, key=lambda t: t.pnl).pnl if trades else 0,
@@ -245,7 +252,7 @@ class Statistics:
         
         
         
-    def _calculate_statistics_18(trades, equity_curve, daily_pnl) -> Dict[str, Any]:
+    def _calculate_statistics_18(trades, equity_curve, daily_pnl, config: BacktestConfig) -> Dict[str, Any]:
         """Calculate comprehensive backtest statistics"""
         if not trades:
             return {
@@ -300,20 +307,23 @@ class Statistics:
         else:
             max_drawdown = 0
         
-        # Sharpe ratio (using capital used instead of initial capital)
+        initial_portfolio = config.initial_portfolio_size
+        risk_free_rate = config.risk_free_rate
         if len(daily_pnl) > 1 and total_capital_used > 0:
             daily_returns = list(daily_pnl.values())
-            daily_returns_pct = [r / total_capital_used for r in daily_returns]  # USE total_capital_used
-            if np.std(daily_returns_pct) > 0:
-                sharpe_ratio = np.sqrt(252) * np.mean(daily_returns_pct) / np.std(daily_returns_pct)
-            else:
-                sharpe_ratio = 0
+            # Fixed:
+            daily_risk_free = risk_free_rate / 252
+
+            daily_returns_pct = [r / initial_portfolio for r in daily_returns]
+            excess_returns = [r - daily_risk_free for r in daily_returns_pct]
+            if np.std(excess_returns) > 0:
+               sharpe_ratio = np.sqrt(252) * np.mean(excess_returns) / np.std(excess_returns)
         else:
             sharpe_ratio = 0
         
         # Total return based on capital used
-        if total_capital_used > 0:
-            return_pct = (total_pnl / total_capital_used)  # Return on capital used
+        if initial_portfolio > 0:
+            return_pct = (total_pnl / initial_portfolio)  # Return on capital used
         else:
             return_pct = 0
         
@@ -330,7 +340,7 @@ class Statistics:
             'max_drawdown': max_drawdown,
             'sharpe_ratio': sharpe_ratio,
             'return_pct': return_pct,
-            'total_capital_used': total_capital_used, 
+            'total_capital_used': initial_portfolio, 
             'avg_trade_pnl': total_pnl / len(trades) if trades else 0,
             'best_trade': max(trades, key=lambda t: t.pnl).pnl if trades else 0,
             'worst_trade': min(trades, key=lambda t: t.pnl).pnl if trades else 0,
