@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 from data.polygon_data_provider import PolygonDataProvider
+from trades.trade import Trade
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,6 +27,12 @@ class AnalysisConfig:
     strike_interval: int = 5  # Strike price interval
     max_concurrent_requests: int = 100000000  # Limit concurrent API requests
     batch_size: int = 500000000000  # Size of batches for parallel processing
+    ib_enabled: bool = True
+    ib_min_wing_width: int = 15
+    ib_max_wing_width: int = 70
+    ib_target_win_loss_ratio: float = 1.5
+    ib_trade_size: int = 10
+    ib_commission_per_contract: float = 0.65
 
 class OptionsAnalyzer:
     """
@@ -111,7 +118,7 @@ class OptionsAnalyzer:
     async def calculate_implied_moves(self) -> pd.DataFrame:
         """
         Calculate implied moves for all time intervals with maximum parallelization.
-        Returns DataFrame with columns: date, timestamp, spx_price, implied_move
+        Returns DataFrame with columns: date, timestamp, spx_price, implied_move, and IB trade details
         """
         if not self.spx_data:
             logger.warning("No SPX data available for analysis")
@@ -157,8 +164,13 @@ class OptionsAnalyzer:
                 timestamp = row['timestamp']
                 spx_price = row['close']
                 
-                task = self._calculate_single_implied_move(date, timestamp, spx_price)
-                calc_tasks.append(task)
+                # Create task for implied move calculation
+                implied_task = self._calculate_single_implied_move(date, timestamp, spx_price)
+                calc_tasks.append(implied_task)
+                
+                # Create task for Iron Butterfly calculation if enabled
+                ib_task = self._calculate_iron_butterfly_trade(date, timestamp, spx_price, closing_price)
+                calc_tasks.append(ib_task)
                 
                 # Store metadata for result construction
                 task_metadata.append({
@@ -168,31 +180,92 @@ class OptionsAnalyzer:
                     'time_remaining_minutes': time_remaining_values.iloc[idx],
                     'spx_price': spx_price,
                     'realized_move': abs(spx_price - closing_price),
-                    'closing_price': closing_price
+                    'closing_price': closing_price,
+                    'task_type': 'implied'
+                })
+                
+                task_metadata.append({
+                    'date': date,
+                    'timestamp': timestamp,
+                    'time_of_day': timestamp.strftime('%H:%M'),
+                    'time_remaining_minutes': time_remaining_values.iloc[idx],
+                    'spx_price': spx_price,
+                    'realized_move': abs(spx_price - closing_price),
+                    'closing_price': closing_price,
+                    'task_type': 'iron_butterfly'
                 })
         
-        # Execute all implied move calculations in batches for better performance
+        # Execute all calculations in batches for better performance
         if calc_tasks:
-            logger.info(f"Executing {len(calc_tasks)} implied move calculations in parallel batches")
-            implied_moves = await self._execute_in_batches(calc_tasks, self.config.batch_size)
+            logger.info(f"Executing {len(calc_tasks)} calculations in parallel batches")
+            all_results = await self._execute_in_batches(calc_tasks, self.config.batch_size)
             
-            # Combine results
+            # Collect IB results by key for merging
+            ib_results_dict = {}
+            implied_results = []
+            
+            for metadata, result in zip(task_metadata, all_results):
+                if isinstance(result, Exception):
+                    logger.error(f"Error for {metadata['date']} {metadata['time_of_day']}: {result}")
+                    continue
+                
+                if metadata['task_type'] == 'implied':
+                    implied_results.append((metadata, result))
+                elif metadata['task_type'] == 'iron_butterfly':
+                    if result:  # Iron Butterfly result is a dict
+                        key = (metadata['date'], metadata['time_of_day'])
+                        ib_results_dict[key] = result
+            
+            # Merge implied results with IB data into single rows
             results = []
-            for metadata, implied_move in zip(task_metadata, implied_moves):
-                if isinstance(implied_move, Exception):
-                    logger.error(f"Error calculating implied move for {metadata['date']} {metadata['time_of_day']}: {implied_move}")
-                    implied_move = 0.0  # Or np.nan if you prefer
+            for metadata, implied_move in implied_results:
+                row = {
+                    'date': metadata['date'],
+                    'timestamp': metadata['timestamp'],
+                    'time_of_day': metadata['time_of_day'],
+                    'time_remaining_minutes': metadata['time_remaining_minutes'],
+                    'spx_price': metadata['spx_price'],
+                    'realized_move': metadata['realized_move'],
+                    'closing_price': metadata['closing_price'],
+                    'implied_move': implied_move if implied_move else 0.0,
+                }
                 
-                metadata['implied_move'] = implied_move
+                # Add IB data if available for this timestamp
+                key = (metadata['date'], metadata['time_of_day'])
+                if key in ib_results_dict:
+                    ib_data = ib_results_dict[key]
+                    row['ib_atm_strike'] = ib_data.get('ib_atm_strike')
+                    row['ib_wing_width'] = ib_data.get('ib_wing_width')
+                    row['ib_long_call_strike'] = ib_data.get('ib_long_call_strike')
+                    row['ib_long_put_strike'] = ib_data.get('ib_long_put_strike')
+                    row['ib_net_premium'] = ib_data.get('ib_net_premium')
+                    row['ib_max_loss'] = ib_data.get('ib_max_loss')
+                    row['ib_win_loss_ratio'] = ib_data.get('ib_win_loss_ratio')
+                    row['ib_trade_size'] = ib_data.get('ib_trade_size')
+                    row['ib_unit_pnl'] = ib_data.get('ib_unit_pnl')
+                    row['ib_unit_pnl_without_commission'] = ib_data.get('ib_unit_pnl_without_commission')
+                    row['ib_total_pnl'] = ib_data.get('ib_total_pnl')
+                    row['ib_total_pnl_without_commission'] = ib_data.get('ib_total_pnl_without_commission')
+                    row['ib_result'] = ib_data.get('ib_result')
+                else:
+                    row['ib_atm_strike'] = None
+                    row['ib_wing_width'] = None
+                    row['ib_long_call_strike'] = None
+                    row['ib_long_put_strike'] = None
+                    row['ib_net_premium'] = None
+                    row['ib_max_loss'] = None
+                    row['ib_win_loss_ratio'] = None
+                    row['ib_trade_size'] = None
+                    row['ib_unit_pnl'] = None
+                    row['ib_unit_pnl_without_commission'] = None
+                    row['ib_total_pnl'] = None
+                    row['ib_total_pnl_without_commission'] = None
+                    row['ib_result'] = None
                 
-                # Only log every 100th result to reduce logging overhead
-                if len(results) % 100 == 0:
-                    logger.info(f"Processed {len(results)}/{len(task_metadata)} calculations")
-                
-                results.append(metadata)
+                results.append(row)
             
             self.analysis_results = pd.DataFrame(results)
-            logger.info(f"Completed {len(results)} calculations")
+            logger.info(f"Completed {len(results)} calculations with IB data merged")
         else:
             logger.warning("No valid data to process after filtering")
             self.analysis_results = pd.DataFrame()
@@ -297,8 +370,6 @@ class OptionsAnalyzer:
             put_quote = quotes[put_contract]
             
             # Calculate midpoints
-            #if(timestamp == pd.Timestamp('2025-06-23 09:30:00-0400',tz='America/New_York')):
-                #a = 1
             call_mid = (call_quote['bid'] + call_quote['ask']) / 2
             put_mid = (put_quote['bid'] + put_quote['ask']) / 2
             
@@ -334,6 +405,213 @@ class OptionsAnalyzer:
         implied_move = lower_implied * (1 - weight) + upper_implied * weight
         
         return implied_move
+    
+    async def _calculate_iron_butterfly_trade(self, date: datetime, timestamp: pd.Timestamp,
+                                               spx_price: float, closing_price: float) -> Optional[Dict]:
+        """
+        Calculate Iron Butterfly trade details at a specific timestamp.
+        Uses the Trade class for P&L calculation to match other strategies.
+        Returns trade details including entry, max win, max loss, and final P&L.
+        """
+        if not self.config.ib_enabled:
+            return None
+            
+        try:
+            atm_strike = self._get_atm_strike(spx_price)
+            min_wing = self.config.ib_min_wing_width
+            max_wing = self.config.ib_max_wing_width
+            target_ratio = self.config.ib_target_win_loss_ratio
+            step = self.config.strike_interval
+            tolerance = 0.03
+            
+            exp_date = self._get_expiration_date(date)
+            quote_cache = {}
+            
+            async def get_quotes_for_distance(d: int) -> Tuple[Optional[float], Optional[float], Optional[Dict]]:
+                """Get ratio and net premium for a specific wing distance"""
+                # Iron Butterfly: short call and put at ATM, long call and put at wings
+                short_call_contract = self._generate_option_symbol(atm_strike, exp_date, 'C')
+                short_put_contract = self._generate_option_symbol(atm_strike, exp_date, 'P')
+                long_call_contract = self._generate_option_symbol(atm_strike + d, exp_date, 'C')
+                long_put_contract = self._generate_option_symbol(atm_strike - d, exp_date, 'P')
+                
+                symbols = [short_call_contract, short_put_contract, long_call_contract, long_put_contract]
+                
+                # Fetch uncached quotes
+                to_fetch = [(s, s) for s in symbols if s not in quote_cache]
+                if to_fetch:
+                    tasks = [self.provider._get_option_tick_quote(s, timestamp) for _, s in to_fetch]
+                    fetched = await asyncio.gather(*tasks, return_exceptions=True)
+                    
+                    for (_, symbol), quote in zip(to_fetch, fetched):
+                        if not isinstance(quote, Exception) and quote:
+                            quote_cache[symbol] = quote
+                        else:
+                            quote_cache[symbol] = None
+                
+                quotes = {s: quote_cache.get(s) for s in symbols}
+                
+                if None in quotes.values():
+                    return None, None, None
+                
+                sc_bid = quotes[short_call_contract].get('bid')
+                sp_bid = quotes[short_put_contract].get('bid')
+                lc_ask = quotes[long_call_contract].get('ask')
+                lp_ask = quotes[long_put_contract].get('ask')
+                
+                if None in [sc_bid, sp_bid, lc_ask, lp_ask]:
+                    return None, None, None
+                
+                net_premium = sc_bid + sp_bid - lc_ask - lp_ask
+                max_loss = d - net_premium
+                
+                if net_premium <= 0 or max_loss <= 0:
+                    return None, None, None
+                
+                ratio = net_premium / max_loss
+                return ratio, net_premium, {
+                    'short_call': {'contract': short_call_contract, 'bid': sc_bid, 'strike': atm_strike},
+                    'short_put': {'contract': short_put_contract, 'bid': sp_bid, 'strike': atm_strike},
+                    'long_call': {'contract': long_call_contract, 'ask': lc_ask, 'strike': atm_strike + d},
+                    'long_put': {'contract': long_put_contract, 'ask': lp_ask, 'strike': atm_strike - d}
+                }
+            
+            # Three-point search for optimal wing width
+            distances = [min_wing, (min_wing + max_wing) // 2, max_wing]
+            distances = [d for d in distances if d % step == 0]  # Align to strike intervals
+            
+            best_d = None
+            best_ratio = None
+            best_diff = float('inf')
+            best_premium = None
+            best_quotes = None
+            
+            for d in distances:
+                ratio, net_premium, quotes = await get_quotes_for_distance(d)
+                if ratio is not None:
+                    diff = abs(ratio - target_ratio)
+                    if diff < best_diff:
+                        best_diff = diff
+                        best_d = d
+                        best_ratio = ratio
+                        best_premium = net_premium
+                        best_quotes = quotes
+            
+            if best_d is None:
+                return None
+            
+            # Binary search refinement
+            if best_ratio < target_ratio:
+                left, right = min_wing, best_d
+            else:
+                left, right = best_d, max_wing
+            
+            while right - left > step:
+                mid = ((left + right) // 2 // step) * step
+                ratio, net_premium, quotes = await get_quotes_for_distance(mid)
+                
+                if ratio is None:
+                    break
+                
+                diff = abs(ratio - target_ratio)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_d = mid
+                    best_ratio = ratio
+                    best_premium = net_premium
+                    best_quotes = quotes
+                
+                if diff <= tolerance:
+                    break
+                
+                if ratio < target_ratio:
+                    right = mid
+                else:
+                    left = mid
+            
+            if best_d is None or best_premium is None:
+                return None
+            
+            # Use Trade class for P&L calculation to match other strategies
+            size = self.config.ib_trade_size
+            commission = self.config.ib_commission_per_contract
+            
+            # Build contracts dict matching Trade class structure
+            contracts = {
+                best_quotes['short_call']['contract']: {
+                    'position': -size,
+                    'entry_price': best_quotes['short_call']['bid'],
+                    'leg_type': 'short_call',
+                    'strike': atm_strike,
+                    'used_capital': commission
+                },
+                best_quotes['short_put']['contract']: {
+                    'position': -size,
+                    'entry_price': best_quotes['short_put']['bid'],
+                    'leg_type': 'short_put',
+                    'strike': atm_strike,
+                    'used_capital': commission
+                },
+                best_quotes['long_call']['contract']: {
+                    'position': size,
+                    'entry_price': best_quotes['long_call']['ask'],
+                    'leg_type': 'long_call',
+                    'strike': atm_strike + best_d,
+                    'used_capital': best_quotes['long_call']['ask'] * 100 + commission
+                },
+                best_quotes['long_put']['contract']: {
+                    'position': size,
+                    'entry_price': best_quotes['long_put']['ask'],
+                    'leg_type': 'long_put',
+                    'strike': atm_strike - best_d,
+                    'used_capital': best_quotes['long_put']['ask'] * 100 + commission
+                },
+            }
+            
+            # Calculate payoffs at expiration
+            payoffs = {}
+            for contract, details in contracts.items():
+                strike = details['strike']
+                if 'call' in details['leg_type']:
+                    payoffs[contract] = max(0, closing_price - strike)
+                else:
+                    payoffs[contract] = max(0, strike - closing_price)
+            
+            # Create temporary Trade object to use its P&L calculation
+            trade = Trade(
+                entry_time=timestamp,
+                exit_time=None,
+                trade_type="Iron Butterfly Analysis",
+                contracts=contracts,
+                size=size,
+                metadata={'net_premium': best_premium}
+            )
+            
+            # Use Trade class methods for P&L calculation
+            trade.calculate_unit_pnl(payoffs, commission)
+            trade.calculate_pnl(size)
+            trade.calculate_unit_pnl_without_commission(payoffs)
+            trade.calculate_pnl_without_commission(size)
+            
+            return {
+                'ib_atm_strike': atm_strike,
+                'ib_wing_width': best_d,
+                'ib_long_call_strike': atm_strike + best_d,
+                'ib_long_put_strike': atm_strike - best_d,
+                'ib_net_premium': best_premium,
+                'ib_max_loss': best_d - best_premium,
+                'ib_win_loss_ratio': best_ratio,
+                'ib_trade_size': size,
+                'ib_unit_pnl': trade.unit_pnl,
+                'ib_unit_pnl_without_commission': trade.unit_pnl_without_commission,
+                'ib_total_pnl': trade.pnl,
+                'ib_total_pnl_without_commission': trade.pnl_without_commission,
+                'ib_result': 'WIN' if trade.pnl > 0 else 'LOSS',
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calculating Iron Butterfly: {e}")
+            return None
     
     def _get_expiration_date(self, trade_date: datetime) -> datetime:
         """Get option expiration date based on DTE configuration"""
@@ -407,21 +685,60 @@ class OptionsAnalyzer:
     def _generate_chart2_data(self, df: pd.DataFrame) -> Dict:
         """
         Chart 2: Average decay curve across all trading days.
-        Returns dict with time_of_day -> average implied/realized
+        Returns dict with time_of_day -> average implied/realized and IB metrics
         """
-        # Group by time of day and calculate averages
-        avg_by_time = df.groupby('time_of_day').agg({
+        agg_dict = {
             'time_remaining_minutes': 'mean',
             'implied_move': 'mean',
             'realized_move': 'mean'
-        }).reset_index()
-        
-        return {
-            'time_of_day': avg_by_time['time_of_day'].tolist(),
-            'time_remaining': avg_by_time['time_remaining_minutes'].tolist(),
-            'avg_implied': avg_by_time['implied_move'].tolist(),
-            'avg_realized': avg_by_time['realized_move'].tolist()
         }
+        
+        # Add IB aggregations if columns exist
+        if 'ib_net_premium' in df.columns:
+            agg_dict['ib_net_premium'] = 'mean'
+            agg_dict['ib_max_loss'] = 'mean'
+            agg_dict['ib_wing_width'] = 'mean'
+            agg_dict['ib_total_pnl'] = ['mean', 'sum', 'count']
+            agg_dict['ib_win_loss_ratio'] = 'mean'
+        
+        avg_by_time = df.groupby('time_of_day').agg(agg_dict)
+        
+        # Flatten column names if multi-level
+        if isinstance(avg_by_time.columns, pd.MultiIndex):
+            avg_by_time.columns = ['_'.join(col).strip('_') for col in avg_by_time.columns]
+        
+        avg_by_time = avg_by_time.reset_index()
+        
+        result = {
+            'time_of_day': avg_by_time['time_of_day'].tolist(),
+            'time_remaining': avg_by_time['time_remaining_minutes'].tolist() if 'time_remaining_minutes' in avg_by_time.columns else avg_by_time['time_remaining_minutes_mean'].tolist(),
+            'avg_implied': avg_by_time['implied_move'].tolist() if 'implied_move' in avg_by_time.columns else avg_by_time['implied_move_mean'].tolist(),
+            'avg_realized': avg_by_time['realized_move'].tolist() if 'realized_move' in avg_by_time.columns else avg_by_time['realized_move_mean'].tolist(),
+        }
+        
+        # Add IB data if available
+        if 'ib_net_premium' in df.columns:
+            result['ib_avg_premium'] = avg_by_time['ib_net_premium'].tolist() if 'ib_net_premium' in avg_by_time.columns else avg_by_time.get('ib_net_premium_mean', [None]*len(avg_by_time)).tolist()
+            result['ib_avg_max_loss'] = avg_by_time['ib_max_loss'].tolist() if 'ib_max_loss' in avg_by_time.columns else avg_by_time.get('ib_max_loss_mean', [None]*len(avg_by_time)).tolist()
+            result['ib_avg_wing_width'] = avg_by_time['ib_wing_width'].tolist() if 'ib_wing_width' in avg_by_time.columns else avg_by_time.get('ib_wing_width_mean', [None]*len(avg_by_time)).tolist()
+            result['ib_avg_pnl'] = avg_by_time.get('ib_total_pnl_mean', [None]*len(avg_by_time)).tolist()
+            result['ib_total_pnl'] = avg_by_time.get('ib_total_pnl_sum', [None]*len(avg_by_time)).tolist()
+            result['ib_trade_count'] = avg_by_time.get('ib_total_pnl_count', [None]*len(avg_by_time)).tolist()
+            result['ib_avg_ratio'] = avg_by_time['ib_win_loss_ratio'].tolist() if 'ib_win_loss_ratio' in avg_by_time.columns else avg_by_time.get('ib_win_loss_ratio_mean', [None]*len(avg_by_time)).tolist()
+            
+            # Calculate win rate per time interval
+            win_rates = []
+            for tod in result['time_of_day']:
+                tod_data = df[df['time_of_day'] == tod]
+                valid_ib = tod_data[tod_data['ib_total_pnl'].notna()]
+                if len(valid_ib) > 0:
+                    win_rate = (valid_ib['ib_total_pnl'] > 0).sum() / len(valid_ib) * 100
+                    win_rates.append(round(win_rate, 2))
+                else:
+                    win_rates.append(None)
+            result['ib_win_rate'] = win_rates
+        
+        return result
     
     def _generate_chart3_data(self, df: pd.DataFrame) -> Dict:
         """
@@ -452,24 +769,66 @@ class OptionsAnalyzer:
     def _generate_chart4_data(self, df: pd.DataFrame) -> Dict:
         """
         Chart 4: Average implied and realized moves for each trading day.
-        Returns dict with date -> average implied/realized
+        Returns dict with date -> average implied/realized and IB metrics
         """
-        # Calculate daily averages
-        daily_avg = df.groupby('date').agg({
+        agg_dict = {
             'implied_move': 'mean',
             'realized_move': 'mean'
-        }).reset_index()
+        }
         
-        # Sort by date (most recent on the right)
+        # Add IB aggregations if columns exist
+        if 'ib_net_premium' in df.columns:
+            agg_dict['ib_net_premium'] = 'mean'
+            agg_dict['ib_max_loss'] = 'mean'
+            agg_dict['ib_total_pnl'] = ['mean', 'sum', 'count']
+            agg_dict['ib_wing_width'] = 'mean'
+        
+        daily_avg = df.groupby('date').agg(agg_dict)
+        
+        # Flatten column names if multi-level
+        if isinstance(daily_avg.columns, pd.MultiIndex):
+            daily_avg.columns = ['_'.join(col).strip('_') for col in daily_avg.columns]
+        
+        daily_avg = daily_avg.reset_index()
         daily_avg = daily_avg.sort_values('date')
         
-        return {
+        result = {
             'dates': [d.strftime('%Y-%m-%d') for d in daily_avg['date']],
-            'avg_implied': daily_avg['implied_move'].tolist(),
-            'avg_realized': daily_avg['realized_move'].tolist(),
-            'trend_implied': self._calculate_trend_line(daily_avg['implied_move']),
-            'trend_realized': self._calculate_trend_line(daily_avg['realized_move'])
+            'avg_implied': daily_avg['implied_move'].tolist() if 'implied_move' in daily_avg.columns else daily_avg['implied_move_mean'].tolist(),
+            'avg_realized': daily_avg['realized_move'].tolist() if 'realized_move' in daily_avg.columns else daily_avg['realized_move_mean'].tolist(),
+            'trend_implied': self._calculate_trend_line(daily_avg['implied_move'] if 'implied_move' in daily_avg.columns else daily_avg['implied_move_mean']),
+            'trend_realized': self._calculate_trend_line(daily_avg['realized_move'] if 'realized_move' in daily_avg.columns else daily_avg['realized_move_mean'])
         }
+        
+        # Add IB data if available
+        if 'ib_net_premium' in df.columns:
+            result['ib_avg_premium'] = daily_avg['ib_net_premium'].tolist() if 'ib_net_premium' in daily_avg.columns else daily_avg.get('ib_net_premium_mean', [None]*len(daily_avg)).tolist()
+            result['ib_avg_max_loss'] = daily_avg['ib_max_loss'].tolist() if 'ib_max_loss' in daily_avg.columns else daily_avg.get('ib_max_loss_mean', [None]*len(daily_avg)).tolist()
+            result['ib_avg_pnl'] = daily_avg.get('ib_total_pnl_mean', [None]*len(daily_avg)).tolist()
+            result['ib_total_pnl'] = daily_avg.get('ib_total_pnl_sum', [None]*len(daily_avg)).tolist()
+            result['ib_trade_count'] = daily_avg.get('ib_total_pnl_count', [None]*len(daily_avg)).tolist()
+            result['ib_avg_wing'] = daily_avg['ib_wing_width'].tolist() if 'ib_wing_width' in daily_avg.columns else daily_avg.get('ib_wing_width_mean', [None]*len(daily_avg)).tolist()
+            
+            # Calculate win rate per day
+            win_rates = []
+            for d in daily_avg['date']:
+                day_data = df[df['date'] == d]
+                valid_ib = day_data[day_data['ib_total_pnl'].notna()]
+                if len(valid_ib) > 0:
+                    win_rate = (valid_ib['ib_total_pnl'] > 0).sum() / len(valid_ib) * 100
+                    win_rates.append(round(win_rate, 2))
+                else:
+                    win_rates.append(None)
+            result['ib_win_rate'] = win_rates
+            
+            # Add IB P&L trend line
+            ib_pnl_series = pd.Series(result['ib_avg_pnl']).dropna()
+            if len(ib_pnl_series) >= 2:
+                result['trend_ib_pnl'] = self._calculate_trend_line(ib_pnl_series)
+            else:
+                result['trend_ib_pnl'] = {'slope': 0, 'intercept': 0, 'r_squared': 0}
+        
+        return result
     
     def _generate_chart5_data(self, df: pd.DataFrame) -> Dict:
         """
@@ -585,7 +944,7 @@ class OptionsAnalyzer:
         logger.info(f"All CSV files exported to {output_dir}")
     
     def _export_raw_data(self, output_dir: str, df: pd.DataFrame):
-        """Export raw analysis data"""
+        """Export raw analysis data (includes Iron Butterfly data in same file)"""
         raw_file = os.path.join(output_dir, 'raw_analysis_data.csv')
         df.to_csv(raw_file, index=False)
         logger.info(f"Exported raw data to {raw_file}")
@@ -609,8 +968,21 @@ class OptionsAnalyzer:
         logger.info("Exported chart 1 data")
     
     def _export_chart2(self, output_dir: str, chart2_data: Dict):
-        """Export chart 2 data"""
-        pd.DataFrame(chart2_data).to_csv(
+        """Export chart 2 data (average decay curve with IB averages)"""
+        export_dict = {
+            'time_of_day': chart2_data['time_of_day'],
+            'time_remaining': chart2_data['time_remaining'],
+            'avg_implied': chart2_data['avg_implied'],
+            'avg_realized': chart2_data['avg_realized']
+        }
+        
+        # Add IB columns if present
+        for key in ['ib_avg_premium', 'ib_avg_max_loss', 'ib_avg_wing_width', 
+                    'ib_avg_pnl', 'ib_total_pnl', 'ib_trade_count', 'ib_avg_ratio', 'ib_win_rate']:
+            if key in chart2_data:
+                export_dict[key] = chart2_data[key]
+        
+        pd.DataFrame(export_dict).to_csv(
             os.path.join(output_dir, 'chart2_average_decay_curve.csv'),
             index=False
         )
@@ -631,8 +1003,8 @@ class OptionsAnalyzer:
         logger.info("Exported chart 3 data")
     
     def _export_chart4(self, output_dir: str, chart4_data: Dict):
-        """Export chart 4 data with proper flattening"""
-        chart4_df = pd.DataFrame({
+        """Export chart 4 data with proper flattening (includes IB daily averages)"""
+        export_dict = {
             'date': chart4_data['dates'],
             'avg_implied': chart4_data['avg_implied'],
             'avg_realized': chart4_data['avg_realized'],
@@ -642,8 +1014,21 @@ class OptionsAnalyzer:
             'trend_realized_slope': chart4_data['trend_realized']['slope'],
             'trend_realized_intercept': chart4_data['trend_realized']['intercept'],
             'trend_realized_r_squared': chart4_data['trend_realized']['r_squared']
-        })
-        chart4_df.to_csv(
+        }
+        
+        # Add IB columns if present
+        for key in ['ib_avg_premium', 'ib_avg_max_loss', 'ib_avg_pnl', 'ib_total_pnl', 
+                    'ib_trade_count', 'ib_avg_wing', 'ib_win_rate']:
+            if key in chart4_data:
+                export_dict[key] = chart4_data[key]
+        
+        # Add IB trend if available
+        if 'trend_ib_pnl' in chart4_data:
+            export_dict['trend_ib_pnl_slope'] = chart4_data['trend_ib_pnl']['slope']
+            export_dict['trend_ib_pnl_intercept'] = chart4_data['trend_ib_pnl']['intercept']
+            export_dict['trend_ib_pnl_r_squared'] = chart4_data['trend_ib_pnl']['r_squared']
+        
+        pd.DataFrame(export_dict).to_csv(
             os.path.join(output_dir, 'chart4_daily_averages.csv'),
             index=False
         )
@@ -683,7 +1068,7 @@ class OptionsAnalyzer:
             'average_realized_move': float(df['realized_move'].mean()),
             'implied_std': float(df['implied_move'].std()),
             'realized_std': float(df['realized_move'].std()),
-            'implied_over_realized_ratio': float(df['implied_move'].mean() / df['realized_move'].mean()),
+            'implied_over_realized_ratio': float(df['implied_move'].mean() / df['realized_move'].mean()) if df['realized_move'].mean() != 0 else 0,
             'correlation': float(df['implied_move'].corr(df['realized_move'])),
             'config': {
                 'start_date': self.config.start_date.strftime('%Y-%m-%d'),
@@ -694,5 +1079,21 @@ class OptionsAnalyzer:
                 'batch_size': self.config.batch_size
             }
         }
+
+        # Add Iron Butterfly statistics from main DataFrame
+        if 'ib_total_pnl' in df.columns:
+            valid_ib = df[df['ib_total_pnl'].notna()]
+            if len(valid_ib) > 0:
+                stats['iron_butterfly'] = {
+                    'total_trades': len(valid_ib),
+                    'trade_size': int(valid_ib['ib_trade_size'].iloc[0]),
+                    'win_rate': float((valid_ib['ib_total_pnl'] > 0).sum() / len(valid_ib) * 100),
+                    'avg_unit_pnl': float(valid_ib['ib_unit_pnl'].mean()),
+                    'avg_total_pnl': float(valid_ib['ib_total_pnl'].mean()),
+                    'sum_total_pnl': float(valid_ib['ib_total_pnl'].sum()),
+                    'avg_premium': float(valid_ib['ib_net_premium'].mean()),
+                    'avg_max_loss': float(valid_ib['ib_max_loss'].mean()),
+                    'avg_wing_width': float(valid_ib['ib_wing_width'].mean()),
+                }
         
         return stats

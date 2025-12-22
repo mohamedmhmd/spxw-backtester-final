@@ -105,6 +105,15 @@ class StrategyConfig:
     analysis_dte: int = 0
     option_underlying: str = "I:SPX"
     strike_price_intervals: int = 5
+
+    # In the StrategyConfig dataclass, add after the existing analysis parameters:
+
+    # Iron Butterfly Analysis parameters (for Analytics)
+    ib_analysis_enabled: bool = True  # Enable Iron Butterfly calculations in analysis
+    ib_analysis_min_wing_width: int = 15  # Min wing width for IB in analysis
+    ib_analysis_max_wing_width: int = 70  # Max wing width for IB in analysis
+    ib_analysis_target_win_loss_ratio: float = 1.5  # Target win/loss ratio for IB
+    ib_analysis_trade_size: int = 10
     
     
     
@@ -198,7 +207,13 @@ class StrategyConfig:
             'analysis_bar_minutes': self.analysis_bar_minutes,
             'analysis_dte': self.analysis_dte,
             'option_underlying': self.option_underlying,
-            'strike_price_intervals': self.strike_price_intervals
+            'strike_price_intervals': self.strike_price_intervals,
+
+            'ib_analysis_enabled': self.ib_analysis_enabled,
+            'ib_analysis_min_wing_width': self.ib_analysis_min_wing_width,
+            'ib_analysis_max_wing_width': self.ib_analysis_max_wing_width,
+            'ib_analysis_target_win_loss_ratio': self.ib_analysis_target_win_loss_ratio,
+            'ib_analysis_trade_size': self.ib_analysis_trade_size,
             
             
 

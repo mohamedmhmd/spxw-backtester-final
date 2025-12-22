@@ -55,7 +55,13 @@ class BacktestEngine:
               bar_minutes=strategy.analysis_bar_minutes,
               dte =strategy.analysis_dte,
               underlying=strategy.option_underlying,
-              strike_interval=strategy.strike_price_intervals)
+              strike_interval=strategy.strike_price_intervals,
+              ib_enabled=getattr(strategy, 'ib_analysis_enabled', True),
+              ib_min_wing_width=getattr(strategy, 'ib_analysis_min_wing_width', 15),
+              ib_max_wing_width=getattr(strategy, 'ib_analysis_max_wing_width', 70),
+              ib_target_win_loss_ratio=getattr(strategy, 'ib_analysis_target_win_loss_ratio', 1.5),
+              ib_trade_size=getattr(strategy, 'ib_analysis_trade_size', 10),
+              ib_commission_per_contract=config.commission_per_contract,)
               
           option_analyzer = OptionsAnalyzer(self.data_provider, analysis_config)
           await option_analyzer.fetch_all_data()

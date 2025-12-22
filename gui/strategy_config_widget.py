@@ -658,6 +658,42 @@ class StrategyConfigWidget(QWidget):
             self.strike_price_intervals.setToolTip("Strike price intervals for option analysis")
             layout.addRow("Strike Price Intervals:", self.strike_price_intervals)
 
+            # Iron Butterfly Analysis section
+            ib_analysis_label = QLabel("=== IRON BUTTERFLY ANALYSIS ===")
+            ib_analysis_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+            layout.addRow(ib_analysis_label)
+
+            
+            self.ib_analysis_enabled = QCheckBox()
+            self.ib_analysis_enabled.setChecked(True)
+            self.ib_analysis_enabled.setToolTip("Enable Iron Butterfly trade simulation at each interval")
+            layout.addRow("Enable IB Analysis:", self.ib_analysis_enabled)
+
+            self.ib_analysis_trade_size = QSpinBox()
+            self.ib_analysis_trade_size.setRange(1, 1000)
+            self.ib_analysis_trade_size.setValue(10)
+            self.ib_analysis_trade_size.setToolTip("Number of contracts per Iron Butterfly trade")
+            layout.addRow("IB Trade Size:", self.ib_analysis_trade_size)
+            
+            self.ib_analysis_min_wing_width = QSpinBox()
+            self.ib_analysis_min_wing_width.setRange(5, 200)
+            self.ib_analysis_min_wing_width.setValue(15)
+            self.ib_analysis_min_wing_width.setToolTip("Minimum wing width for Iron Butterfly")
+            layout.addRow("IB Min Wing Width:", self.ib_analysis_min_wing_width)
+            
+            self.ib_analysis_max_wing_width = QSpinBox()
+            self.ib_analysis_max_wing_width.setRange(10, 300)
+            self.ib_analysis_max_wing_width.setValue(70)
+            self.ib_analysis_max_wing_width.setToolTip("Maximum wing width for Iron Butterfly")
+            layout.addRow("IB Max Wing Width:", self.ib_analysis_max_wing_width)
+            
+            self.ib_analysis_target_win_loss_ratio = QDoubleSpinBox()
+            self.ib_analysis_target_win_loss_ratio.setRange(0.1, 10.0)
+            self.ib_analysis_target_win_loss_ratio.setSingleStep(0.1)
+            self.ib_analysis_target_win_loss_ratio.setValue(1.5)
+            self.ib_analysis_target_win_loss_ratio.setToolTip("Target win/loss ratio for wing selection")
+            layout.addRow("IB Target Win/Loss Ratio:", self.ib_analysis_target_win_loss_ratio)
+
 
 
 
@@ -827,6 +863,11 @@ class StrategyConfigWidget(QWidget):
                 analysis_dte=self.analysis_dte.value(),
                 option_underlying=self.option_underlying.text(),
                 strike_price_intervals=self.strike_price_intervals.value(),
+                ib_analysis_enabled=self.ib_analysis_enabled.isChecked(),
+                ib_analysis_min_wing_width=self.ib_analysis_min_wing_width.value(),
+                ib_analysis_max_wing_width=self.ib_analysis_max_wing_width.value(),
+                ib_analysis_target_win_loss_ratio=self.ib_analysis_target_win_loss_ratio.value(),
+                ib_analysis_trade_size=self.ib_analysis_trade_size.value(),  # NEW
             )
     
     def set_config(self, config: StrategyConfig):
