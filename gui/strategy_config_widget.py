@@ -670,30 +670,44 @@ class StrategyConfigWidget(QWidget):
             layout.addRow("Enable IB Analysis:", self.ib_analysis_enabled)
 
             self.ib_analysis_trade_size = QSpinBox()
-            self.ib_analysis_trade_size.setRange(1, 1000)
+            self.ib_analysis_trade_size.setRange(0, 1000000000)
             self.ib_analysis_trade_size.setValue(10)
             self.ib_analysis_trade_size.setToolTip("Number of contracts per Iron Butterfly trade")
             layout.addRow("IB Trade Size:", self.ib_analysis_trade_size)
             
             self.ib_analysis_min_wing_width = QSpinBox()
-            self.ib_analysis_min_wing_width.setRange(5, 200)
+            self.ib_analysis_min_wing_width.setRange(0, 10000000)
             self.ib_analysis_min_wing_width.setValue(15)
             self.ib_analysis_min_wing_width.setToolTip("Minimum wing width for Iron Butterfly")
             layout.addRow("IB Min Wing Width:", self.ib_analysis_min_wing_width)
             
             self.ib_analysis_max_wing_width = QSpinBox()
-            self.ib_analysis_max_wing_width.setRange(10, 300)
+            self.ib_analysis_max_wing_width.setRange(0, 300000000)
             self.ib_analysis_max_wing_width.setValue(70)
             self.ib_analysis_max_wing_width.setToolTip("Maximum wing width for Iron Butterfly")
             layout.addRow("IB Max Wing Width:", self.ib_analysis_max_wing_width)
             
             self.ib_analysis_target_win_loss_ratio = QDoubleSpinBox()
-            self.ib_analysis_target_win_loss_ratio.setRange(0.1, 10.0)
+            self.ib_analysis_target_win_loss_ratio.setRange(0.0, 10000000.0)
             self.ib_analysis_target_win_loss_ratio.setSingleStep(0.1)
             self.ib_analysis_target_win_loss_ratio.setValue(1.5)
             self.ib_analysis_target_win_loss_ratio.setToolTip("Target win/loss ratio for wing selection")
             layout.addRow("IB Target Win/Loss Ratio:", self.ib_analysis_target_win_loss_ratio)
 
+            # Time segment exclusion toggles
+            exclusion_label = QLabel("=== TIME SEGMENT EXCLUSIONS ===")
+            exclusion_label.setStyleSheet("font-weight: bold; color: blue; margin-top: 15px;")
+            layout.addRow(exclusion_label)
+
+            self.exclude_first_interval = QCheckBox()
+            self.exclude_first_interval.setChecked(True)
+            self.exclude_first_interval.setToolTip("Exclude the first time interval (9:30 AM) from analysis")
+            layout.addRow("Exclude First Interval (9:30 AM):", self.exclude_first_interval)
+
+            self.exclude_last_interval = QCheckBox()
+            self.exclude_last_interval.setChecked(True)
+            self.exclude_last_interval.setToolTip("Exclude the last time interval (4:00 PM) from analysis")
+            layout.addRow("Exclude Last Interval (4:00 PM):", self.exclude_last_interval)
 
 
 
@@ -868,6 +882,9 @@ class StrategyConfigWidget(QWidget):
                 ib_analysis_max_wing_width=self.ib_analysis_max_wing_width.value(),
                 ib_analysis_target_win_loss_ratio=self.ib_analysis_target_win_loss_ratio.value(),
                 ib_analysis_trade_size=self.ib_analysis_trade_size.value(),  # NEW
+                exclude_first_interval=self.exclude_first_interval.isChecked(),
+                exclude_last_interval=self.exclude_last_interval.isChecked(),
+
             )
     
     def set_config(self, config: StrategyConfig):

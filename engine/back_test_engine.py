@@ -61,7 +61,9 @@ class BacktestEngine:
               ib_max_wing_width=getattr(strategy, 'ib_analysis_max_wing_width', 70),
               ib_target_win_loss_ratio=getattr(strategy, 'ib_analysis_target_win_loss_ratio', 1.5),
               ib_trade_size=getattr(strategy, 'ib_analysis_trade_size', 10),
-              ib_commission_per_contract=config.commission_per_contract,)
+              ib_commission_per_contract=config.commission_per_contract,
+              exclude_first_interval=strategy.exclude_first_interval,
+              exclude_last_interval=strategy.exclude_last_interval)
               
           option_analyzer = OptionsAnalyzer(self.data_provider, analysis_config)
           await option_analyzer.fetch_all_data()

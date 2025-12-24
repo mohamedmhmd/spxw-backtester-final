@@ -114,9 +114,11 @@ class StrategyConfig:
     ib_analysis_max_wing_width: int = 70  # Max wing width for IB in analysis
     ib_analysis_target_win_loss_ratio: float = 1.5  # Target win/loss ratio for IB
     ib_analysis_trade_size: int = 10
-    
-    
-    
+
+    # Time segment exclusion parameters
+    exclude_first_interval: bool = False  # Exclude 9:30 AM data
+    exclude_last_interval: bool = False   # Exclude 4:00 PM data
+
     def to_dict(self) -> dict:
         return {
             'name': self.name,
@@ -214,6 +216,8 @@ class StrategyConfig:
             'ib_analysis_max_wing_width': self.ib_analysis_max_wing_width,
             'ib_analysis_target_win_loss_ratio': self.ib_analysis_target_win_loss_ratio,
             'ib_analysis_trade_size': self.ib_analysis_trade_size,
+            'exclude_first_interval': self.exclude_first_interval,
+            'exclude_last_interval': self.exclude_last_interval,
             
             
 

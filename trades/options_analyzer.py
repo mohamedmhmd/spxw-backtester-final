@@ -33,6 +33,8 @@ class AnalysisConfig:
     ib_target_win_loss_ratio: float = 1.5
     ib_trade_size: int = 10
     ib_commission_per_contract: float = 0.65
+    exclude_first_interval: bool = True
+    exclude_last_interval: bool = True
 
 class OptionsAnalyzer:
     """
@@ -120,6 +122,7 @@ class OptionsAnalyzer:
         Calculate implied moves for all time intervals with maximum parallelization.
         Returns DataFrame with columns: date, timestamp, spx_price, implied_move, and IB trade details
         """
+        self.reset_analysis()
         if not self.spx_data:
             logger.warning("No SPX data available for analysis")
             return pd.DataFrame()
@@ -247,6 +250,16 @@ class OptionsAnalyzer:
                     row['ib_total_pnl'] = ib_data.get('ib_total_pnl')
                     row['ib_total_pnl_without_commission'] = ib_data.get('ib_total_pnl_without_commission')
                     row['ib_result'] = ib_data.get('ib_result')
+                    # Add after line 248 (inside the "if key in ib_results_dict:" block)
+                    row['ib_contract_representation'] = ib_data.get('ib_contract_representation')
+                    row['ib_short_call_leg'] = ib_data.get('ib_short_call_leg')
+                    row['ib_short_put_leg'] = ib_data.get('ib_short_put_leg')
+                    row['ib_long_call_leg'] = ib_data.get('ib_long_call_leg')
+                    row['ib_long_put_leg'] = ib_data.get('ib_long_put_leg')
+                    row['ib_short_call_bid'] = ib_data.get('ib_short_call_bid')
+                    row['ib_short_put_bid'] = ib_data.get('ib_short_put_bid')
+                    row['ib_long_call_ask'] = ib_data.get('ib_long_call_ask')
+                    row['ib_long_put_ask'] = ib_data.get('ib_long_put_ask')
                 else:
                     row['ib_atm_strike'] = None
                     row['ib_wing_width'] = None
@@ -261,6 +274,16 @@ class OptionsAnalyzer:
                     row['ib_total_pnl'] = None
                     row['ib_total_pnl_without_commission'] = None
                     row['ib_result'] = None
+                    # Add in the "else" block (around line 251-263), add None values for these columns:
+                    row['ib_contract_representation'] = None
+                    row['ib_short_call_leg'] = None
+                    row['ib_short_put_leg'] = None
+                    row['ib_long_call_leg'] = None
+                    row['ib_long_put_leg'] = None
+                    row['ib_short_call_bid'] = None
+                    row['ib_short_put_bid'] = None
+                    row['ib_long_call_ask'] = None
+                    row['ib_long_put_ask'] = None
                 
                 results.append(row)
             
@@ -284,11 +307,26 @@ class OptionsAnalyzer:
     
     def _filter_to_intervals(self, df: pd.DataFrame) -> pd.DataFrame:
         """Filter DataFrame to only include rows at specified minute intervals"""
-        # Create a mask for the specified intervals
         df = df.copy()
         df['minute_of_day'] = (df['timestamp'].dt.hour - 9) * 60 + (df['timestamp'].dt.minute - 30)
         interval_mask = df['minute_of_day'] % self.config.bar_minutes == 0
-        return df[interval_mask].copy()
+    
+        filtered_df = df[interval_mask].copy()
+    
+        # Apply time segment exclusions
+        if self.config.exclude_first_interval:
+           filtered_df = filtered_df[filtered_df['minute_of_day'] > 0]
+    
+        if self.config.exclude_last_interval:
+           filtered_df = filtered_df[filtered_df['minute_of_day'] < 390]
+    
+        return filtered_df
+    
+    def reset_analysis(self):
+        """Reset analysis state for a fresh run"""
+        self.analysis_results = None
+        self.implied_moves = []
+        self.realized_moves = []
     
     def _calculate_time_remaining(self, timestamp: pd.Timestamp) -> int:
         """Calculate minutes remaining until market close (4:00 PM)"""
@@ -607,6 +645,16 @@ class OptionsAnalyzer:
                 'ib_total_pnl': trade.pnl,
                 'ib_total_pnl_without_commission': trade.pnl_without_commission,
                 'ib_result': 'WIN' if trade.pnl > 0 else 'LOSS',
+                # Add after line 609 (before the closing brace)
+                'ib_contract_representation': f"{atm_strike - best_d}/{atm_strike}  {atm_strike}/{atm_strike + best_d} ({best_d})",
+                'ib_short_call_leg': f"Short Call - {atm_strike}",
+                'ib_short_put_leg': f"Short Put - {atm_strike}",
+                'ib_long_call_leg': f"Long Call - {atm_strike + best_d}",
+                'ib_long_put_leg': f"Long Put - {atm_strike - best_d}",
+                'ib_short_call_bid': best_quotes['short_call']['bid'],
+                'ib_short_put_bid': best_quotes['short_put']['bid'],
+                'ib_long_call_ask': best_quotes['long_call']['ask'],
+                'ib_long_put_ask': best_quotes['long_put']['ask'],
             }
             
         except Exception as e:
