@@ -165,7 +165,7 @@ class OptionsAnalyzer:
             # Create tasks for parallel implied move calculations
             for idx, (_, row) in enumerate(interval_data.iterrows()):
                 timestamp = row['timestamp']
-                spx_price = row['close']
+                spx_price = row['open']
                 
                 # Create task for implied move calculation
                 implied_task = self._calculate_single_implied_move(date, timestamp, spx_price)
