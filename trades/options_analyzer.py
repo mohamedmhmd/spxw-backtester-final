@@ -230,7 +230,7 @@ class OptionsAnalyzer:
                     'spx_price': metadata['spx_price'],
                     'realized_move': metadata['realized_move'],
                     'closing_price': metadata['closing_price'],
-                    'implied_move': implied_move if implied_move else 0.0,
+                    'implied_move': implied_move if implied_move else np.nan,
                 }
                 
                 # Add IB data if available for this timestamp
@@ -375,7 +375,7 @@ class OptionsAnalyzer:
                 if abs(spx_price - atm_strike) <= 1.0:
                     # Use simple ATM straddle calculation
                     straddle_value = await self._calculate_atm_straddle(date, timestamp, atm_strike, spx_price)
-                    intrinsic = max(0, spx_price - atm_strike)
+                    intrinsic = abs(spx_price - atm_strike)
                     return straddle_value - intrinsic
                 else:
                     # Use linear interpolation between strikes
@@ -383,7 +383,7 @@ class OptionsAnalyzer:
                     
             except Exception as e:
                 logger.error(f"Error calculating implied move: {e}")
-                return 0.0
+                return np.nan
     
     def _get_atm_strike(self, spx_price: float) -> int:
         """Get the nearest at-the-money strike price"""
