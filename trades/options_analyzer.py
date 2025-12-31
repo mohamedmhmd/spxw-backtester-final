@@ -335,24 +335,18 @@ class OptionsAnalyzer:
         return max(0, int(remaining))
     
     async def _get_closing_price(self, date: datetime) -> Optional[float]:
-        """Get closing price for a given date, considering DTE"""
-        async with self._semaphore:
-            target_date = date
-            
-            # Adjust for DTE (Days to Expiration)
-            if self.config.dte > 0:
-                # Find the next trading day(s) based on DTE
-                for _ in range(self.config.dte):
-                    target_date = self._get_next_trading_day(target_date)
-            
-            # Get closing price from cached data or fetch if needed
-            if target_date in self.spx_data:
-                df = self.spx_data[target_date]
-                if not df.empty:
-                    return df.iloc[-1]['close']
-            
-            # If not in cache, fetch from Polygon
-            return await self.provider.get_sp_closing_price(target_date, self.config.underlying)
+          """Get closing price for a given date, considering DTE"""
+          async with self._semaphore:
+                target_date = date
+        
+                # Adjust for DTE (Days to Expiration)
+                if self.config.dte > 0:
+                   # Find the next trading day(s) based on DTE
+                   for _ in range(self.config.dte):
+                            target_date = self._get_next_trading_day(target_date)
+        
+                # Always fetch official daily close from Polygon (not last intraday bar)
+                return await self.provider.get_sp_closing_price(target_date, self.config.underlying)
     
     def _get_next_trading_day(self, date: datetime) -> datetime:
         """Get next trading day (skip weekends)"""
