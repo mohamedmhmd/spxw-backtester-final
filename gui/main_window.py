@@ -1,6 +1,8 @@
 from datetime import datetime
+from email import message
 import json
 import os
+from matplotlib.pyplot import title
 import pandas as pd
 import logging
 import asyncio
@@ -19,6 +21,17 @@ import copy
 import sys
 import platform
 import xlsxwriter
+
+# Live Trading imports
+from guardrails.kill_switch import KillSwitch
+from guardrails.risk_limits import RiskLimitsManager, RiskLimitsConfig
+from guardrails.approval_gate import ApprovalGate, ApprovalMode
+from gui.live.live_trading_panel import LiveTradingPanel
+from gui.live.kill_switch_widget import KillSwitchToolbarWidget
+# Only import if you have the IBKR components from Milestone 1:
+from execution.ibkr_connection import IBKRConnection
+from config.ibkr_config import IBKRConfig
+from execution.trade_constructor import LiveTradeConstructor
 
 
 # Set up logging
@@ -82,6 +95,22 @@ class MainWindow(QMainWindow):
         self.last_results = None  # Initialize this to store results
         self.chart_data = None
         self.connection_worker = None
+        # Live trading components
+        self.kill_switch = KillSwitch()  # Initialize kill switch singleton
+        self.live_trading_panel = None
+        self.live_mode_active = False
+        # Add risk manager and approval gate
+        self.risk_limits_config = RiskLimitsConfig(
+            max_contracts_per_trade=10,
+            max_contracts_per_day=50,
+            max_loss_per_day=10000.0,
+            max_iron_condors_per_day=3,
+        )
+        self.risk_manager = RiskLimitsManager(self.risk_limits_config, self.kill_switch)
+        self.approval_gate = ApprovalGate(mode=ApprovalMode.MANUAL)
+        
+        # Reference to left panel for hiding
+        self.left_panel_widget = None
         logger.info(f"Platform: {platform.system()} {platform.release()}")
         logger.info(f"Python: {sys.version}")
         
@@ -122,6 +151,13 @@ class MainWindow(QMainWindow):
         # Status bar
         self.status_bar = self.statusBar()
         self.status_bar.showMessage("Ready")
+
+        # Add kill switch indicator to toolbar/statusbar
+        from gui.live.kill_switch_widget import KillSwitchToolbarWidget
+        
+        self.kill_switch_toolbar = KillSwitchToolbarWidget(self.kill_switch)
+        self.kill_switch_toolbar.clicked.connect(self._toggle_kill_switch_from_menu)
+        self.status_bar.addPermanentWidget(self.kill_switch_toolbar)
         
         # Menu bar
         self._create_menu_bar()
@@ -148,6 +184,29 @@ class MainWindow(QMainWindow):
     
         # Show completion message
         self.status_bar.showMessage("Backtest completed.", 5000)
+
+    def _show_trade_notification(self, title: str, message: str):
+       """
+    Show notification when trade is pending approval.
+    
+    You can customize this to:
+    - Show desktop popup
+    - Play sound
+    - Send to Telegram
+    - etc.
+       """
+      # Option 1: Message box (blocks UI - not recommended)
+    # QMessageBox.information(self, title, message)
+    
+    # Option 2: Status bar message (non-blocking)
+       self.status_bar.showMessage(f"🔔 {title}", 10000)
+    
+       # Option 3: Log it
+       logger.info(f"NOTIFICATION: {title}\n{message}")
+    
+    # Option 4: System tray notification (if you have tray icon)
+    # if hasattr(self, 'tray_icon'):
+    #     self.tray_icon.showMessage(title, message)
     
     def _create_left_panel(self):
         """Create configuration panel"""
@@ -290,6 +349,7 @@ class MainWindow(QMainWindow):
         
         layout.addStretch()
         panel.setLayout(layout)
+        self.left_panel_widget = panel  # Store reference for live mode toggle
         return panel
     
     def get_selected_strategy(self):
@@ -339,40 +399,204 @@ class MainWindow(QMainWindow):
         
         logger.info(f"Strategy changed to: {strategy}")
         self.status_bar.showMessage(f"Strategy changed to: {strategy}", 3000)
+
+
+    def _toggle_live_mode(self, checked: bool):
+        """
+        Toggle between backtest and live trading mode.
+        
+        When live mode is active:
+        - Left panel (backtest config) is HIDDEN
+        - Results widget is HIDDEN  
+        - Live trading panel REPLACES them both
+        """
+        self.live_mode_active = checked
+        
+        if checked:
+            self._show_live_trading_panel()
+            self.status_bar.showMessage("🔴 LIVE TRADING MODE ACTIVE", 5000)
+            logger.info("Switched to LIVE TRADING mode")
+        else:
+            self._show_backtest_panel()
+            self.status_bar.showMessage("📊 Backtest Mode Active", 3000)
+            logger.info("Switched to BACKTEST mode")
+    
+    def _show_live_trading_panel(self):
+        """Show the live trading panel (hides backtest UI completely)"""
+        central_widget = self.centralWidget()
+        if not central_widget:
+            return
+        
+        main_layout = central_widget.layout()
+        if not main_layout:
+            return
+        
+        # HIDE the left panel (backtest config)
+        if self.left_panel_widget:
+            self.left_panel_widget.hide()
+        
+        # HIDE the results widget
+        if hasattr(self, 'results_widget') and self.results_widget:
+            self.results_widget.hide()
+        
+        # CREATE live trading panel if it doesn't exist
+        if not self.live_trading_panel:
+            self.live_trading_panel = LiveTradingPanel()
+            
+            # Inject components
+            self.live_trading_panel.set_components(
+                kill_switch=self.kill_switch,
+                ibkr_connection=None,  # Will be set when connected
+                risk_manager=self.risk_manager,
+                approval_gate=self.approval_gate,
+                trade_constructor=None,  # Will be set when connected
+            )
+            
+            # Connect signals
+            self.live_trading_panel.connection_changed.connect(
+                self._on_live_connection_changed
+            )
+            self.live_trading_panel.ready_to_trade.connect(
+                self._on_ready_to_trade_changed
+            )
+            
+            # Add to layout - takes the FULL width (stretch factor 4 = whole area)
+            main_layout.addWidget(self.live_trading_panel, 4)
+        else:
+            self.live_trading_panel.show()
+        
+        # Update window title
+        self.setWindowTitle("SPX 0DTE Options - LIVE TRADING")
+    
+    def _show_backtest_panel(self):
+        """Show the backtest panel (hides live trading UI)"""
+        # HIDE live trading panel
+        if self.live_trading_panel:
+            self.live_trading_panel.hide()
+        
+        # SHOW left panel (backtest config)
+        if self.left_panel_widget:
+            self.left_panel_widget.show()
+        
+        # SHOW results widget
+        if hasattr(self, 'results_widget') and self.results_widget:
+            self.results_widget.show()
+        
+        # Update window title
+        self.setWindowTitle("SPX 0DTE Options Backtester")
+    
+    def _on_live_connection_changed(self, connected: bool):
+        """Handle live trading connection changes"""
+        if connected:
+            self.status_bar.showMessage("🟢 IBKR Connected", 3000)
+        else:
+            self.status_bar.showMessage("🔴 IBKR Disconnected", 3000)
+    
+    def _on_ready_to_trade_changed(self, ready: bool):
+        """Handle ready to trade status changes"""
+        if ready:
+            self.status_bar.showMessage("✅ System Ready for Live Trading", 3000)
+        else:
+            self.status_bar.showMessage("⚠️ Live Trading Not Ready", 3000)
     
     def _create_menu_bar(self):
         """Create menu bar"""
         menubar = self.menuBar()
         
-        # File menu
-        file_menu = menubar.addMenu('File')
+        # ... existing File menu code ...
         
-        save_config_action = QAction('Save Configuration', self)
-        save_config_action.triggered.connect(self.save_configuration)
-        file_menu.addAction(save_config_action)
+        # ADD THIS after File menu, before Help menu:
         
-        load_config_action = QAction('Load Configuration', self)
-        load_config_action.triggered.connect(self.load_configuration)
-        file_menu.addAction(load_config_action)
+        # Trading menu
+        trading_menu = menubar.addMenu('Trading')
         
-        file_menu.addSeparator()
+        # Live Trading Mode toggle
+        self.live_trading_action = QAction('🔴 Live Trading Mode', self)
+        self.live_trading_action.setCheckable(True)
+        self.live_trading_action.setChecked(False)
+        self.live_trading_action.triggered.connect(self._toggle_live_mode)
+        self.live_trading_action.setShortcut('Ctrl+L')
+        trading_menu.addAction(self.live_trading_action)
         
-        export_results_action = QAction('Export Results', self)
-        export_results_action.triggered.connect(self.export_results)
-        file_menu.addAction(export_results_action)
+        trading_menu.addSeparator()
         
-        file_menu.addSeparator()
+        # Kill switch shortcut
+        kill_switch_action = QAction('Toggle Kill Switch', self)
+        kill_switch_action.setShortcut('Ctrl+K')
+        kill_switch_action.triggered.connect(self._toggle_kill_switch_from_menu)
+        trading_menu.addAction(kill_switch_action)
         
-        exit_action = QAction('Exit', self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
+        # Cancel all orders
+        cancel_all_action = QAction('Cancel All Orders', self)
+        cancel_all_action.setShortcut('Ctrl+Shift+C')
+        cancel_all_action.triggered.connect(self._cancel_all_orders_from_menu)
+        trading_menu.addAction(cancel_all_action)
         
-        # Help menu
-        help_menu = menubar.addMenu('Help')
+        trading_menu.addSeparator()
         
-        about_action = QAction('About', self)
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
+        # Reset daily state
+        reset_day_action = QAction('Reset Daily State', self)
+        reset_day_action.triggered.connect(self._reset_daily_state)
+        trading_menu.addAction(reset_day_action)
+
+    def _toggle_kill_switch_from_menu(self):
+        """Toggle kill switch from menu/keyboard"""
+        if self.kill_switch.is_engaged():
+            result = QMessageBox.question(
+                self,
+                "Disengage Kill Switch",
+                "Are you sure you want to disengage the kill switch?\\n\\n"
+                "This will allow trading to resume.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if result == QMessageBox.StandardButton.Yes:
+                self.kill_switch.disengage("menu")
+        else:
+            self.kill_switch.engage()
+    
+    def _cancel_all_orders_from_menu(self):
+        """Cancel all orders from menu"""
+        result = QMessageBox.question(
+            self,
+            "Cancel All Orders",
+            "Cancel all open orders and pending approvals?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if result == QMessageBox.StandardButton.Yes:
+            # Cancel pending approvals
+            if self.approval_gate:
+                count = self.approval_gate.cancel_all()
+                logger.info(f"Cancelled {count} pending approvals")
+            
+            # Cancel IBKR orders (when connected)
+            if self.live_trading_panel:
+                connection = self.live_trading_panel.ibkr_connection
+                if connection and connection.is_connected():
+                    count = connection.cancel_all_orders()
+                    logger.info(f"Cancelled {count} IBKR orders")
+            
+            self.status_bar.showMessage("All orders cancelled", 3000)
+    
+    def _reset_daily_state(self):
+        """Reset daily trading state"""
+        result = QMessageBox.question(
+            self,
+            "Reset Daily State",
+            "Reset all daily trading counters?\\n\\n"
+            "This will reset:\\n"
+            "• Daily contract count\\n"
+            "• Daily trade count\\n"
+            "• IC1/IC2/IC3 execution flags\\n"
+            "• Daily P&L tracking",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if result == QMessageBox.StandardButton.Yes:
+            if self.risk_manager:
+                self.risk_manager.reset_daily_counters()
+            if self.live_trading_panel:
+                self.live_trading_panel.reset_daily_state()
+            logger.info("Daily state reset")
+            self.status_bar.showMessage("Daily state reset", 3000)
     
     def setup_style(self):
         """Set up application style"""
