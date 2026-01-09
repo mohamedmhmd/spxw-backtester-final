@@ -20,6 +20,9 @@ import pandas as pd
 
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 import numpy as np
+from config.live_config import PolygonLiveConfig
+from data.polygon_data_provider import PolygonLiveDataProvider
+from trades.signal_checker import OptimizedSignalChecker
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,17 @@ class LiveEngineConfig:
     bar_size_minutes: int = 5               # Bar size for signal checking
     
     # Trading hours (EST)
+    trading_start: time = field(default_factory=lambda: time(9, 35))
+    trading_end: time = field(default_factory=lambda: time(15, 45))
+
+    scan_interval_seconds: int = 30  # Reduced - now just a fallback
+    bar_size_minutes: int = 5
+    
+    # Data source
+    use_polygon_live_data: bool = True  # Use WebSocket vs polling
+    polygon_config: PolygonLiveConfig = field(default_factory=PolygonLiveConfig)
+    
+    # Trading hours
     trading_start: time = field(default_factory=lambda: time(9, 35))
     trading_end: time = field(default_factory=lambda: time(15, 45))
     
@@ -110,7 +124,9 @@ class LiveTradingEngine(QObject):
         kill_switch,
         risk_manager,
         approval_gate,
-        trade_constructor
+        trade_constructor,
+        polygon_api_key: str
+
     ):
         super().__init__()
         
@@ -130,6 +146,14 @@ class LiveTradingEngine(QObject):
         self._ic2_trade = None
         self._ic3_trade = None
         self._daily_trades: List[Any] = []
+
+        self.polygon_live = PolygonLiveDataProvider(
+            api_key=polygon_api_key,
+            bar_size_minutes=config.bar_size_minutes
+        )
+        
+        # ADD: Flag for using Polygon vs IBKR for data
+        self.use_polygon_data = True  # Set to True to use Polygon WebSocket
         
         # Market data buffers
         self._spx_bars: pd.DataFrame = pd.DataFrame()
@@ -180,12 +204,17 @@ class LiveTradingEngine(QObject):
         # Reset daily state
         self._reset_daily_state()
         
-        # Start the loop
+        # Connect to Polygon if using it
+        if self.use_polygon_data:
+           asyncio.create_task(self.connect_polygon())
+    
+        # Start the loop (reduced frequency since Polygon pushes data)
+        # Polling interval is now just a fallback/health check
         interval_ms = self.config.scan_interval_seconds * 1000
         self._loop_timer.start(interval_ms)
-        
+    
         self._set_state(EngineState.RUNNING)
-        self._log(f"🚀 Engine STARTED - scanning every {self.config.scan_interval_seconds}s", "info")
+        self._log(f"🚀 Engine STARTED with Polygon live data", "info")
     
     def stop(self):
         """Stop the trading loop"""
@@ -247,9 +276,13 @@ class LiveTradingEngine(QObject):
         self._spx_bars = pd.DataFrame()
         self._spy_bars = pd.DataFrame()
         
+        # Clear Polygon buffers for new day
+        if hasattr(self, 'polygon_live') and self.polygon_live:
+           self.polygon_live.clear_buffers()
+    
         if self.risk_manager:
-            self.risk_manager.reset_daily_counters()
-        
+           self.risk_manager.reset_daily_counters()
+    
         self._log("📅 Daily state reset", "info")
     
     # =========================================================================
@@ -324,46 +357,65 @@ class LiveTradingEngine(QObject):
     # =========================================================================
     
     async def _fetch_market_data(self):
-        """Fetch latest SPX and SPY data from IBKR"""
-        try:
-            # Get current prices
-            spx_price = await self.ibkr.get_spx_price()
-            spy_price = await self.ibkr.get_spy_price()
+          """Fetch latest SPX and SPY data"""
+          try:
+             if self.use_polygon_data:
+            # Use Polygon live data
+                await self._fetch_polygon_data()
+             else:
+                # Use IBKR data (existing implementation)
+                await self._fetch_ibkr_data()
             
-            if spx_price:
-                self._current_spx_price = spx_price
-            if spy_price:
-                self._current_spy_price = spy_price
-            
-            # Get historical bars for signal checking
-            # (Need enough bars for lookback periods)
-            min_bars = max(
-                self.config.iron_1_consecutive_candles,
-                self.config.iron_1_lookback_candles,
-                self.config.iron_1_avg_range_candles
-            ) + 5  # Extra buffer
-            
-            spx_bars = await self.ibkr.get_historical_bars(
-                symbol='SPX',
-                bar_size=f'{self.config.bar_size_minutes} mins',
-                duration='1 D',
-                what_to_show='TRADES'
-            )
-            
-            spy_bars = await self.ibkr.get_historical_bars(
-                symbol='SPY',
-                bar_size=f'{self.config.bar_size_minutes} mins',
-                duration='1 D',
-                what_to_show='TRADES'
-            )
-            
-            if spx_bars is not None and len(spx_bars) > 0:
-                self._spx_bars = spx_bars
-            if spy_bars is not None and len(spy_bars) > 0:
-                self._spy_bars = spy_bars
-            self._update_signal_checker()
-        except Exception as e:
-            self._log(f"Error fetching market data: {e}", "error")
+          except Exception as e:
+             self._log(f"Error fetching market data: {e}", "error")
+
+    async def _fetch_polygon_data(self):
+          """Fetch data from Polygon WebSocket buffers"""
+          # Get latest prices
+          self._current_spx_price = self.polygon_live.get_latest_price('I:SPX')
+          self._current_spy_price = self.polygon_live.get_latest_price('SPY')
+    
+          # Get accumulated bars as DataFrames
+          spx_df = self.polygon_live.get_bars_dataframe('I:SPX')
+          spy_df = self.polygon_live.get_bars_dataframe('SPY')
+    
+          if len(spx_df) > 0:
+             self._spx_bars = spx_df
+          if len(spy_df) > 0:
+             self._spy_bars = spy_df
+    
+          # Update signal checker
+          self._update_signal_checker()
+
+
+    async def connect_polygon(self) -> bool:
+          """Connect to Polygon WebSocket feeds"""
+          if not await self.polygon_live.connect():
+             self._log("Failed to connect to Polygon", "error")
+             return False
+    
+          # Subscribe to SPX and SPY bars with callback
+          await self.polygon_live.subscribe_bars('I:SPX', self._on_new_bar)
+          await self.polygon_live.subscribe_bars('SPY', self._on_new_bar)
+    
+          self._log("Connected to Polygon live data", "info")
+          return True
+    
+    async def _on_new_bar(self, symbol: str, bar_data: dict):
+          """
+    Callback when new 5-minute bar completes.
+    This is the trigger for checking signals!
+         """
+          self._log(f"New {symbol} bar: {bar_data.get('close', 0):.2f}", "debug")
+    
+         # Only trigger signal check on SPX bar completion
+          if symbol == 'I:SPX':
+             # Update data
+             await self._fetch_polygon_data()
+        
+              # Check strategy signals
+             if self._state == EngineState.RUNNING:
+                await self._check_strategy_16()
     
     # =========================================================================
     # STRATEGY 16 LOGIC (adapted from your backtest)
@@ -538,7 +590,7 @@ class LiveTradingEngine(QObject):
         self._all_ranges = self._spx_high - self._spx_low
         self._all_directions = np.where(self._spx_close > self._spx_open, 1, -1)
         
-        self._signal_checker = True  # Flag that we have valid data
+        self._signal_checker = OptimizedSignalChecker(self._spx_bars, self._spy_bars)
     
     def _check_ic1_signals(self, bar_idx: int) -> bool:
         """

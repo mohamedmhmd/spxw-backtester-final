@@ -9,6 +9,11 @@ import gzip
 import logging
 import time
 import ssl
+import json
+from datetime import datetime, time as et_time
+from typing import Callable, Optional
+import websockets
+from collections import deque
 
 
 logging.basicConfig(
@@ -691,3 +696,445 @@ Add these methods to your existing PolygonDataProvider class.
            except Exception as e:
               logger.error(f"Error fetching market holidays: {e}")
               return []
+           
+
+class PolygonLiveDataProvider:
+    """
+    Polygon.io WebSocket live data provider for real-time aggregated bars.
+    
+    Uses Polygon's aggregated minute bars (AM.*) for SPX and SPY.
+    Accumulates bars throughout the trading day for signal checking.
+    
+    Usage:
+        provider = PolygonLiveDataProvider(api_key)
+        await provider.connect()
+        provider.subscribe_bars("I:SPX", callback_function)
+        provider.subscribe_bars("SPY", callback_function)
+    """
+    
+    # Polygon WebSocket endpoints
+    STOCKS_WS_URL = "wss://socket.polygon.io/stocks"
+    OPTIONS_WS_URL = "wss://socket.polygon.io/options"
+    INDICES_WS_URL = "wss://socket.polygon.io/indices"  # For SPX
+    
+    def __init__(self, api_key: str, bar_size_minutes: int = 5):
+        """
+        Initialize live data provider.
+        
+        Args:
+            api_key: Polygon.io API key
+            bar_size_minutes: Bar aggregation size (default 5 minutes)
+        """
+        self.api_key = api_key
+        self.bar_size_minutes = bar_size_minutes
+        
+        # WebSocket connections
+        self._stocks_ws = None
+        self._indices_ws = None
+        self._options_ws = None
+        
+        # Connection state
+        self._connected = False
+        self._running = False
+        
+        # Bar buffers - store today's bars for signal checking
+        # Key: symbol, Value: list of bar dicts
+        self._bar_buffers: Dict[str, deque] = {
+            'I:SPX': deque(maxlen=500),  # ~8 hours of 5-min bars
+            'SPY': deque(maxlen=500),
+        }
+        
+        # Current bar being built (for 5-min aggregation from 1-min bars)
+        self._current_bars: Dict[str, dict] = {}
+        
+        # Callbacks for new bars
+        self._bar_callbacks: Dict[str, List[Callable]] = {}
+        
+        # Last bar timestamps (for tracking 5-min completions)
+        self._last_bar_times: Dict[str, datetime] = {}
+        
+        # Latest prices
+        self._latest_prices: Dict[str, float] = {
+            'I:SPX': 0.0,
+            'SPY': 0.0,
+        }
+        
+        self.logger = logging.getLogger(__name__)
+    
+    # -------------------------------------------------------------------------
+    # CONNECTION MANAGEMENT
+    # -------------------------------------------------------------------------
+    
+    async def connect(self) -> bool:
+        """
+        Establish WebSocket connections to Polygon.
+        
+        Returns:
+            True if all connections successful
+        """
+        try:
+            self._running = True
+            
+            # Connect to indices (for SPX)
+            self._indices_ws = await websockets.connect(
+                self.INDICES_WS_URL,
+                ping_interval=30,
+                ping_timeout=10
+            )
+            await self._authenticate(self._indices_ws)
+            
+            # Connect to stocks (for SPY)
+            self._stocks_ws = await websockets.connect(
+                self.STOCKS_WS_URL,
+                ping_interval=30,
+                ping_timeout=10
+            )
+            await self._authenticate(self._stocks_ws)
+            
+            self._connected = True
+            self.logger.info("Connected to Polygon WebSocket feeds")
+            
+            # Start listening tasks
+            asyncio.create_task(self._listen_indices())
+            asyncio.create_task(self._listen_stocks())
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to connect to Polygon WebSocket: {e}")
+            self._connected = False
+            return False
+    
+    async def disconnect(self):
+        """Close all WebSocket connections"""
+        self._running = False
+        self._connected = False
+        
+        if self._indices_ws:
+            await self._indices_ws.close()
+        if self._stocks_ws:
+            await self._stocks_ws.close()
+        if self._options_ws:
+            await self._options_ws.close()
+        
+        self.logger.info("Disconnected from Polygon WebSocket feeds")
+    
+    async def _authenticate(self, ws):
+        """Authenticate WebSocket connection"""
+        auth_msg = {"action": "auth", "params": self.api_key}
+        await ws.send(json.dumps(auth_msg))
+        
+        response = await ws.recv()
+        data = json.loads(response)
+        
+        if isinstance(data, list) and len(data) > 0:
+            if data[0].get('status') == 'auth_success':
+                self.logger.info("WebSocket authentication successful")
+                return True
+        
+        raise Exception(f"WebSocket authentication failed: {data}")
+    
+    # -------------------------------------------------------------------------
+    # SUBSCRIPTIONS
+    # -------------------------------------------------------------------------
+    
+    async def subscribe_bars(self, symbol: str, callback: Optional[Callable] = None):
+        """
+        Subscribe to aggregated minute bars for a symbol.
+        
+        Args:
+            symbol: "I:SPX" for SPX index, "SPY" for SPY ETF
+            callback: Function called when new 5-min bar completes
+                      Signature: callback(symbol, bar_data)
+        """
+        if callback:
+            if symbol not in self._bar_callbacks:
+                self._bar_callbacks[symbol] = []
+            self._bar_callbacks[symbol].append(callback)
+        
+        # Subscribe to aggregated minute bars
+        # AM.* = Aggregated Minute bars
+        if symbol.startswith('I:'):
+            # Index subscription (SPX)
+            clean_symbol = symbol.replace('I:', '')
+            subscribe_msg = {
+                "action": "subscribe",
+                "params": f"AM.{clean_symbol}"  # Aggregated minute for indices
+            }
+            if self._indices_ws:
+                await self._indices_ws.send(json.dumps(subscribe_msg))
+                self.logger.info(f"Subscribed to {symbol} aggregated bars")
+        else:
+            # Stock subscription (SPY)
+            subscribe_msg = {
+                "action": "subscribe",
+                "params": f"AM.{symbol}"  # Aggregated minute for stocks
+            }
+            if self._stocks_ws:
+                await self._stocks_ws.send(json.dumps(subscribe_msg))
+                self.logger.info(f"Subscribed to {symbol} aggregated bars")
+    
+    async def subscribe_quotes(self, option_symbol: str, callback: Callable):
+        """
+        Subscribe to real-time option quotes (for order execution).
+        
+        Args:
+            option_symbol: e.g., "O:SPXW250109C06000000"
+            callback: Function called on quote update
+        """
+        if not self._options_ws:
+            self._options_ws = await websockets.connect(
+                self.OPTIONS_WS_URL,
+                ping_interval=30,
+                ping_timeout=10
+            )
+            await self._authenticate(self._options_ws)
+            asyncio.create_task(self._listen_options())
+        
+        subscribe_msg = {
+            "action": "subscribe",
+            "params": f"Q.{option_symbol}"  # Quote channel for options
+        }
+        await self._options_ws.send(json.dumps(subscribe_msg))
+    
+    # -------------------------------------------------------------------------
+    # WEBSOCKET LISTENERS
+    # -------------------------------------------------------------------------
+    
+    async def _listen_indices(self):
+        """Listen to indices WebSocket (SPX)"""
+        while self._running and self._indices_ws:
+            try:
+                message = await self._indices_ws.recv()
+                await self._process_message(message, 'I:SPX')
+            except websockets.ConnectionClosed:
+                self.logger.warning("Indices WebSocket connection closed")
+                break
+            except Exception as e:
+                self.logger.error(f"Error in indices listener: {e}")
+    
+    async def _listen_stocks(self):
+        """Listen to stocks WebSocket (SPY)"""
+        while self._running and self._stocks_ws:
+            try:
+                message = await self._stocks_ws.recv()
+                await self._process_message(message, 'SPY')
+            except websockets.ConnectionClosed:
+                self.logger.warning("Stocks WebSocket connection closed")
+                break
+            except Exception as e:
+                self.logger.error(f"Error in stocks listener: {e}")
+    
+    async def _listen_options(self):
+        """Listen to options WebSocket (for quotes)"""
+        while self._running and self._options_ws:
+            try:
+                message = await self._options_ws.recv()
+                # Process option quotes for order execution
+                await self._process_option_message(message)
+            except websockets.ConnectionClosed:
+                self.logger.warning("Options WebSocket connection closed")
+                break
+            except Exception as e:
+                self.logger.error(f"Error in options listener: {e}")
+    
+    async def _process_message(self, message: str, default_symbol: str):
+        """
+        Process incoming WebSocket message.
+        
+        Polygon sends 1-minute aggregated bars. We aggregate these into
+        5-minute bars for signal checking.
+        """
+        try:
+            data = json.loads(message)
+            
+            if not isinstance(data, list):
+                return
+            
+            for item in data:
+                ev = item.get('ev')
+                
+                if ev == 'AM':  # Aggregated Minute bar
+                    await self._handle_minute_bar(item, default_symbol)
+                    
+        except json.JSONDecodeError:
+            pass
+        except Exception as e:
+            self.logger.error(f"Error processing message: {e}")
+    
+    async def _handle_minute_bar(self, bar_data: dict, default_symbol: str):
+        """
+        Handle incoming 1-minute bar and aggregate into 5-minute bars.
+        
+        Polygon AM bar format:
+        {
+            "ev": "AM",
+            "sym": "SPY",
+            "v": 1234,       # Volume
+            "av": 12345,     # Accumulated volume
+            "op": 450.00,    # Official open price
+            "vw": 450.50,    # VWAP
+            "o": 450.10,     # Open
+            "c": 450.50,     # Close
+            "h": 450.60,     # High
+            "l": 450.00,     # Low
+            "a": 450.30,     # Today's VWAP
+            "z": 100,        # Average trade size
+            "s": 1704380400000,  # Start timestamp (ms)
+            "e": 1704380460000,  # End timestamp (ms)
+        }
+        """
+        # Determine symbol
+        symbol = bar_data.get('sym', '')
+        if symbol == 'SPX':
+            symbol = 'I:SPX'
+        elif symbol == '' and default_symbol:
+            symbol = default_symbol
+        
+        # Parse bar
+        bar_time = datetime.fromtimestamp(bar_data.get('s', 0) / 1000)
+        
+        # Update latest price
+        close_price = bar_data.get('c', 0)
+        if close_price > 0:
+            self._latest_prices[symbol] = close_price
+        
+        # Check if within market hours (9:30 AM - 4:00 PM ET)
+        if not self._is_market_hours(bar_time):
+            return
+        
+        # Aggregate into 5-minute bars
+        bar_minute = bar_time.minute
+        five_min_slot = (bar_minute // self.bar_size_minutes) * self.bar_size_minutes
+        slot_time = bar_time.replace(minute=five_min_slot, second=0, microsecond=0)
+        
+        # Initialize or update current bar
+        if symbol not in self._current_bars or self._current_bars[symbol].get('slot_time') != slot_time:
+            # New 5-minute bar - save previous if exists
+            if symbol in self._current_bars and self._current_bars[symbol]:
+                await self._finalize_bar(symbol)
+            
+            # Start new bar
+            self._current_bars[symbol] = {
+                'slot_time': slot_time,
+                'timestamp': slot_time,
+                'open': bar_data.get('o', 0),
+                'high': bar_data.get('h', 0),
+                'low': bar_data.get('l', 0),
+                'close': bar_data.get('c', 0),
+                'volume': bar_data.get('v', 0),
+                'bar_count': 1,
+            }
+        else:
+            # Update existing bar
+            current = self._current_bars[symbol]
+            current['high'] = max(current['high'], bar_data.get('h', 0))
+            current['low'] = min(current['low'], bar_data.get('l', 0)) if current['low'] > 0 else bar_data.get('l', 0)
+            current['close'] = bar_data.get('c', 0)
+            current['volume'] += bar_data.get('v', 0)
+            current['bar_count'] += 1
+        
+        # Check if 5-minute bar is complete (received all 5 constituent bars)
+        # Or use time-based completion
+        if self._is_bar_complete(symbol, bar_time):
+            await self._finalize_bar(symbol)
+    
+    def _is_bar_complete(self, symbol: str, current_time: datetime) -> bool:
+        """Check if current 5-minute bar is complete"""
+        if symbol not in self._current_bars:
+            return False
+        
+        current_bar = self._current_bars[symbol]
+        slot_time = current_bar.get('slot_time')
+        
+        if not slot_time:
+            return False
+        
+        # Bar is complete when we're in the next 5-minute slot
+        next_slot = slot_time.minute + self.bar_size_minutes
+        if current_time.minute >= next_slot or (next_slot >= 60 and current_time.minute < self.bar_size_minutes):
+            return True
+        
+        return False
+    
+    async def _finalize_bar(self, symbol: str):
+        """Finalize and store completed 5-minute bar"""
+        if symbol not in self._current_bars:
+            return
+        
+        bar = self._current_bars[symbol]
+        if not bar or bar.get('bar_count', 0) == 0:
+            return
+        
+        # Add to buffer
+        self._bar_buffers[symbol].append({
+            'timestamp': bar['timestamp'],
+            'open': bar['open'],
+            'high': bar['high'],
+            'low': bar['low'],
+            'close': bar['close'],
+            'volume': bar.get('volume', 0),
+        })
+        
+        self.logger.debug(f"Completed 5-min bar for {symbol}: {bar['timestamp']} "
+                         f"O:{bar['open']:.2f} H:{bar['high']:.2f} L:{bar['low']:.2f} C:{bar['close']:.2f}")
+        
+        # Invoke callbacks
+        if symbol in self._bar_callbacks:
+            for callback in self._bar_callbacks[symbol]:
+                try:
+                    await callback(symbol, bar)
+                except Exception as e:
+                    self.logger.error(f"Error in bar callback: {e}")
+        
+        # Clear current bar
+        self._current_bars[symbol] = {}
+    
+    async def _process_option_message(self, message: str):
+        """Process option quote message"""
+        # Handle option quote updates for order execution
+        pass
+    
+    # -------------------------------------------------------------------------
+    # DATA ACCESS
+    # -------------------------------------------------------------------------
+    
+    def get_bars_dataframe(self, symbol: str) -> pd.DataFrame:
+        """
+        Get accumulated bars as DataFrame (for signal checking).
+        
+        Returns DataFrame with columns: timestamp, open, high, low, close, volume
+        """
+        if symbol not in self._bar_buffers:
+            return pd.DataFrame()
+        
+        bars = list(self._bar_buffers[symbol])
+        if not bars:
+            return pd.DataFrame()
+        
+        return pd.DataFrame(bars)
+    
+    def get_latest_price(self, symbol: str) -> float:
+        """Get latest price for symbol"""
+        return self._latest_prices.get(symbol, 0.0)
+    
+    def get_bar_count(self, symbol: str) -> int:
+        """Get number of bars accumulated today"""
+        return len(self._bar_buffers.get(symbol, []))
+    
+    def clear_buffers(self):
+        """Clear bar buffers (call at start of new day)"""
+        for symbol in self._bar_buffers:
+            self._bar_buffers[symbol].clear()
+        self._current_bars = {}
+        self.logger.info("Cleared bar buffers for new trading day")
+    
+    def _is_market_hours(self, dt: datetime) -> bool:
+        """Check if timestamp is during market hours"""
+        market_open = datetime.time(9, 30)
+        market_close = datetime.time(16, 0)
+        return market_open <= dt.time() <= market_close
+    
+    @property
+    def is_connected(self) -> bool:
+        return self._connected

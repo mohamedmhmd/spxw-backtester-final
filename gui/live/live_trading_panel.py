@@ -125,6 +125,7 @@ class LiveTradingPanel(QWidget):
         self.risk_manager = None
         self.approval_gate = None
         self.trade_constructor = None
+        self._polygon_connected = False
         
         # Connection worker
         self._connection_worker: Optional[IBKRConnectionWorker] = None
@@ -259,8 +260,24 @@ class LiveTradingPanel(QWidget):
         self.daily_pnl_label = QLabel("Daily P&L: $0.00")
         self.daily_pnl_label.setFont(QFont('Arial', 11, QFont.Weight.Bold))
         layout.addWidget(self.daily_pnl_label)
+
+        # Add Polygon status indicator
+        self.polygon_status_label = QLabel("Polygon: Disconnected")
+        self.polygon_status_label.setStyleSheet("color: gray;")
+        layout.addWidget(self.polygon_status_label)
         
         return frame
+    
+    def _update_polygon_status(self, connected: bool):
+        """Update Polygon connection status display"""
+        self._polygon_connected = connected
+        if connected:
+            self.polygon_status_label.setText("Polygon: 🟢 Live")
+            self.polygon_status_label.setStyleSheet("color: green; font-weight: bold;")
+        else:
+            self.polygon_status_label.setText("Polygon: 🔴 Disconnected")
+            self.polygon_status_label.setStyleSheet("color: red;")
+
     
     def _create_left_panel(self) -> QWidget:
         """Create the left configuration panel"""
@@ -935,14 +952,15 @@ class LiveTradingPanel(QWidget):
                 max_wing_width=self.max_wing_input.value(),
                 optimize_wings=self.optimize_wings_check.isChecked(),
             )
-            
+            polygon_api_key = "VGG0V1GnGumf21Yw7mMDwg7_derXxQSP"
             self.trading_engine = LiveTradingEngine(
                 config=config,
                 ibkr_connection=self.ibkr_connection,
                 kill_switch=self.kill_switch,
                 risk_manager=self.risk_manager,
                 approval_gate=self.approval_gate,
-                trade_constructor=self.trade_constructor
+                trade_constructor=self.trade_constructor,
+                polygon_api_key=polygon_api_key
             )
             
             # Connect signals

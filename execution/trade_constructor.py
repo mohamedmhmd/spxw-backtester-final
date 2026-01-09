@@ -289,6 +289,51 @@ class LiveTradeConstructor:
         
         return None
     
+
+    async def _construct_iron_condor_live(self, underlying_price: float):
+          """
+    Construct Iron Condor with live option quotes.
+    
+    Uses existing IronCondorBase.find_iron_condor_strikes() but with
+    live timestamp for quote fetching.
+         """
+          from trades.iron_condor_base import IronCondorBase
+    
+          # Use current timestamp for live quotes
+          timestamp = datetime.now()
+    
+          # Find optimal strikes (this uses your existing logic)
+          result = await IronCondorBase.find_iron_condor_strikes(
+        current_price=underlying_price,
+        timestamp=timestamp,
+        strategy=self.config,  # Your strategy config
+        data_provider=self.polygon_provider,  # REST API for quotes
+        target_ratio=self.config.iron_1_target_win_loss_ratio
+    )
+    
+          return result
+    
+    async def get_live_option_quote(self, contract_symbol: str) -> dict:
+          """Get live option quote via WebSocket subscription"""
+          quote_received = asyncio.Event()
+          quote_data = {}
+    
+          async def on_quote(data):
+                quote_data.update(data)
+                quote_received.set()
+    
+          await self.polygon_live.subscribe_quotes(contract_symbol, on_quote)
+    
+          try:
+             await asyncio.wait_for(quote_received.wait(), timeout=5.0)
+             return quote_data
+          except asyncio.TimeoutError:
+             # Fallback to REST API
+             return await self.polygon_provider._get_option_tick_quote(
+            contract_symbol, 
+            datetime.now()
+        )
+    
     async def _get_quotes_for_distance(
         self,
         atm_strike: float,
