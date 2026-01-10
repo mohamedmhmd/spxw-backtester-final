@@ -133,6 +133,7 @@ class LiveTradingPanel(QWidget):
         # State
         self._is_connected = False
         self._account_info = {}
+        self._executed_trades = []
         self._ic1_trade = None
         self._ic2_trade = None
         
@@ -944,24 +945,43 @@ class LiveTradingPanel(QWidget):
         try:
             from engine.live_trading_engine import LiveTradingEngine, LiveEngineConfig
             
-            config = LiveEngineConfig(
-                scan_interval_seconds=self.scan_interval_input.value(),
-                iron_1_target_win_loss_ratio=self.target_ratio_input.value(),
-                iron_1_trade_size=self.trade_size_input.value(),
-                min_wing_width=self.min_wing_input.value(),
-                max_wing_width=self.max_wing_input.value(),
-                optimize_wings=self.optimize_wings_check.isChecked(),
-            )
-            polygon_api_key = "VGG0V1GnGumf21Yw7mMDwg7_derXxQSP"
-            self.trading_engine = LiveTradingEngine(
-                config=config,
-                ibkr_connection=self.ibkr_connection,
-                kill_switch=self.kill_switch,
-                risk_manager=self.risk_manager,
-                approval_gate=self.approval_gate,
-                trade_constructor=self.trade_constructor,
-                polygon_api_key=polygon_api_key
-            )
+            #config = LiveEngineConfig(
+                #scan_interval_seconds=self.scan_interval_input.value(),
+                #iron_1_target_win_loss_ratio=self.target_ratio_input.value(),
+                #iron_1_trade_size=self.trade_size_input.value(),
+                #min_wing_width=self.min_wing_input.value(),
+                #max_wing_width=self.max_wing_input.value(),
+                #optimize_wings=self.optimize_wings_check.isChecked(),
+            #)
+            #polygon_api_key = "VGG0V1GnGumf21Yw7mMDwg7_derXxQSP"
+            #self.trading_engine = LiveTradingEngine(
+                #config=config,
+                #ibkr_connection=self.ibkr_connection,
+                #kill_switch=self.kill_switch,
+                #risk_manager=self.risk_manager,
+                #approval_gate=self.approval_gate,
+                #trade_constructor=self.trade_constructor,
+                #polygon_api_key=polygon_api_key
+            #)
+
+            from engine.mock_live_trading_engine import MockLiveTradingEngine, MockEngineConfig
+
+            config = MockEngineConfig(
+    scan_interval_seconds=60,
+    mock_spx_price=6000.0,
+    wing_width=25,
+    iron_1_trade_size=1,
+)
+
+            self.trading_engine = MockLiveTradingEngine(
+    config=config,
+    ibkr_connection=self.ibkr_connection,
+    kill_switch=self.kill_switch,
+    risk_manager=self.risk_manager,
+    approval_gate=self.approval_gate,
+    trade_constructor=self.trade_constructor,
+    polygon_api_key=""
+)
             
             # Connect signals
             self.trading_engine.state_changed.connect(self._on_engine_state_changed)
@@ -969,6 +989,7 @@ class LiveTradingPanel(QWidget):
             self.trading_engine.trade_submitted.connect(self._on_trade_submitted)
             self.trading_engine.log_message.connect(self._on_engine_log)
             self.trading_engine.price_update.connect(self._on_price_update)
+            self.trading_engine.trade_executed.connect(self._on_trade_executed)
             
             self._log("Trading engine created")
             
@@ -1022,6 +1043,71 @@ class LiveTradingPanel(QWidget):
         if "IC1" in trade_type or "Iron Condor 1" in trade_type:
             self.ic1_status.setText(f"✅ IC1: Signal detected at {details.get('price', '?')}")
             self.ic1_status.setStyleSheet("padding: 3px; color: green; font-weight: bold;")
+
+
+    def _update_pending_table(self):
+        """Update the pending trades table with current approval queue"""
+        if not self.approval_gate:
+           return
+
+        # Get pending trades from approval gate
+        pending_trades = self.approval_gate.get_pending_trades()
+        # Clear and rebuild table
+        self.pending_table.setRowCount(len(pending_trades))
+   
+        for row, (trade_id, pending_trade) in enumerate(pending_trades.items()):
+            # pending_trade is a PendingTrade object, not a dict!
+        
+            # ID
+            self.pending_table.setItem(row, 0, QTableWidgetItem(str(trade_id)[:8]))
+    
+            # Type
+            self.pending_table.setItem(row, 1, QTableWidgetItem(pending_trade.trade_type))
+    
+            # Strikes/Description
+            self.pending_table.setItem(row, 2, QTableWidgetItem(pending_trade.description))
+    
+            # Quantity
+            self.pending_table.setItem(row, 3, QTableWidgetItem(str(pending_trade.quantity)))
+    
+            # Credit
+            self.pending_table.setItem(row, 4, QTableWidgetItem(f"${pending_trade.estimated_credit:.2f}"))
+    
+            # Countdown
+            time_remaining = pending_trade.time_until_auto_send()
+            countdown_text = f"{int(time_remaining)}s" if time_remaining else "Manual"
+            self.pending_table.setItem(row, 5, QTableWidgetItem(countdown_text))
+    
+            # Actions - create approve/reject buttons
+            actions_widget = QWidget()
+            actions_layout = QHBoxLayout(actions_widget)
+            actions_layout.setContentsMargins(2, 2, 2, 2)
+    
+            approve_btn = QPushButton("✅")
+            approve_btn.setMaximumWidth(30)
+            approve_btn.clicked.connect(lambda checked, tid=trade_id: self._approve_trade(tid))
+            actions_layout.addWidget(approve_btn)
+    
+            reject_btn = QPushButton("❌")
+            reject_btn.setMaximumWidth(30)
+            reject_btn.clicked.connect(lambda checked, tid=trade_id: self._reject_trade(tid))
+            actions_layout.addWidget(reject_btn)
+    
+            self.pending_table.setCellWidget(row, 6, actions_widget)
+
+    def _approve_trade(self, trade_id: str):
+        """Approve a specific trade"""
+        if self.approval_gate:
+           self.approval_gate.approve(trade_id)
+           self._log(f"✅ Approved trade: {trade_id}")
+           self._update_pending_table()
+
+    def _reject_trade(self, trade_id: str):
+        """Reject a specific trade"""
+        if self.approval_gate:
+           self.approval_gate.reject(trade_id, "Manual rejection")
+           self._log(f"❌ Rejected trade: {trade_id}")
+           self._update_pending_table()
     
     @pyqtSlot(str, dict)
     def _on_trade_submitted(self, trade_id: str, trade_info: dict):
@@ -1033,6 +1119,55 @@ class LiveTradingPanel(QWidget):
     def _on_engine_log(self, message: str, level: str):
         """Handle log message from engine"""
         self._log(message)
+
+    @pyqtSlot(str, dict)
+    def _on_trade_executed(self, trade_id: str, trade_info: dict):
+        """Handle trade execution"""
+        self._log(f"✅ Trade EXECUTED: {trade_id}")
+    
+        # Add to executed trades list
+        self._executed_trades.append({
+        'trade_id': trade_id,
+        'trade_type': trade_info.get('trade_type', trade_info.get('strikes', 'Unknown')),
+        'strikes': trade_info.get('strikes', trade_info.get('representation', 'N/A')),
+        'quantity': trade_info.get('quantity', 1),
+        'credit': trade_info.get('limit_price', trade_info.get('net_premium', 0)),
+        'status': trade_info.get('status', 'Filled'),
+        'timestamp': datetime.now(),
+    })
+    
+        # Update the positions table
+        self._update_positions_table()
+    
+        # Also update pending table (remove from pending)
+        self._update_pending_table()
+
+    def _update_positions_table(self):
+        """Update the positions table with executed trades"""
+        self.positions_table.setRowCount(len(self._executed_trades))
+    
+        for row, trade in enumerate(self._executed_trades):
+            # Type
+            self.positions_table.setItem(row, 0, QTableWidgetItem(str(trade.get('trade_type', 'Unknown'))))
+        
+            # Strikes
+            strikes = trade.get('strikes', 'N/A')
+            if isinstance(strikes, dict):
+               strikes = f"{strikes.get('long_put', '')}/{strikes.get('short_put', '')} - {strikes.get('short_call', '')}/{strikes.get('long_call', '')}"
+            self.positions_table.setItem(row, 1, QTableWidgetItem(str(strikes)))
+        
+            # Qty
+            self.positions_table.setItem(row, 2, QTableWidgetItem(str(trade.get('quantity', 1))))
+        
+            # Entry Credit
+            credit = trade.get('credit', 0)
+            self.positions_table.setItem(row, 3, QTableWidgetItem(f"${credit:.2f}" if credit else "N/A"))
+        
+            # Current P&L (would need live updates from IBKR)
+            self.positions_table.setItem(row, 4, QTableWidgetItem("--"))
+        
+            # Status
+            self.positions_table.setItem(row, 5, QTableWidgetItem(trade.get('status', 'Open')))
     
     @pyqtSlot(float, float)
     def _on_price_update(self, spx_price: float, spy_price: float):
@@ -1097,6 +1232,7 @@ class LiveTradingPanel(QWidget):
     def _on_trade_pending(self, trade_id: str, trade_info: dict):
         """Handle new pending trade"""
         self._log(f"Trade {trade_id} pending: {trade_info.get('trade_type', 'Unknown')}")
+        self._update_pending_table()
     
     def _on_trade_approved(self, trade_id: str):
         """Handle trade approved"""
