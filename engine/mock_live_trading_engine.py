@@ -1,21 +1,25 @@
 """
-Mock Live Trading Engine - IBKR Integration Version
+Mock Live Trading Engine - IBKR Integration Version (FIXED)
 
 This version:
 1. Submits trades through the approval gate (appears in pending table)
 2. When approved, actually sends orders to IBKR TWS/Gateway
 3. Updates positions table after execution
+
+FIXED: Uses dedicated IB event loop thread to avoid asyncio conflicts with PyQt.
 """
 
 import logging
-import asyncio
 from datetime import datetime, time, timedelta, date
 from typing import Optional, Dict, List, Any
 from dataclasses import dataclass, field
 from enum import Enum
-import random
 
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
+from ib_insync import Index
+
+# Import the dedicated IB loop
+from engine.ib_loop import get_ib_loop, get_ib_signals, start_ib_loop
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +96,8 @@ class MockTradeConstruction:
 class MockLiveTradingEngine(QObject):
     """
     Mock trading engine that sends real orders to IBKR when approved.
+    
+    FIXED: Uses dedicated IB event loop thread for all async IBKR operations.
     """
     
     state_changed = pyqtSignal(str)
@@ -129,6 +135,10 @@ class MockLiveTradingEngine(QObject):
         
         self._loop_timer = QTimer()
         self._loop_timer.timeout.connect(self._run_loop_iteration)
+        
+        # Get the IB loop (ensure it's started)
+        self._ib_loop = get_ib_loop()
+        self._ib_signals = get_ib_signals()
         
         # Connect approval gate execution callback
         if self.approval_gate:
@@ -200,6 +210,10 @@ class MockLiveTradingEngine(QObject):
         if self.kill_switch and self.kill_switch.is_engaged():
             errors.append("Kill switch is engaged")
         
+        # Ensure IB loop is running
+        if not self._ib_loop.is_alive():
+            errors.append("IB event loop not running - call start_ib_loop() at app startup")
+        
         if errors:
             for error in errors:
                 self._log(f"❌ Pre-flight failed: {error}", "error")
@@ -210,6 +224,8 @@ class MockLiveTradingEngine(QObject):
         return True
     
     def _run_loop_iteration(self):
+        import random
+        
         if self.kill_switch and self.kill_switch.is_engaged():
             self._log("Kill switch engaged - stopping", "warning")
             self.stop()
@@ -230,15 +246,25 @@ class MockLiveTradingEngine(QObject):
         """Create and submit a mock trade to the approval gate"""
         
         # Calculate strikes
-        atm_strike = round(self._current_spx_price / 5) * 5
-        wing_width = self.config.wing_width
+        #spx_index = Index('SPX', 'CBOE')
+        #self.ibkr.ib.qualifyContracts(spx_index)
+
+        #self.ibkr.ib.reqMarketDataType(4)  # Use delayed data if no subscription
+
+        #ticker = self.ibkr.ib.reqTickers(spx_index)[0]
+        #self.ibkr.ib.sleep(2)
         
+        spx_price = 5997.5 #ticker.marketPrice()
+        
+        atm_strike = round(spx_price / 5) * 5
+        wing_width = 25
+    
         strikes = {
-            'short_call': atm_strike,
-            'short_put': atm_strike,
-            'long_call': atm_strike + wing_width,
-            'long_put': atm_strike - wing_width,
-        }
+        'long_put': atm_strike - wing_width,
+        'short_put': atm_strike,
+        'short_call': atm_strike,
+        'long_call': atm_strike + wing_width,
+    }
         
         # Get today's expiry for 0DTE
         expiry = date.today().strftime('%Y%m%d')
@@ -273,23 +299,10 @@ class MockLiveTradingEngine(QObject):
         """
         Called by approval gate when trade is approved.
         This actually sends the order to IBKR!
+        
+        FIXED: Uses dedicated IB event loop thread - NO blocking, NO nested loops.
         """
         self._log(f"🚀 Executing approved trade: {getattr(trade_data, 'trade_type', 'Unknown')}", "info")
-        
-        # Run async execution
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.ensure_future(self._async_execute_to_ibkr(trade_data))
-            else:
-                loop.run_until_complete(self._async_execute_to_ibkr(trade_data))
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self._async_execute_to_ibkr(trade_data))
-    
-    async def _async_execute_to_ibkr(self, trade_data):
-        """Build and send order to IBKR"""
         
         if not self.ibkr or not self.ibkr.is_connected():
             self._log("❌ IBKR not connected - cannot execute", "error")
@@ -299,9 +312,43 @@ class MockLiveTradingEngine(QObject):
             self._log("❌ Kill switch engaged - cannot execute", "error")
             return
         
+        # Submit to the dedicated IB event loop - NON-BLOCKING
+        future = self._ib_loop.submit(self._async_execute_to_ibkr(trade_data))
+        
+        # Add callback for when execution completes
+        future.add_done_callback(
+            lambda f: self._on_execution_complete(f, trade_data)
+        )
+    
+    def _on_execution_complete(self, future, trade_data):
+        """
+        Callback when async execution completes.
+        This runs in the IB loop thread, so we emit a signal to update UI safely.
+        """
+        try:
+            result = future.result()
+            if result:
+                # Emit signal to update UI (thread-safe via Qt signals)
+                self.trade_executed.emit(
+                    str(result.get('order_id', 'unknown')),
+                    result
+                )
+        except Exception as e:
+            self._log(f"❌ Execution callback error: {e}", "error")
+            self.error_occurred.emit(str(e))
+    
+    async def _async_execute_to_ibkr(self, trade_data) -> Optional[dict]:
+        """
+        Build and send order to IBKR.
+        
+        This runs in the dedicated IB event loop thread.
+        Returns dict with order info on success, None on failure.
+        """
         try:
             from ib_insync import Option, Contract, ComboLeg, LimitOrder
             
+            
+
             strikes = trade_data.strikes
             expiry = trade_data.expiry
             quantity = trade_data.quantity
@@ -323,15 +370,16 @@ class MockLiveTradingEngine(QObject):
                     right=right,
                     exchange='SMART',
                     currency='USD',
-                    multiplier='100'
+                    multiplier='100',
                 )
                 leg_contracts[leg_type] = opt
             
-            # Qualify all contracts
+            # Qualify all contracts - use async version
             self._log("   Qualifying contracts with IBKR...", "info")
             all_opts = list(leg_contracts.values())
             
-            qualified = self.ibkr.ib.qualifyContracts(*all_opts)
+            # Use the async qualify method
+            qualified = await self.ibkr.ib.qualifyContractsAsync(*all_opts)
             
             # Check qualification
             qualified_count = sum(1 for c in all_opts if c.conId > 0)
@@ -339,7 +387,7 @@ class MockLiveTradingEngine(QObject):
                 self._log(f"❌ Only qualified {qualified_count}/4 contracts", "error")
                 for leg_type, opt in leg_contracts.items():
                     self._log(f"   {leg_type}: conId={opt.conId}, strike={opt.strike}", "info")
-                return
+                return None
             
             self._log(f"   ✅ All 4 contracts qualified", "info")
             
@@ -384,24 +432,22 @@ class MockLiveTradingEngine(QObject):
             self._log(f"✅ Order placed! Order ID: {trade.order.orderId}", "info")
             self._log(f"   Status: {trade.orderStatus.status}", "info")
             
-            # Emit execution signal
-            self.trade_executed.emit(
-                str(trade.order.orderId),
-                {
-                    'order_id': trade.order.orderId,
-                    'status': trade.orderStatus.status,
-                    'strikes': trade_data.representation,
-                    'quantity': quantity,
-                    'limit_price': limit_price,
-                }
-            )
+            return {
+                'order_id': trade.order.orderId,
+                'status': trade.orderStatus.status,
+                'strikes': trade_data.representation,
+                'quantity': quantity,
+                'limit_price': limit_price,
+            }
             
         except ImportError as e:
             self._log(f"❌ ib_insync not available: {e}", "error")
+            return None
         except Exception as e:
             self._log(f"❌ Error executing order: {e}", "error")
             import traceback
             self._log(traceback.format_exc(), "error")
+            return None
     
     def _log(self, message: str, level: str = "info"):
         if level == "info":

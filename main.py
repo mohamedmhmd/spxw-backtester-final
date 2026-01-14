@@ -9,6 +9,7 @@ import logging
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
+from engine.ib_loop import start_ib_loop, stop_ib_loop
 
 # Set up logging
 logging.basicConfig(
@@ -24,10 +25,14 @@ def main():
     
     # Set application style
     app.setStyle('Fusion')
+    start_ib_loop()
+    logger.info("IB Event Loop started")
     
     # Create and show main window
     window = MainWindow()
     window.show()
+
+    app.aboutToQuit.connect(stop_ib_loop)
     
     sys.exit(app.exec())
 

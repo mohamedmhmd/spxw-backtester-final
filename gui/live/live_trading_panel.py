@@ -18,6 +18,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThread, pyqtSlot
 from PyQt6.QtGui import QFont, QColor
 
+from guardrails.approval_gate import ApprovalGate
+
 logger = logging.getLogger(__name__)
 
 # Import IBKR components from Milestone 1
@@ -30,80 +32,7 @@ except ImportError:
     logger.warning("IBKR components not available - connection disabled")
 
 
-class IBKRConnectionWorker(QThread):
-    """Background worker for IBKR connection operations"""
-    
-    connection_success = pyqtSignal(object)  # Emits IBKRConnection
-    connection_failed = pyqtSignal(str)      # Emits error message
-    disconnected = pyqtSignal()
-    account_update = pyqtSignal(dict)        # Emits account info
-    
-    def __init__(self, config: 'IBKRConfig', kill_switch, action: str = "connect"):
-        super().__init__()
-        self.config = config
-        self.kill_switch = kill_switch
-        self.action = action
-        self.connection: Optional['IBKRConnection'] = None
-    
-    def run(self):
-        """Run connection in background thread"""
-        try:
-            if self.action == "connect":
-                self._do_connect()
-            elif self.action == "disconnect":
-                self._do_disconnect()
-        except Exception as e:
-            logger.error(f"Connection worker error: {e}")
-            self.connection_failed.emit(str(e))
-    
-    def _do_connect(self):
-        """Perform connection"""
-        try:
-            # Create new event loop for this thread
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-            # Create connection
-            self.connection = IBKRConnection(self.config, self.kill_switch)
-            
-            # Connect
-            success = loop.run_until_complete(self.connection.connect())
-            
-            if success:
-                logger.info("IBKR connection successful")
-                self.connection_success.emit(self.connection)
-                
-                # Get initial account info
-                account_info = loop.run_until_complete(self._get_account_info())
-                if account_info:
-                    self.account_update.emit(account_info)
-            else:
-                self.connection_failed.emit("Connection failed - check TWS/Gateway is running")
-            
-            loop.close()
-            
-        except Exception as e:
-            logger.error(f"Connection error: {e}")
-            self.connection_failed.emit(str(e))
-    
-    def _do_disconnect(self):
-        """Perform disconnection"""
-        if self.connection:
-            self.connection.disconnect()
-        self.disconnected.emit()
-    
-    async def _get_account_info(self) -> dict:
-        """Get account information"""
-        if not self.connection or not self.connection.is_connected():
-            return {}
-        
-        try:
-            summary = await self.connection.get_account_summary()
-            return summary
-        except Exception as e:
-            logger.error(f"Error getting account info: {e}")
-            return {}
-
+from engine.ibrkr_manager import IBKRConnectionManager
 
 class LiveTradingPanel(QWidget):
     """
@@ -123,13 +52,13 @@ class LiveTradingPanel(QWidget):
         self.kill_switch = None
         self.ibkr_connection: Optional['IBKRConnection'] = None
         self.risk_manager = None
-        self.approval_gate = None
+        self.approval_gate = ApprovalGate()
         self.trade_constructor = None
         self._polygon_connected = False
-        
-        # Connection worker
-        self._connection_worker: Optional[IBKRConnectionWorker] = None
-        
+
+        # Connection manager
+        self._connection_manager: Optional[IBKRConnectionManager] = None
+
         # State
         self._is_connected = False
         self._account_info = {}
@@ -704,11 +633,11 @@ class LiveTradingPanel(QWidget):
         self._log(f"Connecting to {host}:{port} (Client ID: {client_id})...")
         
         # Start connection in background
-        self._connection_worker = IBKRConnectionWorker(config, self.kill_switch, "connect")
-        self._connection_worker.connection_success.connect(self._on_connection_success)
-        self._connection_worker.connection_failed.connect(self._on_connection_failed)
-        self._connection_worker.account_update.connect(self._on_account_update)
-        self._connection_worker.start()
+        self._connection_manager = IBKRConnectionManager(config, self.kill_switch)
+        self._connection_manager.connection_success.connect(self._on_connection_success)
+        self._connection_manager.connection_failed.connect(self._on_connection_failed)
+        self._connection_manager.account_update.connect(self._on_account_update)
+        self._connection_manager.connect()  # Non-blocking!
     
     def _on_disconnect_clicked(self):
         """Handle disconnect button click"""
@@ -943,7 +872,7 @@ class LiveTradingPanel(QWidget):
     def _create_trading_engine(self):
         """Create the trading engine instance"""
         try:
-            from engine.live_trading_engine import LiveTradingEngine, LiveEngineConfig
+            #from engine.live_trading_engine import LiveTradingEngine, LiveEngineConfig
             
             #config = LiveEngineConfig(
                 #scan_interval_seconds=self.scan_interval_input.value(),
